@@ -79,6 +79,7 @@ namespace NetJSON {
             _typeType = typeof(Type),
             _voidType = typeof(void),
             _intType = typeof(int),
+            _longType = typeof(long),
             _jsonType = typeof(NetJSON),
             _textWriterType = typeof(TextWriter),
             _textReaderType = typeof(TextReader);
@@ -91,6 +92,7 @@ namespace NetJSON {
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
             _generatorGetStringBuilder = _jsonType.GetMethod("GetStringBuilder", MethodBinding),
             _generatorIntToStr = _jsonType.GetMethod("IntToStr", MethodBinding),
+            _generatorLongToStr = _jsonType.GetMethod("LongToStr", MethodBinding),
             _generatorDateToString = _jsonType.GetMethod("DateToString", MethodBinding),
             _generatorDateToISOFormat = _jsonType.GetMethod("DateToISOFormat", MethodBinding),
             _objectToString = _objectType.GetMethod("ToString", Type.EmptyTypes),
@@ -175,6 +177,9 @@ namespace NetJSON {
 
         static readonly ConcurrentDictionary<Type, bool> _primitiveTypes =
             new ConcurrentDictionary<Type, bool>();
+
+        static readonly ConcurrentDictionary<Type, Type> _nullableTypes =
+            new ConcurrentDictionary<Type, Type>();
 
         static readonly ConcurrentDictionary<int, StringBuilder> _stringBuilders =
             new ConcurrentDictionary<int, StringBuilder>();
@@ -282,6 +287,104 @@ namespace NetJSON {
             return new string(s);
         }
 
+        public unsafe static string LongToStr(long snum) {
+            char* s = stackalloc char[21];
+            char* ps = s;
+            long num1 = snum, num2, num3, num4, num5, div;
+
+            if (snum < 0) {
+                *ps++ = '-';
+                if (snum == -9223372036854775808) return "-9223372036854775808";
+                num1 = -snum;
+            }
+
+            if (num1 < 10000) {
+                if (num1 < 10) goto L1;
+                if (num1 < 100) goto L2;
+                if (num1 < 1000) goto L3;
+            } else {
+                num2 = num1 / 10000;
+                num1 -= num2 * 10000;
+                if (num2 < 10000) {
+                    if (num2 < 10) goto L5;
+                    if (num2 < 100) goto L6;
+                    if (num2 < 1000) goto L7;
+                } else {
+                    num3 = num2 / 10000;
+                    num2 -= num3 * 10000;
+                    if (num3 < 10000) {
+                        if (num3 < 10) goto L9;
+                        if (num3 < 100) goto L10;
+                        if (num3 < 1000) goto L11;
+                    } else {
+                        num4 = num3 / 10000;
+                        num3 -= num4 * 10000;
+                        if (num4 < 10000) {
+                            if (num4 < 10) goto L13;
+                            if (num4 < 100) goto L14;
+                            if (num4 < 1000) goto L15;
+                        } else {
+                            num5 = num4 / 10000;
+                            num4 -= num5 * 10000;
+                            if (num5 < 10000) {
+                                if (num5 < 10) goto L17;
+                                if (num5 < 100) goto L18;
+                            }
+                            *ps++ = (char)('0' + (div = (num5 * 5243) >> 19));
+                            num5 -= div * 100;
+                        L18:
+                            *ps++ = (char)('0' + (div = (num5 * 6554) >> 16));
+                            num5 -= div * 10;
+                        L17:
+                            *ps++ = (char)('0' + (num5));
+                        }
+                        *ps++ = (char)('0' + (div = (num4 * 8389) >> 23));
+                        num4 -= div * 1000;
+                    L15:
+                        *ps++ = (char)('0' + (div = (num4 * 5243) >> 19));
+                        num4 -= div * 100;
+                    L14:
+                        *ps++ = (char)('0' + (div = (num4 * 6554) >> 16));
+                        num4 -= div * 10;
+                    L13:
+                        *ps++ = (char)('0' + (num4));
+                    }
+                    *ps++ = (char)('0' + (div = (num3 * 8389) >> 23));
+                    num3 -= div * 1000;
+                L11:
+                    *ps++ = (char)('0' + (div = (num3 * 5243) >> 19));
+                    num3 -= div * 100;
+                L10:
+                    *ps++ = (char)('0' + (div = (num3 * 6554) >> 16));
+                    num3 -= div * 10;
+                L9:
+                    *ps++ = (char)('0' + (num3));
+                }
+                *ps++ = (char)('0' + (div = (num2 * 8389) >> 23));
+                num2 -= div * 1000;
+            L7:
+                *ps++ = (char)('0' + (div = (num2 * 5243) >> 19));
+                num2 -= div * 100;
+            L6:
+                *ps++ = (char)('0' + (div = (num2 * 6554) >> 16));
+                num2 -= div * 10;
+            L5:
+                *ps++ = (char)('0' + (num2));
+            }
+            *ps++ = (char)('0' + (div = (num1 * 8389) >> 23));
+            num1 -= div * 1000;
+        L3:
+            *ps++ = (char)('0' + (div = (num1 * 5243) >> 19));
+            num1 -= div * 100;
+        L2:
+            *ps++ = (char)('0' + (div = (num1 * 6554) >> 16));
+            num1 -= div * 10;
+        L1:
+            *ps++ = (char)('0' + (num1));
+
+            return new string(s);
+        }
+
         private static bool IsPrimitiveType(this Type type) {
             return _primitiveTypes.GetOrAdd(type, key => {
                 if (key.IsGenericType &&
@@ -293,6 +396,12 @@ namespace NetJSON {
                     key == _decimalType || key == _timeSpanType ||
                     key == _guidType ||
                     key.IsEnum || key == _byteArrayType;
+            });
+        }
+
+        private static Type GetNullableType(this Type type) {
+            return _nullableTypes.GetOrAdd(type, key => {
+                return key.Name.StartsWith("Nullable`") ? key.GetGenericArguments()[0] : null;
             });
         }
 
@@ -322,17 +431,9 @@ namespace NetJSON {
 
         private static bool _useTickFormat = true;
 
-        private static bool _ignoreNullValue = true;
-
         public static bool UseISOFormat {
             set {
                 _useTickFormat = !value;
-            }
-        }
-
-        public static bool IgnoreNullValue {
-            set {
-                _ignoreNullValue = value;
             }
         }
 
@@ -416,14 +517,14 @@ namespace NetJSON {
             var sbLocal = il.DeclareLocal(_stringBuilderType);
             il.Emit(OpCodes.Call, _generatorGetStringBuilder);
             il.Emit(OpCodes.Callvirt, _stringBuilderClear);
-            il.Emit(OpCodes.Stloc, sbLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, sbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Ldloc, sbLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, sbLocal);
             il.Emit(OpCodes.Call, writeMethod);
 
-            il.Emit(OpCodes.Ldloc, sbLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, sbLocal);
             il.Emit(OpCodes.Callvirt, _stringBuilderToString);
             il.Emit(OpCodes.Ret);
 
@@ -432,15 +533,15 @@ namespace NetJSON {
             var wsbLocal = wil.DeclareLocal(_stringBuilderType);
             wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
             wil.Emit(OpCodes.Callvirt, _stringBuilderClear);
-            wil.Emit(OpCodes.Stloc, wsbLocal.LocalIndex);
+            wil.Emit(OpCodes.Stloc, wsbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);
             wil.Emit(OpCodes.Ldarg_1);
-            wil.Emit(OpCodes.Ldloc, wsbLocal.LocalIndex);
+            wil.Emit(OpCodes.Ldloc, wsbLocal);
             wil.Emit(OpCodes.Call, writeMethod);
 
             wil.Emit(OpCodes.Ldarg_2);
-            wil.Emit(OpCodes.Ldloc, wsbLocal.LocalIndex);
+            wil.Emit(OpCodes.Ldloc, wsbLocal);
             wil.Emit(OpCodes.Callvirt, _stringBuilderToString);
             wil.Emit(OpCodes.Callvirt, _textWriterWrite);
             wil.Emit(OpCodes.Ret);
@@ -786,7 +887,7 @@ namespace NetJSON {
                         il.MarkLabel(boolLabel);
 
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldloc, boolLocal.LocalIndex);
+                        il.Emit(OpCodes.Ldloc, boolLocal);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (type.IsEnum) {
@@ -885,15 +986,15 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Callvirt,
                 _genericDictType.MakeGenericType(keyType, valueType).GetMethod("GetEnumerator"));
-            il.Emit(OpCodes.Stloc_S, enumeratorLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc_S, enumeratorLocal);
             il.BeginExceptionBlock();
             il.Emit(OpCodes.Br, startEnumeratorLabel);
             il.MarkLabel(moveNextLabel);
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
             il.Emit(OpCodes.Call,
                 enumeratorLocal.LocalType.GetProperty("Current")
                 .GetGetMethod());
-            il.Emit(OpCodes.Stloc, entryLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, entryLocal);
 
             il.Emit(OpCodes.Ldloc, hasItem);
             il.Emit(OpCodes.Brfalse, hasItemLabel);
@@ -908,7 +1009,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldstr, QuotChar);
 
-            il.Emit(OpCodes.Ldloca, entryLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloca, entryLocal);
             il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Key").GetGetMethod());
             if (keyType.IsValueType)
                 il.Emit(OpCodes.Box, keyType);
@@ -923,7 +1024,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Pop);
 
             //il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldloca, entryLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloca, entryLocal);
             il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Value").GetGetMethod());
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, valueType));
@@ -932,12 +1033,12 @@ namespace NetJSON {
             il.Emit(OpCodes.Stloc, hasItem);
 
             il.MarkLabel(startEnumeratorLabel);
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
             il.Emit(OpCodes.Call, enumeratorType.GetMethod("MoveNext", MethodBinding));
             il.Emit(OpCodes.Brtrue, moveNextLabel);
             il.Emit(OpCodes.Leave, endEnumeratorLabel);
             il.BeginFinallyBlock();
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
             il.Emit(OpCodes.Constrained, enumeratorLocal.LocalType);
             il.Emit(OpCodes.Callvirt, _iDisposableDispose);
             il.EndExceptionBlock();
@@ -961,49 +1062,49 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldlen);
                 il.Emit(OpCodes.Conv_I4);
-                il.Emit(OpCodes.Stloc, countLocal.LocalIndex);
+                il.Emit(OpCodes.Stloc, countLocal);
             } else {
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Callvirt, type.GetMethod("get_Count"));
-                il.Emit(OpCodes.Stloc, countLocal.LocalIndex);
+                il.Emit(OpCodes.Stloc, countLocal);
             }
 
-            il.Emit(OpCodes.Ldloc, countLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, countLocal);
             il.Emit(OpCodes.Ldc_I4_1);
             il.Emit(OpCodes.Sub);
-            il.Emit(OpCodes.Stloc, diffLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, diffLocal);
 
 
             il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Stloc, indexLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, indexLocal);
             il.Emit(OpCodes.Br, startLabel);
             il.MarkLabel(endLabel);
             il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldloc, indexLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, indexLocal);
             if (isArray)
                 il.Emit(OpCodes.Ldelem, itemType);
             else
                 il.Emit(OpCodes.Callvirt, type.GetMethod("get_Item"));
-            il.Emit(OpCodes.Stloc, itemLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, itemLocal);
 
 
             //il.Emit(OpCodes.Ldarg_0);
 
-            if (itemLocal.LocalType == _intType) {
+            if (itemType == _intType || itemType == _longType) {
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldloc, itemLocal.LocalIndex);
-                il.Emit(OpCodes.Call, _generatorIntToStr);
+                il.Emit(OpCodes.Ldloc, itemLocal);
+                il.Emit(OpCodes.Call, itemType == _intType ? _generatorIntToStr : _generatorLongToStr);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
             } else {
-                il.Emit(OpCodes.Ldloc, itemLocal.LocalIndex);
+                il.Emit(OpCodes.Ldloc, itemLocal);
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, itemType));
             }
 
 
-            il.Emit(OpCodes.Ldloc, indexLocal.LocalIndex);
-            il.Emit(OpCodes.Ldloc, diffLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, indexLocal);
+            il.Emit(OpCodes.Ldloc, diffLocal);
             il.Emit(OpCodes.Beq, checkCountLabel);
 
             il.Emit(OpCodes.Ldarg_1);
@@ -1015,15 +1116,16 @@ namespace NetJSON {
             il.MarkLabel(checkCountLabel);
 
 
-            il.Emit(OpCodes.Ldloc, indexLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, indexLocal);
             il.Emit(OpCodes.Ldc_I4_1);
             il.Emit(OpCodes.Add);
-            il.Emit(OpCodes.Stloc, indexLocal.LocalIndex);
+            il.Emit(OpCodes.Stloc, indexLocal);
             il.MarkLabel(startLabel);
-            il.Emit(OpCodes.Ldloc, indexLocal.LocalIndex);
-            il.Emit(OpCodes.Ldloc, countLocal.LocalIndex);
+            il.Emit(OpCodes.Ldloc, indexLocal);
+            il.Emit(OpCodes.Ldloc, countLocal);
             il.Emit(OpCodes.Blt, endLabel);
         }
+
 
         internal static void WritePropertiesFor(TypeBuilder typeBuilder, Type type, ILGenerator il) {
 
@@ -1038,32 +1140,42 @@ namespace NetJSON {
             foreach (var prop in props) {
                 var name = prop.Name;
                 var propType = prop.PropertyType;
+                var originPropType = prop.PropertyType;
                 var isPrimitive = propType.IsPrimitiveType();
+                var nullableType = propType.GetNullableType();
+                var isNullable = nullableType != null;
 
-                var isValueType =_ignoreNullValue && propType.IsValueType;
-                var propNullLabel = _ignoreNullValue ? il.DefineLabel() : default(Label);
-                var equalityMethod = _ignoreNullValue ? propType.GetMethod("op_Equality") : null;
-                var propValue = _ignoreNullValue ? il.DeclareLocal(propType) : null;
+                propType = isNullable ? nullableType : propType;
+                var isValueType = propType.IsValueType;
+                var propNullLabel = il.DefineLabel();
+                var equalityMethod = propType.GetMethod("op_Equality");
+                var propValue = il.DeclareLocal(propType);
 
-                if (_ignoreNullValue) {
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-                    il.Emit(OpCodes.Stloc, propValue);
-
-                    il.Emit(OpCodes.Ldloc, propValue);
-                    if (isValueType && isPrimitive) {
-                        LoadDefaultValueByType(il, propType);
-                    } else {
-                        il.Emit(OpCodes.Ldnull);
-                    }
-
-                    if (equalityMethod != null) {
-                        il.Emit(OpCodes.Call, equalityMethod);
-                        il.Emit(OpCodes.Brtrue, propNullLabel);
-                    } else {
-                        il.Emit(OpCodes.Beq, propNullLabel);
-                    }
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+                if (isNullable) {
+                    var nullablePropValue = il.DeclareLocal(originPropType);
+                    il.Emit(OpCodes.Stloc, nullablePropValue);
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
                 }
+
+                il.Emit(OpCodes.Stloc, propValue);
+
+                il.Emit(OpCodes.Ldloc, propValue);
+                if (isValueType && isPrimitive) {
+                    LoadDefaultValueByType(il, propType);
+                } else {
+                    il.Emit(OpCodes.Ldnull);
+                }
+
+                if (equalityMethod != null) {
+                    il.Emit(OpCodes.Call, equalityMethod);
+                    il.Emit(OpCodes.Brtrue, propNullLabel);
+                } else {
+                    il.Emit(OpCodes.Beq, propNullLabel);
+                }
+
 
                 if (counter > 0) {
                     il.Emit(OpCodes.Ldarg_1);
@@ -1078,34 +1190,22 @@ namespace NetJSON {
                 il.Emit(OpCodes.Pop);
 
 
-                if (propType == _intType) {
+                if (propType == _intType || propType == _longType) {
                     il.Emit(OpCodes.Ldarg_1);
-                    if (_ignoreNullValue)
-                        il.Emit(OpCodes.Ldloc, propValue);
-                    else {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-                    }
-                    //il.Emit(OpCodes.Box, propType);
-                    il.Emit(OpCodes.Call, _generatorIntToStr);
+                    il.Emit(OpCodes.Ldloc, propValue);
+
+                    il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
                     il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                     il.Emit(OpCodes.Pop);
                 } else {
-                    //il.Emit(OpCodes.Ldarg_0);
-                    if (_ignoreNullValue)
-                        il.Emit(OpCodes.Ldloc, propValue);
-                    else {
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-                    }
+                    il.Emit(OpCodes.Ldloc, propValue);
+
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
                 }
 
+                il.MarkLabel(propNullLabel);
 
-                if (_ignoreNullValue)
-                    il.MarkLabel(propNullLabel);
-                
                 counter++;
             }
 
@@ -1653,8 +1753,10 @@ namespace NetJSON {
                 var propName = prop.Name;
                 var conditionLabel = il.DefineLabel();
                 var propType = prop.PropertyType;
-                
-                
+                var nullableType = propType.GetNullableType();
+                var isNullable = nullableType != null;
+                propType = isNullable ? nullableType : propType;
+
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, propName);
                 il.Emit(OpCodes.Call, _stringOpEquality);
@@ -1695,6 +1797,9 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldloc, propValue);
+                    if (isNullable) {
+                        il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
+                    }
                     il.Emit(OpCodes.Callvirt, prop.SetMethod);
 
                     il.Emit(OpCodes.Ret);
