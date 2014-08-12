@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -20,6 +21,9 @@ namespace NetJSON {
 
         public abstract string Serialize(T value);
         public abstract T Deserialize(string value);
+
+        public abstract void Serialize(T value, TextWriter writer);
+        public abstract T Deserialize(TextReader reader);
     }
 
     public static class NetJSON {
@@ -75,7 +79,9 @@ namespace NetJSON {
             _typeType = typeof(Type),
             _voidType = typeof(void),
             _intType = typeof(int),
-            _jsonType = typeof(NetJSON);
+            _jsonType = typeof(NetJSON),
+            _textWriterType = typeof(TextWriter),
+            _textReaderType = typeof(TextReader);
 
         static readonly MethodInfo _stringBuilderToString =
             _stringBuilderType.GetMethod("ToString", Type.EmptyTypes),
@@ -116,6 +122,8 @@ namespace NetJSON {
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
             _getChars = _stringType.GetMethod("get_Chars"),
             _dictSetItem = _dictType.GetMethod("set_Item"),
+            _textWriterWrite = _textWriterType.GetMethod("Write", new []{ _stringType }),
+            _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
         const int Delimeter = (int)',',
@@ -393,8 +401,14 @@ namespace NetJSON {
             var serializeMethod = type.DefineMethod(SerializeStr, MethodAttribute,
                 _stringType, new[] { objType });
 
+            var serializeWithTextWriterMethod = type.DefineMethod(SerializeStr, MethodAttribute,
+                _voidType, new[] { objType, _textWriterType });
+
             var deserializeMethod = type.DefineMethod(DeserializeStr, MethodAttribute,
                 objType, new[] { _stringType });
+
+            var deserializeWithReaderMethod = type.DefineMethod(DeserializeStr, MethodAttribute,
+                objType, new[] { _textReaderType });
 
 
             var il = serializeMethod.GetILGenerator();
@@ -413,18 +427,48 @@ namespace NetJSON {
             il.Emit(OpCodes.Callvirt, _stringBuilderToString);
             il.Emit(OpCodes.Ret);
 
+            var wil = serializeWithTextWriterMethod.GetILGenerator();
+
+            var wsbLocal = wil.DeclareLocal(_stringBuilderType);
+            wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
+            wil.Emit(OpCodes.Callvirt, _stringBuilderClear);
+            wil.Emit(OpCodes.Stloc, wsbLocal.LocalIndex);
+
+            //il.Emit(OpCodes.Ldarg_0);
+            wil.Emit(OpCodes.Ldarg_1);
+            wil.Emit(OpCodes.Ldloc, wsbLocal.LocalIndex);
+            wil.Emit(OpCodes.Call, writeMethod);
+
+            wil.Emit(OpCodes.Ldarg_2);
+            wil.Emit(OpCodes.Ldloc, wsbLocal.LocalIndex);
+            wil.Emit(OpCodes.Callvirt, _stringBuilderToString);
+            wil.Emit(OpCodes.Callvirt, _textWriterWrite);
+            wil.Emit(OpCodes.Ret);
+
             var dil = deserializeMethod.GetILGenerator();
 
             dil.Emit(OpCodes.Ldarg_1);
             dil.Emit(OpCodes.Call, readMethod);
-
             dil.Emit(OpCodes.Ret);
 
+            var rdil = deserializeWithReaderMethod.GetILGenerator();
+
+            rdil.Emit(OpCodes.Ldarg_1);
+            rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+            rdil.Emit(OpCodes.Call, readMethod);
+            rdil.Emit(OpCodes.Ret);
+
             type.DefineMethodOverride(serializeMethod,
-                genericType.GetMethod(SerializeStr));
+                genericType.GetMethod(SerializeStr, new []{ objType }));
+
+            type.DefineMethodOverride(serializeWithTextWriterMethod,
+                genericType.GetMethod(SerializeStr, new []{ objType, _textWriterType }));
 
             type.DefineMethodOverride(deserializeMethod,
-                genericType.GetMethod(DeserializeStr));
+                genericType.GetMethod(DeserializeStr, new []{ _stringType }));
+
+            type.DefineMethodOverride(deserializeWithReaderMethod,
+                genericType.GetMethod(DeserializeStr, new [] { _textReaderType }));
 
             returnType = type.CreateType();
             _types[objType] = returnType;
@@ -1115,9 +1159,19 @@ namespace NetJSON {
                 return GetSerializer<T>().Serialize(value);
         }
 
+        public static void Serialize<T>(T value, TextWriter writer) {
+            //lock (_lockObject)
+            GetSerializer<T>().Serialize(value, writer);
+        }
+
         public static T Deserialize<T>(string json) {
             //lock (_lockObject)
                 return GetSerializer<T>().Deserialize(json);
+        }
+
+        public static T Deserialize<T>(TextReader reader) {
+            //lock (_lockObject)
+            return GetSerializer<T>().Deserialize(reader);
         }
 
         public static object DeserializeObject(string json) {
