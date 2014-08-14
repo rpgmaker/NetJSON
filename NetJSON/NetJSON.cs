@@ -120,6 +120,8 @@ namespace NetJSON {
             _isCharTag = _jsonType.GetMethod("IsCharTag"),
             _isEndChar = _jsonType.GetMethod("IsEndChar", MethodBinding),
             _isArrayEndChar = _jsonType.GetMethod("IsArrayEndChar", MethodBinding),
+            _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
+            _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
             _getChars = _stringType.GetMethod("get_Chars"),
@@ -185,6 +187,9 @@ namespace NetJSON {
             new ConcurrentDictionary<int, StringBuilder>();
 
         static readonly ConcurrentDictionary<int, StringBuilder> _dateStringBuilders =
+            new ConcurrentDictionary<int, StringBuilder>();
+
+        static readonly ConcurrentDictionary<int, StringBuilder> _encodingStringBuilders =
             new ConcurrentDictionary<int, StringBuilder>();
 
         static readonly ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
@@ -579,6 +584,112 @@ namespace NetJSON {
             return returnType;
         }
 
+
+        public static unsafe void SkipProperty(string json, ref int index) {
+            char current = '\0', schar = '\0', echar = '\0', prev = '\0';
+            int count = 0, charCount = 0;
+            bool isBeginEnd = false, isTag = false, isQuote = false;
+            fixed (char* ptr = json) {
+                while (true) {
+                    current = *(ptr + index);
+                    var hasChar = schar != '\0';
+                    if (!hasChar) {
+                        if (current != ' ' && current != ':') {
+                            echar = current == '"' ? '"' :
+                                    current == '{' ? '}' :
+                                    current == '[' ? ']' : '\0';
+                            isQuote = echar == '"';
+                            if (echar == '\0') {
+                                index--;
+                                GetNonStringValue(json, ref index);
+                                return;
+                            }
+                            schar = current;
+                            count = 1;
+                            charCount = 1;
+                        }
+                        ++index;
+                        continue;
+                    }
+                    isBeginEnd = (current == schar || current == echar);
+                    isTag = isBeginEnd && charCount == 0;
+                    if (isTag) count++;
+                    if (count == 2) {
+                        ++index;
+                        break;
+                    }
+                    if (!isTag) {
+                        if (isQuote) {
+                            if (current == '"' && charCount > 0 && prev != '\\') {
+                                ++index;
+                                charCount = 0;
+                                continue;
+                            }
+                        } else {
+                            if (isBeginEnd) {
+                                if (current == schar) charCount++;
+                                else if (current == echar) charCount--;
+                                if (charCount == 0 && prev == echar) index++;
+                            }
+                        }
+                    }
+                    prev = current;
+                    if (current != echar)
+                        ++index;
+                }
+            }
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void EncodedJSONString(StringBuilder sb, string str) {
+            sb.Append(str);
+            return;
+            char c;
+            fixed (char* chr = str) {
+                char* ptr = chr;
+                while ((c = *(ptr++)) != '\0') {
+                    switch (c) {
+                        case '"': sb.Append("\\\""); break;
+                        case '\\': sb.Append(@"\\"); break;
+                        //case '\u0000': sb.Append(@"\u0000"); break; ;
+                        //case '\u0001': sb.Append(@"\u0001"); break; ;
+                        //case '\u0002': sb.Append(@"\u0002"); break; ;
+                        //case '\u0003': sb.Append(@"\u0003"); break; ;
+                        //case '\u0004': sb.Append(@"\u0004"); break; ;
+                        //case '\u0005': sb.Append(@"\u0005"); break; ;
+                        //case '\u0006': sb.Append(@"\u0006"); break; ;
+                        //case '\u0007': sb.Append(@"\u0007"); break; ;
+                        //case '\u0008': sb.Append(@"\b"); break; ;
+                        //case '\u0009': sb.Append(@"\t"); break; ;
+                        //case '\u000A': sb.Append(@"\n"); break; ;
+                        //case '\u000B': sb.Append(@"\u000B"); break; ;
+                        //case '\u000C': sb.Append(@"\f"); break; ;
+                        //case '\u000D': sb.Append(@"\r"); break; ;
+                        //case '\u000E': sb.Append(@"\u000E"); break; ;
+                        //case '\u000F': sb.Append(@"\u000F"); break; ;
+                        //case '\u0010': sb.Append(@"\u0010"); break; ;
+                        //case '\u0011': sb.Append(@"\u0011"); break; ;
+                        //case '\u0012': sb.Append(@"\u0012"); break; ;
+                        //case '\u0013': sb.Append(@"\u0013"); break; ;
+                        //case '\u0014': sb.Append(@"\u0014"); break; ;
+                        //case '\u0015': sb.Append(@"\u0015"); break; ;
+                        //case '\u0016': sb.Append(@"\u0016"); break; ;
+                        //case '\u0017': sb.Append(@"\u0017"); break; ;
+                        //case '\u0018': sb.Append(@"\u0018"); break; ;
+                        //case '\u0019': sb.Append(@"\u0019"); break; ;
+                        //case '\u001A': sb.Append(@"\u001A"); break; ;
+                        //case '\u001B': sb.Append(@"\u001B"); break; ;
+                        //case '\u001C': sb.Append(@"\u001C"); break; ;
+                        //case '\u001D': sb.Append(@"\u001D"); break; ;
+                        //case '\u001E': sb.Append(@"\u001E"); break; ;
+                        //case '\u001F': sb.Append(@"\u001F"); break; ;
+                        default: sb.Append(c); break;
+                    }
+                }
+            }
+        }
+
         public static string GetName(this Type type) {
             var sb = new StringBuilder();
             var arguments =
@@ -809,10 +920,16 @@ namespace NetJSON {
 
                     //il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldarg_0);
-                    if (type == _objectType)
+                    if (type == _objectType){
                         il.Emit(OpCodes.Callvirt, _objectToString);
-                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                    //il.Emit(OpCodes.Pop);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        //il.Emit(OpCodes.Pop);
+                    }
+                    else if (type == _stringType) {
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        //il.Emit(OpCodes.Call, _encodedJSONString);
+                        //il.Emit(OpCodes.Ldarg_1);
+                    }
 
                     if (needQuote) {
                         //il.Emit(OpCodes.Ldarg_2);
@@ -1806,11 +1923,15 @@ namespace NetJSON {
 
                     il.MarkLabel(propNullLabel);
                 }
-                
+
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(conditionLabel);
             }
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Call, _skipProperty);
 
             il.Emit(OpCodes.Ret);
 
