@@ -59,6 +59,7 @@ namespace NetJSON {
             _stringType = typeof(String),
             _byteArrayType = typeof(byte[]),
             _charType = typeof(char),
+            _charPtrType = typeof(char*),
             _guidType = typeof(Guid),
             _boolType = typeof(bool),
             _timeSpanType = typeof(TimeSpan),
@@ -87,6 +88,7 @@ namespace NetJSON {
         static readonly MethodInfo _stringBuilderToString =
             _stringBuilderType.GetMethod("ToString", Type.EmptyTypes),
             _stringBuilderAppend = _stringBuilderType.GetMethod("Append", new[] { _stringType }),
+            _stringBuilderAppendObject = _stringBuilderType.GetMethod("Append", new[] { _objectType }),
             _stringBuilderAppendChar = _stringBuilderType.GetMethod("Append", new[] { _charType }),
             _stringBuilderClear = _stringBuilderType.GetMethod("Clear"),
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
@@ -585,58 +587,57 @@ namespace NetJSON {
         }
 
 
-        public static unsafe void SkipProperty(string json, ref int index) {
+        public static unsafe void SkipProperty(char* ptr, ref int index) {
             char current = '\0', schar = '\0', echar = '\0', prev = '\0';
             int count = 0, charCount = 0;
             bool isBeginEnd = false, isTag = false, isQuote = false;
-            fixed (char* ptr = json) {
-                while (true) {
-                    current = *(ptr + index);
-                    var hasChar = schar != '\0';
-                    if (!hasChar) {
-                        if (current != ' ' && current != ':') {
-                            echar = current == '"' ? '"' :
-                                    current == '{' ? '}' :
-                                    current == '[' ? ']' : '\0';
-                            isQuote = echar == '"';
-                            if (echar == '\0') {
-                                index--;
-                                GetNonStringValue(json, ref index);
-                                return;
-                            }
-                            schar = current;
-                            count = 1;
-                            charCount = 1;
+
+            while (true) {
+                current = *(ptr + index);
+                var hasChar = schar != '\0';
+                if (!hasChar) {
+                    if (current != ' ' && current != ':') {
+                        echar = current == '"' ? '"' :
+                                current == '{' ? '}' :
+                                current == '[' ? ']' : '\0';
+                        isQuote = echar == '"';
+                        if (echar == '\0') {
+                            index--;
+                            GetNonStringValue(ptr, ref index);
+                            return;
                         }
-                        ++index;
-                        continue;
+                        schar = current;
+                        count = 1;
+                        charCount = 1;
                     }
-                    isBeginEnd = (current == schar || current == echar);
-                    isTag = isBeginEnd && charCount == 0;
-                    if (isTag) count++;
-                    if (count == 2) {
-                        ++index;
-                        break;
-                    }
-                    if (!isTag) {
-                        if (isQuote) {
-                            if (current == '"' && charCount > 0 && prev != '\\') {
-                                ++index;
-                                charCount = 0;
-                                continue;
-                            }
-                        } else {
-                            if (isBeginEnd) {
-                                if (current == schar) charCount++;
-                                else if (current == echar) charCount--;
-                                if (charCount == 0 && prev == echar) index++;
-                            }
-                        }
-                    }
-                    prev = current;
-                    if (current != echar)
-                        ++index;
+                    ++index;
+                    continue;
                 }
+                isBeginEnd = (current == schar || current == echar);
+                isTag = isBeginEnd && charCount == 0;
+                if (isTag) count++;
+                if (count == 2) {
+                    ++index;
+                    break;
+                }
+                if (!isTag) {
+                    if (isQuote) {
+                        if (current == '"' && charCount > 0 && prev != '\\') {
+                            ++index;
+                            charCount = 0;
+                            continue;
+                        }
+                    } else {
+                        if (isBeginEnd) {
+                            if (current == schar) charCount++;
+                            else if (current == echar) charCount--;
+                            if (charCount == 0 && prev == echar) index++;
+                        }
+                    }
+                }
+                prev = current;
+                if (current != echar)
+                    ++index;
             }
         }
 
@@ -823,8 +824,30 @@ namespace NetJSON {
 
             var index = il.DeclareLocal(_intType);
 
+            var ptr = il.DeclareLocal(typeof(char*));
+            var pinned = il.DeclareLocal(typeof(string), true);
+
+            var @fixed = il.DefineLabel();
+
+            //fixed
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Stloc, pinned);
+
+            il.Emit(OpCodes.Ldloc, pinned);
+            il.Emit(OpCodes.Conv_I);
+            il.Emit(OpCodes.Dup);
+
+            il.Emit(OpCodes.Brfalse, @fixed);
+            il.Emit(OpCodes.Call, typeof(RuntimeHelpers).GetMethod("get_OffsetToStringData"));
+            il.Emit(OpCodes.Add);
+            il.MarkLabel(@fixed);
+
+            //char* ptr = str;
+            il.Emit(OpCodes.Stloc, ptr);
+
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, index);
+
 
             if (type == _objectType) {
                 var startsWithLabel = il.DefineLabel();
@@ -840,7 +863,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Brfalse, startsWithLabel);
 
                 //IsArray
-                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
                 il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, typeof(List<object>)));
                 il.Emit(OpCodes.Ret);
@@ -851,7 +874,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Brtrue, notStartsWithLabel);
 
                 //IsDictionary
-                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
                 il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, 
                     typeof(Dictionary<string, object>)));
@@ -863,7 +886,7 @@ namespace NetJSON {
             } else {
                 var isArray = type.IsListType() || type.IsArray;
 
-                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
                 if(isArray)
                     il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, type));
@@ -1124,21 +1147,39 @@ namespace NetJSON {
             il.MarkLabel(hasItemLabel);
 
             il.Emit(OpCodes.Ldarg_1);
+
             il.Emit(OpCodes.Ldstr, QuotChar);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
             il.Emit(OpCodes.Ldloca, entryLocal);
             il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Key").GetGetMethod());
             if (keyType.IsValueType)
                 il.Emit(OpCodes.Box, keyType);
-
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
 
             il.Emit(OpCodes.Ldstr, QuotChar);
-            il.Emit(OpCodes.Ldstr, Colon);
-
-            il.Emit(OpCodes.Call, _stringConcat);
-
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
+            il.Emit(OpCodes.Ldstr, Colon);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
             il.Emit(OpCodes.Pop);
+
+            //il.Emit(OpCodes.Ldstr, QuotChar);
+
+            //il.Emit(OpCodes.Ldloca, entryLocal);
+            //il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Key").GetGetMethod());
+            //if (keyType.IsValueType)
+            //    il.Emit(OpCodes.Box, keyType);
+
+
+            //il.Emit(OpCodes.Ldstr, QuotChar);
+            //il.Emit(OpCodes.Ldstr, Colon);
+
+            //il.Emit(OpCodes.Call, _stringConcat);
+
+            //il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+            //il.Emit(OpCodes.Pop);
 
             //il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldloca, entryLocal);
@@ -1413,7 +1454,7 @@ namespace NetJSON {
             return _readMethodBuilders.GetOrAdd("ExtractObjectValue", _ => {
 
                 var method = type.DefineMethod("ExtractObjectValue", StaticMethodAttribute, _objectType,
-                    new[] { _stringType, _intType.MakeByRefType() });
+                    new[] { _charPtrType, _intType.MakeByRefType() });
 
                 var il = method.GetILGenerator();
 
@@ -1538,30 +1579,10 @@ namespace NetJSON {
             Action<ILGenerator, LocalBuilder> endIndexIf = null) {
 
             var current = il.DeclareLocal(_charType);
+            var ptr = il.DeclareLocal(_charPtrType);
             
-            var ptr = il.DeclareLocal(typeof(char*));
-            var pinned = il.DeclareLocal(typeof(string), true);
-
-            var @fixed = il.DefineLabel();
             var startLoop = il.DefineLabel();
             var @break = needBreak ? il.DefineLabel() : default(Label);
-
-
-            //fixed
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Stloc, pinned);
-
-            il.Emit(OpCodes.Ldloc, pinned);
-            il.Emit(OpCodes.Conv_I);
-            il.Emit(OpCodes.Dup);
-
-            il.Emit(OpCodes.Brfalse, @fixed);
-            il.Emit(OpCodes.Call, typeof(RuntimeHelpers).GetMethod("get_OffsetToStringData"));
-            il.Emit(OpCodes.Add);
-            il.MarkLabel(@fixed);
-
-            //char* ptr = str;
-            il.Emit(OpCodes.Stloc, ptr);
 
             //Logic before loop
 
@@ -1569,6 +1590,8 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, current);
 
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Stloc, ptr);
             
             if (beforeAction != null)
                 beforeAction(il, ptr);
@@ -1757,7 +1780,7 @@ namespace NetJSON {
             var methodName = String.Concat(ExtractStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _stringType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType() });
             _extractMethodBuilders[key] = method;
 
             var il = method.GetILGenerator();
@@ -1813,7 +1836,7 @@ namespace NetJSON {
                 return DateTime.MinValue;
             else if (value == "\\/Date(253402300800)\\/")
                 return DateTime.MaxValue;
-            else if (value.StartsWith("\\/Date(")) {
+            else if (value[0] == '\\') {
                 var ticks = FastStringToLong(value.Substring(7, value.IndexOf(')',7) - 7));
                 return new DateTime(1970, 1, 1).AddSeconds(ticks);
             }
@@ -1857,7 +1880,7 @@ namespace NetJSON {
             var methodName = String.Concat(SetStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                _voidType, new[] { _stringType, _intType.MakeByRefType(), type, _stringType });
+                _voidType, new[] { _charPtrType, _intType.MakeByRefType(), type, _stringType });
             _setValueMethodBuilders[key] = method;
 
             const bool Optimized = true;
@@ -1965,7 +1988,7 @@ namespace NetJSON {
             var methodName = String.Concat(CreateListStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _stringType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType() });
             _createListMethodBuilders[key] = method;
 
             var il = method.GetILGenerator();
@@ -2229,7 +2252,7 @@ namespace NetJSON {
             var methodName = String.Concat(CreateClassOrDictStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _stringType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType() });
             _readMethodBuilders[key] = method;
 
             var il = method.GetILGenerator();
@@ -2574,53 +2597,50 @@ namespace NetJSON {
         }
 
 
-        public unsafe static string GetStringBasedValue(string json, ref int index) {
+        public unsafe static string GetStringBasedValue(char* ptr, ref int index) {
             char current = '\0', prev = '\0';
             int count = 0, startIndex = 0;
             string value = string.Empty;
-            
-            fixed (char* ptr = json) {
-                while (true) {
-                    current = *(ptr + index);
-                    if (count == 0 && current == '"') {
-                        startIndex = index + 1;
-                        ++count;
-                    } else if (count > 0 && current == '"' && prev != '\\') {
-                        value = new string(ptr, startIndex, index - startIndex);
-                        ++index;
-                        break;
-                    } else if (count == 0 && current == 'n') {
-                        index += 3;
-                        return null;
-                    }
 
-                    prev = current;
+
+            while (true) {
+                current = ptr[index];//*(ptr + index);
+                if (count == 0 && current == '"') {
+                    startIndex = index + 1;
+                    ++count;
+                } else if (count > 0 && current == '"' && prev != '\\') {
+                    value = new string(ptr, startIndex, index - startIndex);
                     ++index;
+                    break;
+                } else if (count == 0 && current == 'n') {
+                    index += 3;
+                    return null;
                 }
+
+                prev = current;
+                ++index;
             }
 
             return value;
         }
 
-        public unsafe static string GetNonStringValue(string json, ref int index) {
+        public unsafe static string GetNonStringValue(char* ptr, ref int index) {
             char current = '\0';
             int startIndex = -1;
             string value = string.Empty;
 
-            fixed (char* ptr = json) {
-                while (true) {
-                    current = *(ptr + index);
-                    if (current != ' ' && current != ':') {
-                        if (startIndex == -1)
-                            startIndex = index;
-                        if (current == ',' || current == ']' || current == '}') {
-                            value = new string(ptr, startIndex, index - startIndex);
-                            --index;
-                            break;
-                        }
+            while (true) {
+                current = ptr[index];//*(ptr + index);
+                if (current != ' ' && current != ':') {
+                    if (startIndex == -1)
+                        startIndex = index;
+                    if (current == ',' || current == ']' || current == '}') {
+                        value = new string(ptr, startIndex, index - startIndex);
+                        --index;
+                        break;
                     }
-                    ++index;
                 }
+                ++index;
             }
             if (value == "null")
                 return null;
