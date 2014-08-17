@@ -54,9 +54,6 @@
   <ItemGroup>
     <Folder Include="lib\net40\" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="BackUp.txt" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>copy "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net40\$(TargetFileName)"</PostBuildEvent>
