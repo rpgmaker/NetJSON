@@ -24,9 +24,15 @@ namespace NetJSON {
 
         public abstract void Serialize(T value, TextWriter writer);
         public abstract T Deserialize(TextReader reader);
+
     }
 
     public static class NetJSON {
+
+        private static class NetJSONCachedSerializer<T> {
+            public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+        }
+        
         const string QuotChar = "\"";
 
         const int BUFFER_SIZE = 11;
@@ -432,8 +438,10 @@ namespace NetJSON {
             return !type.IsCollectionType() && !type.IsPrimitiveType();
         }
 
+        [ThreadStatic]
+        private static StringBuilder _cachedStringBuilder;
         public static StringBuilder GetStringBuilder() {
-            return _stringBuilders.GetOrAdd(Thread.CurrentThread.ManagedThreadId, key => new StringBuilder(DefaultStringBuilderCapacity));
+            return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
 
         private static bool _useTickFormat = true;
@@ -1165,22 +1173,6 @@ namespace NetJSON {
 
             il.Emit(OpCodes.Pop);
 
-            //il.Emit(OpCodes.Ldstr, QuotChar);
-
-            //il.Emit(OpCodes.Ldloca, entryLocal);
-            //il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Key").GetGetMethod());
-            //if (keyType.IsValueType)
-            //    il.Emit(OpCodes.Box, keyType);
-
-
-            //il.Emit(OpCodes.Ldstr, QuotChar);
-            //il.Emit(OpCodes.Ldstr, Colon);
-
-            //il.Emit(OpCodes.Call, _stringConcat);
-
-            //il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-            //il.Emit(OpCodes.Pop);
-
             //il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldloca, entryLocal);
             il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Value").GetGetMethod());
@@ -1400,16 +1392,7 @@ namespace NetJSON {
         }
 
         internal static NetJSONSerializer<T> GetSerializer<T>() {
-            var type = typeof(T);
-            return (NetJSONSerializer<T>)GetSerializer(type);
-        }
-
-        internal static object GetSerializer(Type type) {
-            var serializer = default(object);
-            if (!_serializers.TryGetValue(type, out serializer)) {
-                serializer = _serializers[type] = Activator.CreateInstance(Generate(type));
-            }
-            return serializer;
+            return NetJSONCachedSerializer<T>.Serializer;
         }
 
         public static string Serialize<T>(T value) {
@@ -2604,7 +2587,7 @@ namespace NetJSON {
 
 
             while (true) {
-                current = ptr[index];//*(ptr + index);
+                current = ptr[index];
                 if (count == 0 && current == '"') {
                     startIndex = index + 1;
                     ++count;
@@ -2630,7 +2613,7 @@ namespace NetJSON {
             string value = string.Empty;
 
             while (true) {
-                current = ptr[index];//*(ptr + index);
+                current = ptr[index];
                 if (current != ' ' && current != ':') {
                     if (startIndex == -1)
                         startIndex = index;
