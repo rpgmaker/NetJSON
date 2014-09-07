@@ -191,14 +191,6 @@ namespace NetJSON {
         static readonly ConcurrentDictionary<Type, Type> _nullableTypes =
             new ConcurrentDictionary<Type, Type>();
 
-        static readonly ConcurrentDictionary<int, StringBuilder> _stringBuilders =
-            new ConcurrentDictionary<int, StringBuilder>();
-
-        static readonly ConcurrentDictionary<int, StringBuilder> _dateStringBuilders =
-            new ConcurrentDictionary<int, StringBuilder>();
-
-        static readonly ConcurrentDictionary<int, StringBuilder> _encodingStringBuilders =
-            new ConcurrentDictionary<int, StringBuilder>();
 
         static readonly ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
 
@@ -452,8 +444,11 @@ namespace NetJSON {
             }
         }
 
+        [ThreadStatic]
+        private static StringBuilder _cachedDateStringBuilder;
+
         public static string DateToISOFormat(DateTime date) {
-            return _dateStringBuilders.GetOrAdd(Thread.CurrentThread.ManagedThreadId, key => new StringBuilder(25))
+            return (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
                 .Clear().Append(IntToStr(date.Year)).Append('-').Append(IntToStr(date.Month))
             .Append('-').Append(IntToStr(date.Day)).Append('T').Append(IntToStr(date.Hour)).Append(':').Append(IntToStr(date.Minute)).Append(':')
             .Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
@@ -1396,28 +1391,23 @@ namespace NetJSON {
         }
 
         public static string Serialize<T>(T value) {
-            //lock (_lockObject)
-                return GetSerializer<T>().Serialize(value);
+           return GetSerializer<T>().Serialize(value);
         }
 
         public static void Serialize<T>(T value, TextWriter writer) {
-            //lock (_lockObject)
             GetSerializer<T>().Serialize(value, writer);
         }
 
         public static T Deserialize<T>(string json) {
-            //lock (_lockObject)
-                return GetSerializer<T>().Deserialize(json);
+           return GetSerializer<T>().Deserialize(json);
         }
 
         public static T Deserialize<T>(TextReader reader) {
-            //lock (_lockObject)
             return GetSerializer<T>().Deserialize(reader);
         }
 
         public static object DeserializeObject(string json) {
-            lock (_lockObject)
-                return GetSerializer<object>().Deserialize(json);
+            return GetSerializer<object>().Deserialize(json);
         }
 
         private unsafe static void MoveToNextKey(char* str, ref int index) {
