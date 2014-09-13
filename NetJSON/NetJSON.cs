@@ -644,8 +644,6 @@ namespace NetJSON {
             }
         }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void EncodedJSONString(StringBuilder sb, string str) {
             sb.Append(str);
             return;
@@ -1881,7 +1879,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
-                    il.Emit(OpCodes.Callvirt, prop.SetMethod);
+                    il.Emit(OpCodes.Callvirt, prop.GetSetMethod());
                 } else {
                     var propValue = il.DeclareLocal(propType);
                     var isValueType = propType.IsValueType;
@@ -1913,7 +1911,7 @@ namespace NetJSON {
                     if (isNullable) {
                         il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
                     }
-                    il.Emit(OpCodes.Callvirt, prop.SetMethod);
+                    il.Emit(OpCodes.Callvirt, prop.GetSetMethod());
 
                     il.Emit(OpCodes.Ret);
 
@@ -2553,18 +2551,14 @@ namespace NetJSON {
             il.Emit(OpCodes.Stind_I4);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsEndChar(char current) {
             return current == ':' || current == '{' || current == ' ';
         }
 
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsArrayEndChar(char current) {
             return current == ',' || current == ']' || current == ' ';
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsCharTag(char current) {
             return current == '{' || current == '}';
         }
