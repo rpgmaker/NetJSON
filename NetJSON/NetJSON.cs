@@ -1444,12 +1444,23 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldc_I4, (int)' ');
                     il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Beq, tokenLabel);
+
                     il.Emit(OpCodes.Ldc_I4, (int)':');
                     il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Beq, tokenLabel);
+
                     il.Emit(OpCodes.Ldc_I4, (int)',');
                     il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Beq, tokenLabel);
+
+                    il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Beq, tokenLabel);
+
+                    il.Emit(OpCodes.Ldc_I4, (int)'\r');
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Beq, tokenLabel);
+
 
                     //if(current == '"') {
                     il.Emit(OpCodes.Ldc_I4, (int)'"');
@@ -2092,6 +2103,14 @@ namespace NetJSON {
                         il.Emit(OpCodes.Beq, currentEndCharLabel);
 
                         il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                        il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
+                        il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
                         il.Emit(OpCodes.Ldc_I4, (int)']');
                         il.Emit(OpCodes.Beq, currentEndCharLabel);
 
@@ -2148,6 +2167,14 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Ldc_I4, (int)' ');
+                    il.Emit(OpCodes.Beq, currentBlank);
+
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                    il.Emit(OpCodes.Beq, currentBlank);
+
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Ldc_I4, (int)'\r');
                     il.Emit(OpCodes.Beq, currentBlank);
 
                     il.Emit(OpCodes.Ldloc, current);
@@ -2446,6 +2473,14 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Ldc_I4, (int)':');
+                    il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                    il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Ldc_I4, (int)'\r');
                     il.Emit(OpCodes.Beq, currentEndCharLabel);
 
                     il.Emit(OpCodes.Ldloc, current);
