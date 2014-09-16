@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -129,6 +130,7 @@ namespace NetJSON {
             _isEndChar = _jsonType.GetMethod("IsEndChar", MethodBinding),
             _isArrayEndChar = _jsonType.GetMethod("IsArrayEndChar", MethodBinding),
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
+            _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
             _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
@@ -645,8 +647,6 @@ namespace NetJSON {
         }
 
         public static unsafe void EncodedJSONString(StringBuilder sb, string str) {
-            sb.Append(str);
-            return;
             char c;
             fixed (char* chr = str) {
                 char* ptr = chr;
@@ -654,38 +654,38 @@ namespace NetJSON {
                     switch (c) {
                         case '"': sb.Append("\\\""); break;
                         case '\\': sb.Append(@"\\"); break;
-                        //case '\u0000': sb.Append(@"\u0000"); break; ;
-                        //case '\u0001': sb.Append(@"\u0001"); break; ;
-                        //case '\u0002': sb.Append(@"\u0002"); break; ;
-                        //case '\u0003': sb.Append(@"\u0003"); break; ;
-                        //case '\u0004': sb.Append(@"\u0004"); break; ;
-                        //case '\u0005': sb.Append(@"\u0005"); break; ;
-                        //case '\u0006': sb.Append(@"\u0006"); break; ;
-                        //case '\u0007': sb.Append(@"\u0007"); break; ;
-                        //case '\u0008': sb.Append(@"\b"); break; ;
-                        //case '\u0009': sb.Append(@"\t"); break; ;
-                        //case '\u000A': sb.Append(@"\n"); break; ;
-                        //case '\u000B': sb.Append(@"\u000B"); break; ;
-                        //case '\u000C': sb.Append(@"\f"); break; ;
-                        //case '\u000D': sb.Append(@"\r"); break; ;
-                        //case '\u000E': sb.Append(@"\u000E"); break; ;
-                        //case '\u000F': sb.Append(@"\u000F"); break; ;
-                        //case '\u0010': sb.Append(@"\u0010"); break; ;
-                        //case '\u0011': sb.Append(@"\u0011"); break; ;
-                        //case '\u0012': sb.Append(@"\u0012"); break; ;
-                        //case '\u0013': sb.Append(@"\u0013"); break; ;
-                        //case '\u0014': sb.Append(@"\u0014"); break; ;
-                        //case '\u0015': sb.Append(@"\u0015"); break; ;
-                        //case '\u0016': sb.Append(@"\u0016"); break; ;
-                        //case '\u0017': sb.Append(@"\u0017"); break; ;
-                        //case '\u0018': sb.Append(@"\u0018"); break; ;
-                        //case '\u0019': sb.Append(@"\u0019"); break; ;
-                        //case '\u001A': sb.Append(@"\u001A"); break; ;
-                        //case '\u001B': sb.Append(@"\u001B"); break; ;
-                        //case '\u001C': sb.Append(@"\u001C"); break; ;
-                        //case '\u001D': sb.Append(@"\u001D"); break; ;
-                        //case '\u001E': sb.Append(@"\u001E"); break; ;
-                        //case '\u001F': sb.Append(@"\u001F"); break; ;
+                        case '\u0000': sb.Append(@"\u0000"); break;
+                        case '\u0001': sb.Append(@"\u0001"); break;
+                        case '\u0002': sb.Append(@"\u0002"); break;
+                        case '\u0003': sb.Append(@"\u0003"); break;
+                        case '\u0004': sb.Append(@"\u0004"); break;
+                        case '\u0005': sb.Append(@"\u0005"); break;
+                        case '\u0006': sb.Append(@"\u0006"); break;
+                        case '\u0007': sb.Append(@"\u0007"); break;
+                        case '\u0008': sb.Append(@"\b"); break;
+                        case '\u0009': sb.Append(@"\t"); break;
+                        case '\u000A': sb.Append(@"\n"); break;
+                        case '\u000B': sb.Append(@"\u000B"); break;
+                        case '\u000C': sb.Append(@"\f"); break;
+                        case '\u000D': sb.Append(@"\r"); break;
+                        case '\u000E': sb.Append(@"\u000E"); break;
+                        case '\u000F': sb.Append(@"\u000F"); break;
+                        case '\u0010': sb.Append(@"\u0010"); break;
+                        case '\u0011': sb.Append(@"\u0011"); break;
+                        case '\u0012': sb.Append(@"\u0012"); break;
+                        case '\u0013': sb.Append(@"\u0013"); break;
+                        case '\u0014': sb.Append(@"\u0014"); break;
+                        case '\u0015': sb.Append(@"\u0015"); break;
+                        case '\u0016': sb.Append(@"\u0016"); break;
+                        case '\u0017': sb.Append(@"\u0017"); break;
+                        case '\u0018': sb.Append(@"\u0018"); break;
+                        case '\u0019': sb.Append(@"\u0019"); break;
+                        case '\u001A': sb.Append(@"\u001A"); break;
+                        case '\u001B': sb.Append(@"\u001B"); break;
+                        case '\u001C': sb.Append(@"\u001C"); break;
+                        case '\u001D': sb.Append(@"\u001D"); break;
+                        case '\u001E': sb.Append(@"\u001E"); break;
+                        case '\u001F': sb.Append(@"\u001F"); break;
                         default: sb.Append(c); break;
                     }
                 }
@@ -950,9 +950,9 @@ namespace NetJSON {
                         //il.Emit(OpCodes.Pop);
                     }
                     else if (type == _stringType) {
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        //il.Emit(OpCodes.Call, _encodedJSONString);
-                        //il.Emit(OpCodes.Ldarg_1);
+                        //il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Call, _encodedJSONString);
+                        il.Emit(OpCodes.Ldarg_1);
                     }
 
                     if (needQuote) {
@@ -1753,6 +1753,68 @@ namespace NetJSON {
             return new Decimal(FastStringToDouble(numStr));
         }
 
+        [ThreadStatic]
+        static StringBuilder _decodeJSONStringBuilder;
+
+        public unsafe static string DecodeJSONString(char* ptr, ref int index) {
+            char current = '\0', next = '\0';
+            bool hasQuote = false;
+            var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
+
+            while (true) {
+                current = ptr[index];
+
+                if (hasQuote) {
+                    //if (current == '\0') break;
+
+                    if (current == '"') {
+                        ++index;
+                        break;
+                    } else {
+                        if (current != '\\') {
+                            sb.Append(current);
+                        } else {
+                            next = ptr[++index];
+                            switch (next) {
+                                case 'r': sb.Append('\r'); break;
+                                case 'n': sb.Append('\n'); break;
+                                case 't': sb.Append('\t'); break;
+                                case 'f': sb.Append('\f'); break;
+                                case '"': sb.Append('"'); break;
+                                case '\\': sb.Append('\\'); break;
+                                case '/': sb.Append('/'); break;
+                                case 'b': sb.Append('\b'); break;
+                                case 'u':
+                                    const int offset = 0x10000;
+                                    var uu = Int32.Parse(new string(ptr, index, 4), NumberStyles.HexNumber);
+                                    var u = uu < offset ? new string((char)uu, 1) :
+                                        new string(
+                                            new char[]{
+                                                (char)(((uu - offset) >> 10) + 0xD800),
+                                                (char)((uu - offset) % 0x0400 + 0xDC00)
+                                            }
+                                        );
+                                    sb.Append(u);
+                                    break;
+                            }
+
+                        }
+                    }
+                } else {
+                    if (current == '"') {
+                        hasQuote = true;
+                    } else if (current == 'n') {
+                        index += 3;
+                        return null;
+                    }
+                }
+
+                ++index;
+            }
+
+            return sb.ToString();
+        }
+
         private static MethodInfo GenerateExtractValueFor(TypeBuilder typeBuilder, Type type) {
             MethodBuilder method;
             var key = type.FullName;
@@ -1772,9 +1834,13 @@ namespace NetJSON {
                 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
-                if (type.IsStringBasedType()) 
-                    il.Emit(OpCodes.Call, _getStringBasedValue);    
-                else
+                if (type.IsStringBasedType()) {
+                    if (type == _stringType) {
+                        il.Emit(OpCodes.Call, _decodeJSONString);
+                    } else {
+                        il.Emit(OpCodes.Call, _getStringBasedValue);
+                    }
+                } else
                     il.Emit(OpCodes.Call, _getNonStringValue);
                 il.Emit(OpCodes.Stloc, value);
 
