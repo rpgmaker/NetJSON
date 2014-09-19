@@ -1722,7 +1722,7 @@ namespace NetJSON {
                             ++p;
                         }
                         val += rem / div;
-                        return val;
+                        return val * neg;
                     }
                     val = (val * 10.0) + (*p - '0');
                     ++p;
@@ -1751,7 +1751,7 @@ namespace NetJSON {
                             ++p;
                         }
                         val += rem / div;
-                        return val;
+                        return val * neg;
                     }
                     val = (val * 10.0f) + (*p - '0');
                     ++p;
@@ -2074,7 +2074,7 @@ namespace NetJSON {
             var addMethod = obj.LocalType.GetMethod("Add");
 
             var prevLabel = il.DefineLabel();
-
+            
 
             il.Emit(OpCodes.Newobj, obj.LocalType.GetConstructor(Type.EmptyTypes));
             il.Emit(OpCodes.Stloc, obj);
@@ -2107,141 +2107,96 @@ namespace NetJSON {
 
                 if (isPrimitive) {
                     if (isStringBased) {
-                        var currentQuoteAndPrevSlashLabel = il.DefineLabel();
-                        var startIndexEqualZeroLabel = il.DefineLabel();
-                        var startIndexNotEqualZeroLabel = il.DefineLabel();
-                        var currentEqual2Label = il.DefineLabel();
                         var text = il.DeclareLocal(_stringType);
 
-                        //if(current == '"' && prev != '\\')
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'"');
-                        il.Emit(OpCodes.Bne_Un, currentQuoteAndPrevSlashLabel);
-                        il.Emit(OpCodes.Ldloc, prev);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\\');
-                        il.Emit(OpCodes.Beq, currentQuoteAndPrevSlashLabel);
 
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Bne_Un, startIndexEqualZeroLabel);
-
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldind_I4);
-                        il.Emit(OpCodes.Stloc, startIndex);
-
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Beq, startIndexNotEqualZeroLabel);
-
-                        il.MarkLabel(startIndexEqualZeroLabel);
-
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldind_I4);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Sub);
-                        il.Emit(OpCodes.Stloc, endIndex);
-
-                        il.MarkLabel(startIndexNotEqualZeroLabel);
-
-                        il.Emit(OpCodes.Ldloc, count);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Add);
-                        il.Emit(OpCodes.Stloc, count);
-
-                        il.MarkLabel(currentQuoteAndPrevSlashLabel);
-
-                        il.Emit(OpCodes.Ldloc, count);
-                        il.Emit(OpCodes.Ldc_I4_2);
-                        il.Emit(OpCodes.Bne_Un, currentEqual2Label);
-
-                        il.Emit(OpCodes.Ldloc, ptr);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Add);
-                        il.Emit(OpCodes.Ldloc, endIndex);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Sub);
-                        il.Emit(OpCodes.Newobj, _strCtorWithPtr);
-                        //il.Emit(OpCodes.Call, _createString);
-                        il.Emit(OpCodes.Stloc, text);
-
-                        il.Emit(OpCodes.Ldloc, obj);
-                        GenerateChangeTypeFor(typeBuilder, elementType, il, text);
-                        il.Emit(OpCodes.Callvirt, addMethod);
-
-                        il.MarkLabel(currentEqual2Label);
-                    } else {
-                        var isEndChar = il.DeclareLocal(_boolType);
-                        var startIndexEndCharLabel = il.DefineLabel();
-                        var isEndCharLabel = il.DefineLabel();
-                        var text = il.DeclareLocal(_stringType);
-                        var currentEndCharLabel = il.DefineLabel();
-                        var currentEndCharLabel2 = il.DefineLabel();
-
-                        //current == ',' || current == ']' || current == ' ';
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)',');
-                        il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
-                        il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
-                        il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)']');
-                        il.Emit(OpCodes.Beq, currentEndCharLabel);
+                        var blankNewLineLabel = il.DefineLabel();
 
                         il.Emit(OpCodes.Ldloc, current);
                         il.Emit(OpCodes.Ldc_I4, (int)' ');
-                        il.Emit(OpCodes.Ceq);
-                        il.Emit(OpCodes.Br, currentEndCharLabel2);
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
 
-                        il.MarkLabel(currentEndCharLabel);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.MarkLabel(currentEndCharLabel2);
- 
-                        il.Emit(OpCodes.Stloc, isEndChar);
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)',');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
 
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Bne_Un, startIndexEndCharLabel);
-                        il.Emit(OpCodes.Ldloc, isEndChar);
-                        il.Emit(OpCodes.Brtrue, startIndexEndCharLabel);
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)']');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
 
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldind_I4);
-                        il.Emit(OpCodes.Stloc, startIndex);
+                        if (isStringType) {
+                            il.Emit(OpCodes.Call, _decodeJSONString);
+                        } else {
+                            il.Emit(OpCodes.Call, _getStringBasedValue);
+                        }
+                        il.Emit(OpCodes.Stloc, text);
 
-                        il.MarkLabel(startIndexEndCharLabel);
+                        il.Emit(OpCodes.Ldloc, obj);
 
-                        il.Emit(OpCodes.Ldloc, isEndChar);
-                        il.Emit(OpCodes.Brfalse, isEndCharLabel);
+                        if (!isStringType)
+                            GenerateChangeTypeFor(typeBuilder, elementType, il, text);
+                        else
+                            il.Emit(OpCodes.Ldloc, text);
 
-                        il.Emit(OpCodes.Ldloc, ptr);
-                        il.Emit(OpCodes.Ldloc, startIndex);
+                        il.Emit(OpCodes.Callvirt, addMethod);
+
+                        GenerateUpdateCurrent(il, current, ptr);
+
+                        var currentLabel = il.DefineLabel();
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)']');
+                        il.Emit(OpCodes.Bne_Un, currentLabel);
+                        //break
+                        il.Emit(OpCodes.Br, bLabel);
+                        il.MarkLabel(currentLabel);
+
+                        il.MarkLabel(blankNewLineLabel);
+                    } else {
+                        var text = il.DeclareLocal(_stringType);
+                        
+                        var blankNewLineLabel = il.DefineLabel();
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)' ');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)',');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)']');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldloc, current);
+                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
+                        il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldind_I4);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Sub);
-                        //il.Emit(OpCodes.Call, _createString);
-                        il.Emit(OpCodes.Newobj, _strCtorWithPtr);
+                        il.Emit(OpCodes.Call, _getNonStringValue);
+
                         il.Emit(OpCodes.Stloc, text);
 
                         il.Emit(OpCodes.Ldloc, obj);
                         GenerateChangeTypeFor(typeBuilder, elementType, il, text);
                         il.Emit(OpCodes.Callvirt, addMethod);
 
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Dup);
-                        il.Emit(OpCodes.Stloc, startIndex);
-                        il.Emit(OpCodes.Stloc, endIndex);
-
-                        il.MarkLabel(isEndCharLabel);
+                        il.MarkLabel(blankNewLineLabel);
                     }
                 } else {
                     var currentBlank = il.DefineLabel();
@@ -2712,14 +2667,24 @@ namespace NetJSON {
             char current = '\0';
             int startIndex = -1;
             string value = string.Empty;
+            int indexDiff = 0;
 
             while (true) {
                 current = ptr[index];
+                if (startIndex > -1) {
+                    switch (current) {
+                        case '\n':
+                        case '\r':
+                        case ' ':
+                            ++indexDiff;
+                            break;
+                    }
+                }
                 if (current != ' ' && current != ':') {
                     if (startIndex == -1)
                         startIndex = index;
                     if (current == ',' || current == ']' || current == '}') {
-                        value = new string(ptr, startIndex, index - startIndex);
+                        value = new string(ptr, startIndex, index - startIndex - indexDiff);
                         --index;
                         break;
                     }
