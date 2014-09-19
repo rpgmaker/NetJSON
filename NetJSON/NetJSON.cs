@@ -138,6 +138,7 @@ namespace NetJSON {
             _dictSetItem = _dictType.GetMethod("set_Item"),
             _textWriterWrite = _textWriterType.GetMethod("Write", new []{ _stringType }),
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
+            _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
         const int Delimeter = (int)',',
@@ -446,6 +447,14 @@ namespace NetJSON {
             }
         }
 
+        private static bool _caseSensitive = true;
+
+        public static bool CaseSensitive {
+            set {
+                _caseSensitive = value;
+            }
+        }
+
         [ThreadStatic]
         private static StringBuilder _cachedDateStringBuilder;
 
@@ -601,7 +610,7 @@ namespace NetJSON {
                 current = *(ptr + index);
                 var hasChar = schar != '\0';
                 if (!hasChar) {
-                    if (current != ' ' && current != ':') {
+                    if (current != ' ' && current != ':' && current != '\n' && current != '\r') {
                         echar = current == '"' ? '"' :
                                 current == '{' ? '}' :
                                 current == '[' ? ']' : '\0';
@@ -618,6 +627,7 @@ namespace NetJSON {
                     ++index;
                     continue;
                 }
+            endLabel:
                 isBeginEnd = (current == schar || current == echar);
                 isTag = isBeginEnd && charCount == 0;
                 if (isTag) count++;
@@ -628,9 +638,10 @@ namespace NetJSON {
                 if (!isTag) {
                     if (isQuote) {
                         if (current == '"' && charCount > 0 && prev != '\\') {
-                            ++index;
+                            //++index;
                             charCount = 0;
-                            continue;
+                            goto endLabel;
+                            //continue;
                         }
                     } else {
                         if (isBeginEnd) {
@@ -1947,7 +1958,12 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, propName);
-                il.Emit(OpCodes.Call, _stringOpEquality);
+                if (_caseSensitive)
+                    il.Emit(OpCodes.Call, _stringOpEquality);
+                else {
+                    il.Emit(OpCodes.Ldc_I4, (int)StringComparison.OrdinalIgnoreCase);
+                    il.Emit(OpCodes.Call, _stringEqualCompare);
+                }
                 il.Emit(OpCodes.Brfalse, conditionLabel);
 
 
