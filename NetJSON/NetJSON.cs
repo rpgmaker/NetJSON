@@ -1890,7 +1890,8 @@ namespace NetJSON {
                                 case 'b': sb.Append('\b'); break;
                                 case 'u':
                                     const int offset = 0x10000;
-                                    var uu = Int32.Parse(new string(ptr, index, 4), NumberStyles.HexNumber);
+                                    var str = new string(ptr, index + 1, 4);
+                                    var uu = Int32.Parse(str, NumberStyles.HexNumber);
                                     var u = uu < offset ? new string((char)uu, 1) :
                                         new string(
                                             new char[]{
