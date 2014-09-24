@@ -1900,6 +1900,7 @@ namespace NetJSON {
                                             }
                                         );
                                     sb.Append(u);
+                                    index += 4;
                                     break;
                             }
 
