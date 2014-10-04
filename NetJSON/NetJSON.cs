@@ -650,6 +650,7 @@ namespace NetJSON {
                         charCount = 1;
                     }
                     ++index;
+                    prev = current;
                     continue;
                 }
             endLabel:
@@ -676,9 +677,16 @@ namespace NetJSON {
                         }
                     }
                 }
-                prev = current;
-                if (current != echar)
+                if (current != echar) {
                     ++index;
+                } else {
+                    if (isQuote) {
+                        if (prev == '\\') {
+                            ++index;
+                        }
+                    }
+                }
+                prev = current;
             }
         }
 
