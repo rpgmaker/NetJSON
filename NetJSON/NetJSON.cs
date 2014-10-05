@@ -142,6 +142,7 @@ namespace NetJSON {
             _getChars = _stringType.GetMethod("get_Chars"),
             _dictSetItem = _dictType.GetMethod("set_Item"),
             _textWriterWrite = _textWriterType.GetMethod("Write", new []{ _stringType }),
+            _fastObjectToStr = _jsonType.GetMethod("FastObjectToString", MethodBinding),
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
@@ -498,6 +499,47 @@ namespace NetJSON {
             else if (date == DateTime.MaxValue)
                 return "\\/Date(253402300800)\\/";
             return String.Concat("\\/Date(", IntUtility.ltoa((long)(date - Epoch).TotalSeconds), ")\\/");
+        }
+
+        [ThreadStatic]
+        private static StringBuilder _cachedObjectStringBuilder;
+
+        public static string FastObjectToString(object value) {
+
+            var type = value.GetType();
+
+            var sb = (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
+
+            var needQuotes = type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType;
+
+            if (needQuotes)
+                sb.Append(QuotChar);
+
+            if (type == _stringType)
+                sb.Append((string)value);
+            else if (type == _intType)
+                return IntToStr((int)value);
+            else if (type == _longType)
+                return LongToStr((long)value);
+            else if (type == _decimalType)
+                return DecimalToStr((decimal)value);
+            else if (type == _boolType)
+                return (bool)value ? "true" : "false";
+            else if (type == _doubleType)
+                return DoubleToStr((double)value);
+            else if (type == _floatType)
+                return FloatToStr((float)value);
+            else if (type == _dateTimeType)
+                sb.Append(DateToString((DateTime)value));
+            else if (type == _byteArrayType)
+                sb.Append(Convert.ToBase64String((byte[])value));
+            else
+                sb.Append(value);
+            
+            if (needQuotes)
+                sb.Append(QuotChar);
+
+            return sb.ToString();
         }
 
         internal static Type Generate(Type objType) {
@@ -955,20 +997,22 @@ namespace NetJSON {
                 _voidType, new[] { type, _stringBuilderType });
             _writeMethodBuilders[key] = method;
             var il = method.GetILGenerator();
+            var isTypeObject = type == _objectType;
 
-            if (type.IsPrimitiveType()) {
+            if (type.IsPrimitiveType() || isTypeObject) {
                 var nullLabel = il.DefineLabel();
 
                 needQuote = needQuote && (type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType);
 
-                if (type == _stringType || type == _objectType) {
+                if (type == _stringType || isTypeObject) {
 
                     il.Emit(OpCodes.Ldarg_0);
                     if (type == _stringType) {
                         il.Emit(OpCodes.Ldnull);
                         il.Emit(OpCodes.Call, _stringOpEquality);
-                    }
-                    il.Emit(OpCodes.Brfalse, nullLabel);
+                        il.Emit(OpCodes.Brfalse, nullLabel);
+                    } else
+                        il.Emit(OpCodes.Brtrue, nullLabel);
 
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Ldstr, NullStr);
@@ -989,7 +1033,7 @@ namespace NetJSON {
                     //il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldarg_0);
                     if (type == _objectType){
-                        il.Emit(OpCodes.Callvirt, _objectToString);
+                        il.Emit(OpCodes.Call, _fastObjectToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         //il.Emit(OpCodes.Pop);
                     }
@@ -1498,6 +1542,43 @@ namespace NetJSON {
 
         internal static NetJSONSerializer<T> GetSerializer<T>() {
             return NetJSONCachedSerializer<T>.Serializer;
+        }
+
+        public delegate object DeserializeWithTypeDelegate(string value);
+
+        static ConcurrentDictionary<Type, DeserializeWithTypeDelegate> _deserializeWithTypes =
+            new ConcurrentDictionary<Type, DeserializeWithTypeDelegate>();
+
+        static MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
+        static Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
+
+        public static object Deserialize(Type type, string value) {
+
+            DeserializeWithTypeDelegate del;
+
+            if (!_deserializeWithTypes.TryGetValue(type, out del)) {
+
+                var name = String.Concat(DeserializeStr, type.FullName);
+                var method = new DynamicMethod(name, type, new[] { _stringType }, restrictedSkipVisibility: true);
+
+                var il = method.GetILGenerator();
+                var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                var genericType = _netJSONSerializerType.MakeGenericType(type);
+
+                var genericDeserialize = genericType.GetMethod(DeserializeStr, new[] { _stringType });
+
+                il.Emit(OpCodes.Call, genericMethod);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Callvirt, genericDeserialize);
+                il.Emit(OpCodes.Isinst, type);
+
+                il.Emit(OpCodes.Ret);
+
+
+                _deserializeWithTypes[type] = del = method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
+                
+            }
+            return del(value);
         }
 
         public static string Serialize<T>(T value) {
