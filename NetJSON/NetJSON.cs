@@ -1545,19 +1545,46 @@ namespace NetJSON {
         }
 
         public delegate object DeserializeWithTypeDelegate(string value);
+        public delegate string SerializeWithTypeDelegate(object value);
 
-        static ConcurrentDictionary<Type, DeserializeWithTypeDelegate> _deserializeWithTypes =
-            new ConcurrentDictionary<Type, DeserializeWithTypeDelegate>();
+        static ConcurrentDictionary<string, DeserializeWithTypeDelegate> _deserializeWithTypes =
+            new ConcurrentDictionary<string, DeserializeWithTypeDelegate>();
+
+        static ConcurrentDictionary<Type, SerializeWithTypeDelegate> _serializeWithTypes =
+            new ConcurrentDictionary<Type, SerializeWithTypeDelegate>();
 
         static MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
         static Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
 
+        public static string Serialize(Type type, object value) {
+            return _serializeWithTypes.GetOrAdd(type, _ => {
+                var name = String.Concat(SerializeStr, type.FullName);
+                var method = new DynamicMethod(name, _stringType, new[] { _objectType }, restrictedSkipVisibility: true);
+
+                var il = method.GetILGenerator();
+                var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                var genericType = _netJSONSerializerType.MakeGenericType(type);
+
+                var genericSerialize = genericType.GetMethod(SerializeStr, new[] { type });
+
+                il.Emit(OpCodes.Call, genericMethod);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Isinst, type);
+                il.Emit(OpCodes.Callvirt, genericSerialize);
+
+                il.Emit(OpCodes.Ret);
+
+                return method.CreateDelegate(typeof(SerializeWithTypeDelegate)) as SerializeWithTypeDelegate;
+            })(value);
+        }
+
+        public static string Serialize(object value) {
+            return Serialize(value.GetType(), value);
+        }
+
         public static object Deserialize(Type type, string value) {
 
-            DeserializeWithTypeDelegate del;
-
-            if (!_deserializeWithTypes.TryGetValue(type, out del)) {
-
+            return _deserializeWithTypes.GetOrAdd(type.FullName, _ => {
                 var name = String.Concat(DeserializeStr, type.FullName);
                 var method = new DynamicMethod(name, type, new[] { _stringType }, restrictedSkipVisibility: true);
 
@@ -1574,11 +1601,9 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ret);
 
-
-                _deserializeWithTypes[type] = del = method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
-                
-            }
-            return del(value);
+                return method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
+            
+            })(value);
         }
 
         public static string Serialize<T>(T value) {
