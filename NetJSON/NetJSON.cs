@@ -80,6 +80,9 @@ namespace NetJSON {
             _decimalType = typeof(decimal),
             _floatType = typeof(float),
             _doubleType = typeof(double),
+            _enumeratorTypeNonGeneric = typeof(IEnumerator),
+            _ienumerableType = typeof(IEnumerable<>),
+            _enumeratorType = typeof(IEnumerator<>),
             _genericKeyValuePairType = typeof(KeyValuePair<,>),
             _serializerType = typeof(NetJSONSerializer<>),
             _genericDictionaryEnumerator =
@@ -155,6 +158,7 @@ namespace NetJSON {
              NullStr = "null",
               IListStr = "IList`1",
               IDictStr = "IDictionary`2",
+              KeyValueStr = "KeyValuePair`2",
               CreateListStr = "CreateList",
               CreateClassOrDictStr = "CreateClassOrDict",
               ExtractStr = "Extract",
@@ -440,7 +444,8 @@ namespace NetJSON {
         }
 
         internal static bool IsDictionaryType(this Type type) {
-            return _dictType.IsAssignableFrom(type) || type.Name == IDictStr;
+            Type interfaceType = null;
+            return _dictType.IsAssignableFrom(type) || type.Name == IDictStr || ((interfaceType = type.GetInterface(_ienumerableType.Name)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
         }
 
         public static bool IsCollectionType(this Type type) {
@@ -504,13 +509,21 @@ namespace NetJSON {
         [ThreadStatic]
         private static StringBuilder _cachedObjectStringBuilder;
 
+        public static StringBuilder CachedObjectStringBuilder() {
+            return (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
+        }
+
+        public static bool NeedQuotes(Type type) {
+            return type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType;
+        }
+
         public static string FastObjectToString(object value) {
 
             var type = value.GetType();
 
-            var sb = (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
+            var sb = CachedObjectStringBuilder();
 
-            var needQuotes = type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType;
+            var needQuotes = NeedQuotes(type);
 
             if (needQuotes)
                 sb.Append(QuotChar);
@@ -550,7 +563,7 @@ namespace NetJSON {
 
             var isPrimitive = objType.IsPrimitiveType();
             var genericType = _serializerType.MakeGenericType(objType);
-            var typeName = String.Concat(objType.Name, ClassStr);//objType.Name;
+            var typeName = String.Concat(objType.GetName(), ClassStr);//objType.Name;
             var asmName = typeName;
             var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(
                 new AssemblyName(asmName) {
@@ -1201,7 +1214,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
             il.Emit(OpCodes.Pop);
 
-            if (type.IsDictionaryType())
+            if (isDict)
                 WriteDictionary(typeBuilder, type, il);
             else WriteListArray(typeBuilder, type, il);
 
@@ -1214,11 +1227,19 @@ namespace NetJSON {
         internal static void WriteDictionary(TypeBuilder typeBuilder, Type type, ILGenerator il) {
             var arguments = type.GetGenericArguments();
             var keyType = arguments[0];
-            var valueType = arguments[1];
+            var valueType = arguments.Length > 1 ? arguments[1] : null;
+
+            if (keyType.Name == KeyValueStr) {
+                arguments = keyType.GetGenericArguments();
+                keyType = arguments[0];
+                valueType = arguments[1];
+            }
+           
             var isKeyPrimitive = keyType.IsPrimitiveType();
             var isValuePrimitive = valueType.IsPrimitiveType();
             var keyValuePairType = _genericKeyValuePairType.MakeGenericType(keyType, valueType);
-            var enumeratorType = _genericDictionaryEnumerator.MakeGenericType(keyType, valueType);
+            var enumerableType = _ienumerableType.MakeGenericType(keyValuePairType);
+            var enumeratorType = _enumeratorType.MakeGenericType(keyValuePairType);//_genericDictionaryEnumerator.MakeGenericType(keyType, valueType);
             var enumeratorLocal = il.DeclareLocal(enumeratorType);
             var entryLocal = il.DeclareLocal(keyValuePairType);
             var startEnumeratorLabel = il.DefineLabel();
@@ -1234,13 +1255,13 @@ namespace NetJSON {
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Callvirt,
-                _genericDictType.MakeGenericType(keyType, valueType).GetMethod("GetEnumerator"));
-            il.Emit(OpCodes.Stloc_S, enumeratorLocal);
+                enumerableType.GetMethod("GetEnumerator"));
+            il.Emit(OpCodes.Stloc, enumeratorLocal);
             il.BeginExceptionBlock();
             il.Emit(OpCodes.Br, startEnumeratorLabel);
             il.MarkLabel(moveNextLabel);
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
-            il.Emit(OpCodes.Call,
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
+            il.Emit(OpCodes.Callvirt,
                 enumeratorLocal.LocalType.GetProperty("Current")
                 .GetGetMethod());
             il.Emit(OpCodes.Stloc, entryLocal);
@@ -1309,13 +1330,12 @@ namespace NetJSON {
             il.Emit(OpCodes.Stloc, hasItem);
 
             il.MarkLabel(startEnumeratorLabel);
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
-            il.Emit(OpCodes.Call, enumeratorType.GetMethod("MoveNext", MethodBinding));
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
+            il.Emit(OpCodes.Callvirt, _enumeratorTypeNonGeneric.GetMethod("MoveNext", MethodBinding));
             il.Emit(OpCodes.Brtrue, moveNextLabel);
             il.Emit(OpCodes.Leave, endEnumeratorLabel);
             il.BeginFinallyBlock();
-            il.Emit(OpCodes.Ldloca_S, enumeratorLocal);
-            il.Emit(OpCodes.Constrained, enumeratorLocal.LocalType);
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
             il.Emit(OpCodes.Callvirt, _iDisposableDispose);
             il.EndExceptionBlock();
             il.MarkLabel(endEnumeratorLabel);
@@ -2517,16 +2537,35 @@ namespace NetJSON {
             var isNullObjectLabel = il.DefineLabel();
 
 
-            var isDict = _dictType.IsAssignableFrom(type);
+            var isDict = type.IsDictionaryType();
             var arguments = isDict ? type.GetGenericArguments() : null;
             var hasArgument = arguments != null;
             var keyType = hasArgument ? arguments[0] : _objectType;
-            var valueType = hasArgument ? arguments[1] : _objectType;
+            var valueType = hasArgument && arguments.Length > 1 ? arguments[1] : _objectType;
+            var isKeyValuePair = false;
+
+            if (keyType.Name == KeyValueStr) {
+                arguments = keyType.GetGenericArguments();
+                keyType = arguments[0];
+                valueType = arguments[1];
+                isKeyValuePair = true;
+            }
+
             var isStringType = !isDict || keyType == _stringType || keyType == _objectType;
 
             var isNotTagLabel = il.DefineLabel();
-            var dictSetItem = isDict ? type.GetMethod("set_Item") : null;
-            
+            var dictSetItem = isDict ? (isKeyValuePair ? 
+                //TODO: Figure out a better to get the correct methods
+                (type.Name == "CocurrentBag`1" ? type.GetMethod("Add") :
+                type.Name == "ConcurrentQueue`1" ? type.GetMethod("Enqueue") :
+                type.Name == "ConcurrentStack`1" ? type.GetMethod("Push") : null)
+                : type.GetMethod("set_Item")) : null;
+
+            if (isDict) {
+                if (type.Name == IDictStr) {
+                    type = _genericDictType.MakeGenericType(keyType, valueType);
+                }
+            }
 
 
             if (type.IsValueType) {
@@ -2697,13 +2736,17 @@ namespace NetJSON {
                     IncrementIndexRef(il);
 
                     if (isDict) {
-                        //dict[key] = ExtractValue(json, ref index)
                         il.Emit(OpCodes.Ldloc, obj);
                         il.Emit(OpCodes.Ldloc, keyLocal);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-                        il.Emit(OpCodes.Callvirt, dictSetItem);
+                        if (isKeyValuePair) {
+                            il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
+                            il.Emit(OpCodes.Callvirt, dictSetItem);
+                        } else {
+                            il.Emit(OpCodes.Callvirt, dictSetItem);
+                        }
                     } else {
                         //Set property based on key
                         il.Emit(OpCodes.Ldarg_0);
@@ -2808,8 +2851,14 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-                    il.Emit(OpCodes.Callvirt, dictSetItem);
 
+                    if (isKeyValuePair) {
+                        il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
+                        il.Emit(OpCodes.Callvirt, dictSetItem);
+                    } else {
+                        il.Emit(OpCodes.Callvirt, dictSetItem);
+                    }
+                    
                     GenerateUpdateCurrent(il, current, ptr);
 
                     
