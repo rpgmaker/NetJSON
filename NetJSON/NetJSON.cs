@@ -73,6 +73,7 @@ namespace NetJSON {
             _stringBuilderType = typeof(StringBuilder),
             _listType = typeof(IList),
             _dictType = typeof(IDictionary),
+            _dictStringObject = typeof(Dictionary<string, object>),
             _genericDictType = typeof(Dictionary<,>),
             _genericListType = typeof(List<>),
             _objectType = typeof(Object),
@@ -135,6 +136,9 @@ namespace NetJSON {
             _fastStringToGuid = _jsonType.GetMethod("FastStringToGuid", MethodBinding),
             _moveToArrayBlock = _jsonType.GetMethod("MoveToArrayBlock", MethodBinding),
             _fastStringToByteArray = _jsonType.GetMethod("FastStringToByteArray", MethodBinding),
+            _listToListObject = _jsonType.GetMethod("ListToListObject", MethodBinding),
+            _isListType = _jsonType.GetMethod("IsListType", MethodBinding),
+            _isDictType = _jsonType.GetMethod("IsDictionaryType", MethodBinding),
             _guidNewGuid = _guidType.GetMethod("NewGuid", MethodBinding),
             _stringLength = _stringType.GetMethod("get_Length"),
             _createString = _jsonType.GetMethod("CreateString"),
@@ -433,6 +437,10 @@ namespace NetJSON {
             return Convert.ToBase64String(value);
         }
 
+        public static List<object> ListToListObject(IList list) {
+            return list.Cast<object>().ToList();
+        }
+
         private static bool IsPrimitiveType(this Type type) {
             return _primitiveTypes.GetOrAdd(type, key => {
                 if (key.IsGenericType &&
@@ -457,11 +465,11 @@ namespace NetJSON {
             return _typeProperties.GetOrAdd(type, key => key.GetProperties(PropertyBinding));
         }
 
-        internal static bool IsListType(this Type type) {
+        public static bool IsListType(this Type type) {
             return _listType.IsAssignableFrom(type) || type.Name == IListStr;
         }
 
-        internal static bool IsDictionaryType(this Type type) {
+        public static bool IsDictionaryType(this Type type) {
             Type interfaceType = null;
             return _dictType.IsAssignableFrom(type) || type.Name == IDictStr || ((interfaceType = type.GetInterface(_ienumerableType.Name)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
         }
@@ -547,7 +555,7 @@ namespace NetJSON {
             return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
 
                 var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
-                    new[] { _stringBuilderType, _objectType });
+                    new[] { _objectType, _stringBuilderType });
 
                 var il = method.GetILGenerator();
 
@@ -556,9 +564,41 @@ namespace NetJSON {
                 var needQuoteStartLabel = il.DefineLabel();
                 var needQuoteEndLabel = il.DefineLabel();
 
-                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Callvirt, _objectGetType);
                 il.Emit(OpCodes.Stloc, typeLocal);
+
+                var isListTypeLabel = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, typeLocal);
+                il.Emit(OpCodes.Call, _isListType);
+                il.Emit(OpCodes.Brfalse, isListTypeLabel);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, _listType);
+                il.Emit(OpCodes.Call, _listToListObject);
+                il.Emit(OpCodes.Starg, 0);
+
+                WriteCollection(type, typeof(List<object>), il);
+                il.Emit(OpCodes.Ret);
+
+                il.MarkLabel(isListTypeLabel);
+
+                var isDictTypeLabel = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, typeLocal);
+                il.Emit(OpCodes.Call, _isDictType);
+                il.Emit(OpCodes.Brfalse, isDictTypeLabel);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, _dictStringObject);
+                il.Emit(OpCodes.Starg, 0);
+
+                WriteCollection(type, _dictStringObject, il);
+                il.Emit(OpCodes.Ret);
+
+                il.MarkLabel(isDictTypeLabel);
+
 
                 il.Emit(OpCodes.Ldloc, typeLocal);
                 il.Emit(OpCodes.Call, _needQuote);
@@ -568,7 +608,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldloc, needQuoteLocal);
                 il.Emit(OpCodes.Brfalse, needQuoteStartLabel);
 
-                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldstr, QuotChar);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
@@ -592,8 +632,8 @@ namespace NetJSON {
                     il.Emit(OpCodes.Brfalse, compareLabel);
 
                     if (objType == _stringType) {
-                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Castclass, _stringType);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
@@ -603,26 +643,26 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldstr, "true");
                         il.Emit(OpCodes.Stloc, boolLocal);
 
-                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Unbox_Any, _boolType);
                         il.Emit(OpCodes.Brtrue, boolLabel);
                         il.Emit(OpCodes.Ldstr, "false");
                         il.Emit(OpCodes.Stloc, boolLocal);
                         il.MarkLabel(boolLabel);
 
-                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldloc, boolLocal);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (objType == _objectType) {
-                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
                         il.Emit(OpCodes.Pop);
                     } 
                     else {
-                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
                         if (objType.IsValueType)
                             il.Emit(OpCodes.Unbox_Any, objType);
                         else il.Emit(OpCodes.Castclass, objType);
@@ -633,12 +673,11 @@ namespace NetJSON {
 
                     il.MarkLabel(compareLabel);
                 }
-
                
                 il.Emit(OpCodes.Ldloc, needQuoteLocal);
                 il.Emit(OpCodes.Brfalse, needQuoteEndLabel);
 
-                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldstr, QuotChar);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
@@ -1138,16 +1177,19 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldstr, QuotChar);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         //il.Emit(OpCodes.Pop);
-                    } else il.Emit(OpCodes.Ldarg_1);
+                    } 
 
                     //il.Emit(OpCodes.Ldarg_2);
-                    il.Emit(OpCodes.Ldarg_0);
+
                     if (type == _objectType){
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Call, GenerateFastObjectToString(typeBuilder));
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Pop);
                     }
                     else if (type == _stringType) {
+                        il.Emit(OpCodes.Ldarg_0);
                         //il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Call, _encodedJSONString);
                         il.Emit(OpCodes.Ldarg_1);
@@ -1464,6 +1506,12 @@ namespace NetJSON {
             var countLocal = il.DeclareLocal(typeof(int));
             var diffLocal = il.DeclareLocal(typeof(int));
             var checkCountLabel = il.DefineLabel();
+            var listLocal = isArray ? default(LocalBuilder) : il.DeclareLocal(_listType);
+
+            if (listLocal != null) {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Stloc, listLocal);
+            }
 
             if (isArray) {
                 il.Emit(OpCodes.Ldarg_0);
@@ -1471,7 +1519,8 @@ namespace NetJSON {
                 il.Emit(OpCodes.Conv_I4);
                 il.Emit(OpCodes.Stloc, countLocal);
             } else {
-                il.Emit(OpCodes.Ldarg_0);
+                //il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, listLocal);
                 il.Emit(OpCodes.Callvirt, type.GetMethod("get_Count"));
                 il.Emit(OpCodes.Stloc, countLocal);
             }
@@ -1486,7 +1535,10 @@ namespace NetJSON {
             il.Emit(OpCodes.Stloc, indexLocal);
             il.Emit(OpCodes.Br, startLabel);
             il.MarkLabel(endLabel);
-            il.Emit(OpCodes.Ldarg_0);
+            if (isArray)
+                il.Emit(OpCodes.Ldarg_0);
+            else
+                il.Emit(OpCodes.Ldloc, listLocal);
             il.Emit(OpCodes.Ldloc, indexLocal);
             if (isArray)
                 il.Emit(OpCodes.Ldelem, itemType);
