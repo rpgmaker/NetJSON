@@ -112,6 +112,8 @@ namespace NetJSON {
             _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
             _generatorDateToString = _jsonType.GetMethod("DateToString", MethodBinding),
             _generatorDateToISOFormat = _jsonType.GetMethod("DateToISOFormat", MethodBinding),
+            _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
+            _byteArrayToStr = _jsonType.GetMethod("ByteArrayToStr", MethodBinding),
             _objectToString = _objectType.GetMethod("ToString", Type.EmptyTypes),
             _stringFormat = _stringType.GetMethod("Format", new[] { _stringType, _objectType }),
             _convertBase64 = typeof(Convert).GetMethod("ToBase64String", new[] { _byteArrayType }),
@@ -130,8 +132,10 @@ namespace NetJSON {
             _fastStringToDate = _jsonType.GetMethod("FastStringToDate", MethodBinding),
             _fastStringToDouble = _jsonType.GetMethod("FastStringToDouble", MethodBinding),
             _fastStringToBool = _jsonType.GetMethod("FastStringToBool", MethodBinding),
+            _fastStringToGuid = _jsonType.GetMethod("FastStringToGuid", MethodBinding),
             _moveToArrayBlock = _jsonType.GetMethod("MoveToArrayBlock", MethodBinding),
             _fastStringToByteArray = _jsonType.GetMethod("FastStringToByteArray", MethodBinding),
+            _guidNewGuid = _guidType.GetMethod("NewGuid", MethodBinding),
             _stringLength = _stringType.GetMethod("get_Length"),
             _createString = _jsonType.GetMethod("CreateString"),
             _isCharTag = _jsonType.GetMethod("IsCharTag"),
@@ -147,6 +151,10 @@ namespace NetJSON {
             _textWriterWrite = _textWriterType.GetMethod("Write", new []{ _stringType }),
             _fastObjectToStr = _jsonType.GetMethod("FastObjectToString", MethodBinding),
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
+            _typeopEquality = _typeType.GetMethod("op_Equality", MethodBinding),
+            _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
+            _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
+            _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
@@ -415,6 +423,16 @@ namespace NetJSON {
             return new string(s);
         }
 
+        public static string GuidToStr(Guid value) {
+            //TODO: Optimize
+            return value.ToString();
+        }
+
+        public static string ByteArrayToStr(byte[] value) {
+            //TODO: Optimize
+            return Convert.ToBase64String(value);
+        }
+
         private static bool IsPrimitiveType(this Type type) {
             return _primitiveTypes.GetOrAdd(type, key => {
                 if (key.IsGenericType &&
@@ -486,6 +504,13 @@ namespace NetJSON {
             }
         }
 
+        private static bool _generateAssembly = false;
+        public static bool GenerateAssembly {
+            set {
+                _generateAssembly = value;
+            }
+        }
+
         [ThreadStatic]
         private static StringBuilder _cachedDateStringBuilder;
 
@@ -517,42 +542,113 @@ namespace NetJSON {
             return type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType;
         }
 
-        public static string FastObjectToString(object value) {
+        private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
 
-            var type = value.GetType();
+            return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
 
-            var sb = CachedObjectStringBuilder();
+                var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
+                    new[] { _stringBuilderType, _objectType });
 
-            var needQuotes = NeedQuotes(type);
+                var il = method.GetILGenerator();
 
-            if (needQuotes)
-                sb.Append(QuotChar);
+                var typeLocal = il.DeclareLocal(_typeType);
+                var needQuoteLocal = il.DeclareLocal(_boolType);
+                var needQuoteStartLabel = il.DefineLabel();
+                var needQuoteEndLabel = il.DefineLabel();
 
-            if (type == _stringType)
-                sb.Append((string)value);
-            else if (type == _intType)
-                return IntToStr((int)value);
-            else if (type == _longType)
-                return LongToStr((long)value);
-            else if (type == _decimalType)
-                return DecimalToStr((decimal)value);
-            else if (type == _boolType)
-                return (bool)value ? "true" : "false";
-            else if (type == _doubleType)
-                return DoubleToStr((double)value);
-            else if (type == _floatType)
-                return FloatToStr((float)value);
-            else if (type == _dateTimeType)
-                sb.Append(DateToString((DateTime)value));
-            else if (type == _byteArrayType)
-                sb.Append(Convert.ToBase64String((byte[])value));
-            else
-                sb.Append(value);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Callvirt, _objectGetType);
+                il.Emit(OpCodes.Stloc, typeLocal);
+
+                il.Emit(OpCodes.Ldloc, typeLocal);
+                il.Emit(OpCodes.Call, _needQuote);
+                il.Emit(OpCodes.Stloc, needQuoteLocal);
+
+
+                il.Emit(OpCodes.Ldloc, needQuoteLocal);
+                il.Emit(OpCodes.Brfalse, needQuoteStartLabel);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldstr, QuotChar);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+
+                il.MarkLabel(needQuoteStartLabel);
+
+                var types = new[] { _stringType, _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
+                var methods = new[] { null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, _generatorDateToString, _byteArrayToStr, _guidToStr, null };
+
+                for (var i = 0; i < types.Length; i++) {
+                    var objType = types[i];
+                    var compareLabel = il.DefineLabel();
+
+                    il.Emit(OpCodes.Ldloc, typeLocal);
             
-            if (needQuotes)
-                sb.Append(QuotChar);
+                    il.Emit(OpCodes.Ldtoken, objType);
+                    il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
 
-            return sb.ToString();
+                    il.Emit(OpCodes.Call, _typeopEquality);
+
+                    il.Emit(OpCodes.Brfalse, compareLabel);
+
+                    if (objType == _stringType) {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Castclass, _stringType);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    } else if (objType == _boolType) {
+                        var boolLocal = il.DeclareLocal(_stringType);
+                        var boolLabel = il.DefineLabel();
+                        il.Emit(OpCodes.Ldstr, "true");
+                        il.Emit(OpCodes.Stloc, boolLocal);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Unbox_Any, _boolType);
+                        il.Emit(OpCodes.Brtrue, boolLabel);
+                        il.Emit(OpCodes.Ldstr, "false");
+                        il.Emit(OpCodes.Stloc, boolLocal);
+                        il.MarkLabel(boolLabel);
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldloc, boolLocal);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    } else if (objType == _objectType) {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
+                        il.Emit(OpCodes.Pop);
+                    } 
+                    else {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        if (objType.IsValueType)
+                            il.Emit(OpCodes.Unbox_Any, objType);
+                        else il.Emit(OpCodes.Castclass, objType);
+                        il.Emit(OpCodes.Call, methods[i]);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    }
+
+                    il.MarkLabel(compareLabel);
+                }
+
+               
+                il.Emit(OpCodes.Ldloc, needQuoteLocal);
+                il.Emit(OpCodes.Brfalse, needQuoteEndLabel);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldstr, QuotChar);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+
+                il.MarkLabel(needQuoteEndLabel);
+
+                il.Emit(OpCodes.Ret);
+
+                return method;
+            });
         }
 
         internal static Type Generate(Type objType) {
@@ -674,8 +770,9 @@ namespace NetJSON {
 
             returnType = type.CreateType();
             _types[objType] = returnType;
-            
-            //assembly.Save(String.Concat(typeName, _dllStr));
+
+            if (_generateAssembly)
+                assembly.Save(String.Concat(typeName, _dllStr));
 
             return returnType;
         }
@@ -1046,8 +1143,8 @@ namespace NetJSON {
                     //il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldarg_0);
                     if (type == _objectType){
-                        il.Emit(OpCodes.Call, _fastObjectToStr);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Call, GenerateFastObjectToString(typeBuilder));
+                        il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Pop);
                     }
                     else if (type == _stringType) {
@@ -1065,12 +1162,11 @@ namespace NetJSON {
                 } else {
 
                     if (type == _dateTimeType) {
-                        if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        }
+                        
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Ldstr, IsoFormat);
                         il.Emit(OpCodes.Ldarg_0);
@@ -1079,12 +1175,11 @@ namespace NetJSON {
                         il.Emit(OpCodes.Call, _useTickFormat ? _generatorDateToString : _generatorDateToISOFormat);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                        if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        }
+                        
                     } else if (type == _byteArrayType) {
 
                         il.Emit(OpCodes.Ldarg_0);
@@ -1098,24 +1193,21 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ret);
                         il.MarkLabel(nullLabel);
 
-                        if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        }
-
+                        
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Call, _convertBase64);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                        if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        }
+                        
                     } else if (type == _boolType) {
                         var boolLocal = il.DeclareLocal(_stringType);
                         var boolLabel = il.DefineLabel();
@@ -1159,6 +1251,23 @@ namespace NetJSON {
                         il.Emit(OpCodes.Call, _generatorDecimalToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
+                    } else if (type == _guidType) {
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, _guidToStr);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
                     }
                     else {
                         if (needQuote) {
@@ -1181,6 +1290,8 @@ namespace NetJSON {
                             il.Emit(OpCodes.Pop);
                         }
                     }
+
+
                 }
             } else {
                 WriteSerializeFor(typeBuilder, type, il);
@@ -1553,6 +1664,8 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldsfld, _timeSpanType.GetField("MinValue"));
             else if (type == _boolType)
                 il.Emit(OpCodes.Ldc_I4_0);
+            else if (type == _guidType)
+                il.Emit(OpCodes.Call, _guidNewGuid);
             else if (type == _decimalType) {
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Newobj, _decimalType.GetConstructor(new[] { _intType }));
@@ -2132,6 +2245,11 @@ namespace NetJSON {
             return DateTime.Parse(value);
         }
 
+        public static Guid FastStringToGuid(string value) {
+            //TODO: Optimize
+            return new Guid(value);
+        }
+
         private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value) {
             il.Emit(OpCodes.Ldloc, value);
 
@@ -2155,6 +2273,9 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, _fastStringToByteArray);
             else if (type == _boolType) 
                 il.Emit(OpCodes.Call, _fastStringToBool);
+            else if (type == _guidType) {
+                il.Emit(OpCodes.Call, _fastStringToGuid);
+            }
             else if (type.IsEnum)
                 il.Emit(OpCodes.Call, ReadStringToEnumFor(typeBuilder, type));
         }
@@ -2553,12 +2674,13 @@ namespace NetJSON {
 
             var isStringType = !isDict || keyType == _stringType || keyType == _objectType;
 
+            MethodInfo addMethod = null;
+
             var isNotTagLabel = il.DefineLabel();
             var dictSetItem = isDict ? (isKeyValuePair ? 
-                //TODO: Figure out a better to get the correct methods
-                (type.Name == "CocurrentBag`1" ? type.GetMethod("Add") :
-                type.Name == "ConcurrentQueue`1" ? type.GetMethod("Enqueue") :
-                type.Name == "ConcurrentStack`1" ? type.GetMethod("Push") : null)
+                ((addMethod = type.GetMethod("Add")) != null ? addMethod :
+                (addMethod = type.GetMethod("Enqueue")) != null ? addMethod :
+                (addMethod = type.GetMethod("Push")) != null ? addMethod : null)
                 : type.GetMethod("set_Item")) : null;
 
             if (isDict) {
@@ -2976,7 +3098,7 @@ namespace NetJSON {
         }
 
         public static bool IsStringBasedType(this Type type) {
-            return type == _stringType || type == _dateTimeType || type == _timeSpanType || type == _byteArrayType;
+            return type == _stringType || type == _dateTimeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
         }
     }
 }
