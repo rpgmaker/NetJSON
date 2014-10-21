@@ -79,6 +79,7 @@ namespace NetJSON {
             _objectType = typeof(Object),
             _nullableType = typeof(Nullable<>),
             _decimalType = typeof(decimal),
+            _genericCollectionType = typeof(ICollection<>),
             _floatType = typeof(float),
             _doubleType = typeof(double),
             _enumeratorTypeNonGeneric = typeof(IEnumerator),
@@ -172,6 +173,8 @@ namespace NetJSON {
               IDictStr = "IDictionary`2",
               KeyValueStr = "KeyValuePair`2",
               CreateListStr = "CreateList",
+              ICollectionStr = "ICollection`1",
+             IEnumerableStr = "IEnumerable`1",
               CreateClassOrDictStr = "CreateClassOrDict",
               ExtractStr = "Extract",
               SetStr = "Set",
@@ -466,12 +469,16 @@ namespace NetJSON {
         }
 
         public static bool IsListType(this Type type) {
-            return _listType.IsAssignableFrom(type) || type.Name == IListStr;
+            Type interfaceType = null;
+            return _listType.IsAssignableFrom(type) || type.Name == IListStr ||
+                (type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+                ((interfaceType = type.GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr);
         }
 
         public static bool IsDictionaryType(this Type type) {
             Type interfaceType = null;
-            return _dictType.IsAssignableFrom(type) || type.Name == IDictStr || ((interfaceType = type.GetInterface(_ienumerableType.Name)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
+            return _dictType.IsAssignableFrom(type) || type.Name == IDictStr
+                || ((interfaceType = type.GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
         }
 
         public static bool IsCollectionType(this Type type) {
@@ -1494,9 +1501,90 @@ namespace NetJSON {
             il.MarkLabel(endEnumeratorLabel);
         }
 
+        internal static void WriteICollectionArray(TypeBuilder typeBuilder, Type type, ILGenerator il) {
+            var arguments = type.GetGenericArguments();
+            var itemType = arguments[0];
+            
+            
+            var isItemPrimitive = itemType.IsPrimitiveType();
+            
+            var enumerableType = _ienumerableType.MakeGenericType(itemType);
+            var enumeratorType = _enumeratorType.MakeGenericType(itemType);
+            var enumeratorLocal = il.DeclareLocal(enumeratorType);
+            var entryLocal = il.DeclareLocal(itemType);
+            var startEnumeratorLabel = il.DefineLabel();
+            var moveNextLabel = il.DefineLabel();
+            var endEnumeratorLabel = il.DefineLabel();
+            var hasItem = il.DeclareLocal(_boolType);
+            var hasItemLabel = il.DefineLabel();
+            var needQuote = (itemType == _stringType || itemType == _guidType || itemType == _timeSpanType || itemType == _dateTimeType || itemType == _byteArrayType);
+
+
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Stloc, hasItem);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Callvirt,
+                enumerableType.GetMethod("GetEnumerator"));
+            il.Emit(OpCodes.Stloc, enumeratorLocal);
+            il.BeginExceptionBlock();
+            il.Emit(OpCodes.Br, startEnumeratorLabel);
+            il.MarkLabel(moveNextLabel);
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
+            il.Emit(OpCodes.Callvirt,
+                enumeratorLocal.LocalType.GetProperty("Current")
+                .GetGetMethod());
+            il.Emit(OpCodes.Stloc, entryLocal);
+
+            il.Emit(OpCodes.Ldloc, hasItem);
+            il.Emit(OpCodes.Brfalse, hasItemLabel);
+
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldc_I4_S, Delimeter);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+            il.Emit(OpCodes.Pop);
+
+            il.MarkLabel(hasItemLabel);
+
+            
+            //il.Emit(OpCodes.Ldarg_0);
+            if (itemType == _intType || itemType == _longType) {
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldloc, entryLocal);
+                il.Emit(OpCodes.Call, itemType == _intType ? _generatorIntToStr : _generatorLongToStr);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+            } else {
+                il.Emit(OpCodes.Ldloc, entryLocal);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, itemType));
+            }
+
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Stloc, hasItem);
+
+            il.MarkLabel(startEnumeratorLabel);
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
+            il.Emit(OpCodes.Callvirt, _enumeratorTypeNonGeneric.GetMethod("MoveNext", MethodBinding));
+            il.Emit(OpCodes.Brtrue, moveNextLabel);
+            il.Emit(OpCodes.Leave, endEnumeratorLabel);
+            il.BeginFinallyBlock();
+            il.Emit(OpCodes.Ldloc, enumeratorLocal);
+            il.Emit(OpCodes.Callvirt, _iDisposableDispose);
+            il.EndExceptionBlock();
+            il.MarkLabel(endEnumeratorLabel);
+        }
+
         internal static void WriteListArray(TypeBuilder typeBuilder, Type type, ILGenerator il) {
 
             var isArray = type.IsArray;
+            var isCollectionList = !isArray && !_listType.IsAssignableFrom(type);
+
+            if (isCollectionList) {
+                WriteICollectionArray(typeBuilder, type, il);
+                return;
+            }
+
             var itemType = isArray ? type.GetElementType() : type.GetGenericArguments()[0];
             var isPrimitive = itemType.IsPrimitiveType();
             var itemLocal = il.DeclareLocal(itemType);
@@ -2465,15 +2553,16 @@ namespace NetJSON {
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
             var isStringBased = isStringType || elementType == _dateTimeType || elementType == _timeSpanType || isByteArray;
+            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
 
 
-            var obj = il.DeclareLocal(typeof(List<>).MakeGenericType(elementType));
+            var obj = isCollectionType ? il.DeclareLocal(type) : il.DeclareLocal(typeof(List<>).MakeGenericType(elementType));
             var objArray = isArray ? il.DeclareLocal(elementType.MakeArrayType()) : null;
             var count = il.DeclareLocal(_intType);
             var startIndex = il.DeclareLocal(_intType);
             var endIndex = il.DeclareLocal(_intType);
             var prev = il.DeclareLocal(_charType);
-            var addMethod = obj.LocalType.GetMethod("Add");
+            var addMethod = _genericCollectionType.MakeGenericType(elementType).GetMethod("Add");
 
             var prevLabel = il.DefineLabel();
             

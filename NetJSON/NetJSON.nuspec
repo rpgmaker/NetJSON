@@ -4,7 +4,7 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.0.4.5</version> 
+    <version>1.0.5</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description> 
     <language>en-US</language>
