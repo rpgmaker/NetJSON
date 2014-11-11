@@ -2397,6 +2397,8 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, _fastStringToInt);
             else if (type == typeof(uint))
                 il.Emit(OpCodes.Call, _fastStringToUInt);
+            else if (type == _decimalType)
+                il.Emit(OpCodes.Call, _fastStringToDecimal);
             else if (type == typeof(long))
                 il.Emit(OpCodes.Call, _fastStringToLong);
             else if (type == typeof(ulong))
@@ -2411,12 +2413,11 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, _timeSpanParse);
             else if (type == _byteArrayType)
                 il.Emit(OpCodes.Call, _fastStringToByteArray);
-            else if (type == _boolType) 
+            else if (type == _boolType)
                 il.Emit(OpCodes.Call, _fastStringToBool);
             else if (type == _guidType) {
                 il.Emit(OpCodes.Call, _fastStringToGuid);
-            }
-            else if (type.IsEnum)
+            } else if (type.IsEnum)
                 il.Emit(OpCodes.Call, ReadStringToEnumFor(typeBuilder, type));
         }
 
