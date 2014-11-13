@@ -222,6 +222,9 @@ namespace NetJSON {
 
         static readonly ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
 
+        static readonly ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
+            new ConcurrentDictionary<Type, Delegate>();
+
         static readonly ConcurrentDictionary<Type, PropertyInfo[]> _typeProperties =
             new ConcurrentDictionary<Type, PropertyInfo[]>();
 
@@ -511,6 +514,14 @@ namespace NetJSON {
             }
         }
 
+        private static bool _useEnumString = false;
+
+        public static bool UseEnumString {
+            set {
+                _useEnumString = value;
+            }
+        }
+
         private static bool _skipDefaultValue = true;
 
         public static bool SkipDefaultValue {
@@ -554,7 +565,7 @@ namespace NetJSON {
         }
 
         public static bool NeedQuotes(Type type) {
-            return type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType;
+            return type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType || (_useEnumString && type.IsEnum);
         }
 
         private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
@@ -975,9 +986,7 @@ namespace NetJSON {
             var values = Enum.GetValues(type).Cast<int>().ToArray();
             var keys = Enum.GetNames(type);
 
-            var count = values.Length;
-
-            for (var i = 0; i < count; i++) {
+            for (var i = 0; i < values.Length; i++) {
 
                 var value = values[i];
                 var k = keys[i];
@@ -1026,28 +1035,56 @@ namespace NetJSON {
             _writeEnumToStringMethodBuilders[key] = method;
             var il = method.GetILGenerator();
 
-            var values = Enum.GetValues(type).Cast<int>().ToArray();
+            if (_useEnumString) {
+                var values = Enum.GetValues(type).Cast<int>().ToArray();
+                var names = Enum.GetNames(type);
 
-            var count = values.Length;
+                var count = values.Length;
 
-            for (var i = 0; i < count; i++) {
+                for (var i = 0; i < count; i++) {
 
-                var value = values[i];
-                var @int = (int)value;
+                    var value = values[i];
+                    var @int = value;
 
-                var label = il.DefineLabel();
+                    var label = il.DefineLabel();
 
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldc_I4, @int);
-                il.Emit(OpCodes.Bne_Un, label);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, @int);
+                    il.Emit(OpCodes.Bne_Un, label);
 
-                il.Emit(OpCodes.Ldstr, IntToStr(@int));
-                il.Emit(OpCodes.Ret);
+                    il.Emit(OpCodes.Ldstr, names[i]);
+                    il.Emit(OpCodes.Ret);
 
-                il.MarkLabel(label);
+                    il.MarkLabel(label);
+                }
+
+                il.Emit(OpCodes.Ldstr, "0");
+            } else {
+                var values = Enum.GetValues(type).Cast<int>().ToArray();
+
+                var count = values.Length;
+
+                for (var i = 0; i < count; i++) {
+
+                    var value = values[i];
+                    var @int = value;
+
+                    var label = il.DefineLabel();
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, @int);
+                    il.Emit(OpCodes.Bne_Un, label);
+
+                    il.Emit(OpCodes.Ldstr, IntToStr(@int));
+                    il.Emit(OpCodes.Ret);
+
+                    il.MarkLabel(label);
+                }
+
+                il.Emit(OpCodes.Ldstr, "0");
             }
+            
 
-            il.Emit(OpCodes.Ldstr, "0");
             il.Emit(OpCodes.Ret);
 
             return method;
@@ -1274,14 +1311,27 @@ namespace NetJSON {
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (type.IsEnum) {
+
+                        if (_useEnumString) {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        }
+
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Call, WriteEnumToStringFor(typeBuilder, type));
-                        //il.Emit(OpCodes.Conv_I4);
-                        //il.Emit(OpCodes.Box, _intType);
-                        //il.Emit(OpCodes.Call, _generatorIntToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
+
+                        if (_useEnumString) {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        }
+
                     } else if (type == _floatType) {
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
@@ -1361,8 +1411,140 @@ namespace NetJSON {
             methodIL.Emit(OpCodes.Ret);
             methodIL.MarkLabel(conditionLabel);
 
-            if (type.IsClassType()) WritePropertiesFor(typeBuilder, type, methodIL);
+            if (type.IsNotPublic && type.IsClass) {
+
+                throw new InvalidOperationException("Non-Public Types is not supported yet");
+                
+                var method = WriteNonPublicProperties(typeBuilder, type);
+
+                methodIL.Emit(OpCodes.Ldarg_0);
+                methodIL.Emit(OpCodes.Ldarg_1);
+
+                methodIL.Emit(OpCodes.Call, method);
+            }
+            else if (type.IsClassType()) WritePropertiesFor(typeBuilder, type, methodIL);
             else WriteCollection(typeBuilder, type, methodIL);
+        }
+
+        internal static MethodInfo WriteNonPublicProperties(TypeBuilder typeBuilder, Type type) {
+            return _nonPublicBuilder.GetOrAdd(type, _ => {
+
+                var method = new DynamicMethod(String.Concat(WriteStr, type.Name), _voidType, new[] { type, _stringBuilderType }, typeBuilder.Module, true);
+
+                var il = method.GetILGenerator();
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldc_I4_S, ObjectOpen);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+                il.Emit(OpCodes.Pop);
+
+                var hasValue = il.DeclareLocal(_boolType);
+                var props = type.GetTypeProperties();
+                var count = props.Length - 1;
+                var counter = 0;
+
+
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Stloc, hasValue);
+
+
+                foreach (var prop in props) {
+                    var name = prop.Name;
+                    var propType = prop.PropertyType;
+                    var originPropType = prop.PropertyType;
+                    var isPrimitive = propType.IsPrimitiveType();
+                    var nullableType = propType.GetNullableType();
+                    var isNullable = nullableType != null;
+
+                    propType = isNullable ? nullableType : propType;
+                    var isValueType = propType.IsValueType;
+                    var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
+                    var equalityMethod = propType.GetMethod("op_Equality");
+                    var propValue = il.DeclareLocal(propType);
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+                    if (isNullable) {
+                        var nullablePropValue = il.DeclareLocal(originPropType);
+                        il.Emit(OpCodes.Stloc, nullablePropValue);
+                        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                        il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
+                    }
+
+                    il.Emit(OpCodes.Stloc, propValue);
+
+
+                    if (_skipDefaultValue) {
+                        il.Emit(OpCodes.Ldloc, propValue);
+                        if (isValueType && isPrimitive) {
+                            LoadDefaultValueByType(il, propType);
+                        } else {
+                            il.Emit(OpCodes.Ldnull);
+                        }
+
+                        if (equalityMethod != null) {
+                            il.Emit(OpCodes.Call, equalityMethod);
+                            il.Emit(OpCodes.Brtrue, propNullLabel);
+                        } else {
+                            il.Emit(OpCodes.Beq, propNullLabel);
+                        }
+                    }
+
+
+                    if (counter > 0) {
+
+                        var hasValueDelimeterLabel = il.DefineLabel();
+
+                        il.Emit(OpCodes.Ldloc, hasValue);
+                        il.Emit(OpCodes.Brfalse, hasValueDelimeterLabel);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldc_I4, Delimeter);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+                        il.Emit(OpCodes.Pop);
+
+                        il.MarkLabel(hasValueDelimeterLabel);
+                    }
+
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldstr, String.Concat(QuotChar, name, QuotChar, Colon));
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                    il.Emit(OpCodes.Pop);
+
+
+                    if (propType == _intType || propType == _longType) {
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldloc, propValue);
+
+                        il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    } else {
+                        il.Emit(OpCodes.Ldloc, propValue);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
+                    }
+
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Stloc, hasValue);
+
+                    if (_skipDefaultValue) {
+                        il.MarkLabel(propNullLabel);
+                    }
+
+                    counter++;
+                }
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldc_I4_S, ObjectClose);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+                il.Emit(OpCodes.Pop);
+
+                il.Emit(OpCodes.Ret);
+
+                return method.CreateDelegate(typeof(Action<,>).MakeGenericType(type, _stringBuilderType));
+            }).Method;
         }
 
         internal static void WriteCollection(TypeBuilder typeBuilder, Type type, ILGenerator il) {
@@ -1407,7 +1589,7 @@ namespace NetJSON {
             var endEnumeratorLabel = il.DefineLabel();
             var hasItem = il.DeclareLocal(_boolType);
             var hasItemLabel = il.DefineLabel();
-            var needQuote = (keyType == _stringType || keyType == _guidType || keyType == _timeSpanType || keyType == _dateTimeType || keyType == _byteArrayType);
+            var needQuote = (keyType == _stringType || keyType == _guidType || keyType == _timeSpanType || keyType == _dateTimeType || keyType == _byteArrayType || (_useEnumString && keyType.IsEnum));
 
 
             il.Emit(OpCodes.Ldc_I4_0);
@@ -1517,7 +1699,7 @@ namespace NetJSON {
             var endEnumeratorLabel = il.DefineLabel();
             var hasItem = il.DeclareLocal(_boolType);
             var hasItemLabel = il.DefineLabel();
-            var needQuote = (itemType == _stringType || itemType == _guidType || itemType == _timeSpanType || itemType == _dateTimeType || itemType == _byteArrayType);
+            var needQuote = (itemType == _stringType || itemType == _guidType || itemType == _timeSpanType || itemType == _dateTimeType || itemType == _byteArrayType || (_useEnumString && itemType.IsEnum));
 
 
             il.Emit(OpCodes.Ldc_I4_0);
@@ -2553,7 +2735,7 @@ namespace NetJSON {
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || elementType == _dateTimeType || elementType == _timeSpanType || isByteArray;
+            var isStringBased = isStringType || elementType == _dateTimeType || elementType == _timeSpanType || isByteArray || (_useEnumString && elementType.IsEnum);
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
 
 
@@ -2814,7 +2996,7 @@ namespace NetJSON {
                 isKeyValuePair = true;
             }
 
-            var isStringType = !isDict || keyType == _stringType || keyType == _objectType;
+            var isStringType = !isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
 
             MethodInfo addMethod = null;
 
@@ -3240,7 +3422,7 @@ namespace NetJSON {
         }
 
         public static bool IsStringBasedType(this Type type) {
-            return type == _stringType || type == _dateTimeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
+            return type == _stringType || type == _dateTimeType || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
         }
     }
 }
