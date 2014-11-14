@@ -127,6 +127,9 @@ namespace NetJSON {
             _toExpectedType = typeof(AutomaticTypeConverter).GetMethod("ToExpectedType"),
             _fastStringToInt = _jsonType.GetMethod("FastStringToInt", MethodBinding),
             _fastStringToUInt = _jsonType.GetMethod("FastStringToUInt", MethodBinding),
+            _fastStringToUShort = _jsonType.GetMethod("FastStringToUShort", MethodBinding),
+            _fastStringToShort = _jsonType.GetMethod("FastStringToShort", MethodBinding),
+            _fastStringToByte = _jsonType.GetMethod("FastStringToByte", MethodBinding),
             _fastStringToLong = _jsonType.GetMethod("FastStringToLong", MethodBinding),
             _fastStringToULong = _jsonType.GetMethod("FastStringToULong", MethodBinding),
             _fastStringToDecimal = _jsonType.GetMethod("FastStringToDecimal", MethodBinding),
@@ -981,17 +984,18 @@ namespace NetJSON {
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
                 type, new[] { _stringType });
             _readEnumToStringMethodBuilders[key] = method;
+
+            var eType = type.GetEnumUnderlyingType();
             var il = method.GetILGenerator();
 
-            var values = Enum.GetValues(type).Cast<int>().ToArray();
+            var values = Enum.GetValues(type).Cast<object>().ToArray();
             var keys = Enum.GetNames(type);
 
             for (var i = 0; i < values.Length; i++) {
 
                 var value = values[i];
                 var k = keys[i];
-                var @int = value;
-
+                
                 var label = il.DefineLabel();
                 var label2 = il.DefineLabel();
 
@@ -1000,24 +1004,77 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, _stringOpEquality);
                 il.Emit(OpCodes.Brfalse, label);
 
-                il.Emit(OpCodes.Ldc_I4, @int);
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldc_I8, (long)value);
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldc_I4, (uint)value);
+                else if (eType == typeof(byte)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                    il.Emit(OpCodes.Conv_U1);
+                } else if (eType == typeof(ushort)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                    il.Emit(OpCodes.Conv_U2);
+                } else if (eType == typeof(short)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                    il.Emit(OpCodes.Conv_I2);
+                }
+
+                
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(label);
 
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldstr, IntToStr(@int));
+
+
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)value));
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldstr, LongToStr((long)value));
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
+                else if (eType == typeof(byte))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
+                else if (eType == typeof(ushort))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
+                else if (eType == typeof(short))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
+                 
                 il.Emit(OpCodes.Call, _stringOpEquality);
                 il.Emit(OpCodes.Brfalse, label2);
 
-                il.Emit(OpCodes.Ldc_I4, @int);
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldc_I8, (long)value);
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldc_I4, (uint)value);
+                else if (eType == typeof(byte)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                    il.Emit(OpCodes.Conv_U1);
+                } else if (eType == typeof(ushort)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                    il.Emit(OpCodes.Conv_U2);
+                } else if (eType == typeof(short)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                    il.Emit(OpCodes.Conv_I2);
+                }
+
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(label2);
             }
 
             //Return default enum if no match is found
-            il.Emit(OpCodes.Ldc_I4_0);
+            LoadDefaultValueByType(il, eType);
             il.Emit(OpCodes.Ret);
 
             return method;
@@ -1033,10 +1090,13 @@ namespace NetJSON {
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
                 _stringType, new[] { type });
             _writeEnumToStringMethodBuilders[key] = method;
+
+            var eType = type.GetEnumUnderlyingType();
+
             var il = method.GetILGenerator();
 
             if (_useEnumString) {
-                var values = Enum.GetValues(type).Cast<int>().ToArray();
+                var values = Enum.GetValues(type).Cast<object>().ToArray();
                 var names = Enum.GetNames(type);
 
                 var count = values.Length;
@@ -1044,12 +1104,30 @@ namespace NetJSON {
                 for (var i = 0; i < count; i++) {
 
                     var value = values[i];
-                    var @int = value;
-
+                    
                     var label = il.DefineLabel();
 
                     il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, @int);
+
+                    if (eType == _intType)
+                        il.Emit(OpCodes.Ldc_I4, (int)value);
+                    else if (eType == _longType)
+                        il.Emit(OpCodes.Ldc_I8, (long)value);
+                    else if (eType == typeof(ulong))
+                        il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                    else if (eType == typeof(uint))
+                        il.Emit(OpCodes.Ldc_I4, (uint)value);
+                    else if (eType == typeof(byte)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                        il.Emit(OpCodes.Conv_U1);
+                    } else if (eType == typeof(ushort)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                        il.Emit(OpCodes.Conv_U2);
+                    } else if (eType == typeof(short)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                        il.Emit(OpCodes.Conv_I2);
+                    }
+                    
                     il.Emit(OpCodes.Bne_Un, label);
 
                     il.Emit(OpCodes.Ldstr, names[i]);
@@ -1058,32 +1136,64 @@ namespace NetJSON {
                     il.MarkLabel(label);
                 }
 
-                il.Emit(OpCodes.Ldstr, "0");
             } else {
-                var values = Enum.GetValues(type).Cast<int>().ToArray();
+                var values = Enum.GetValues(type).Cast<object>().ToArray();
 
                 var count = values.Length;
 
                 for (var i = 0; i < count; i++) {
 
                     var value = values[i];
-                    var @int = value;
-
+                    
                     var label = il.DefineLabel();
 
                     il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldc_I4, @int);
+
+                    if (eType == _intType)
+                        il.Emit(OpCodes.Ldc_I4, (int)value);
+                    else if (eType == _longType)
+                        il.Emit(OpCodes.Ldc_I8, (long)value);
+                    else if (eType == typeof(ulong))
+                        il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                    else if (eType == typeof(uint))
+                        il.Emit(OpCodes.Ldc_I4, (uint)value);
+                    else if (eType == typeof(byte)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                        il.Emit(OpCodes.Conv_U1);
+                    } else if (eType == typeof(ushort)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                        il.Emit(OpCodes.Conv_U2);
+                    } else if (eType == typeof(short)) {
+                        il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                        il.Emit(OpCodes.Conv_I2);
+                    }
+
                     il.Emit(OpCodes.Bne_Un, label);
 
-                    il.Emit(OpCodes.Ldstr, IntToStr(@int));
+                    if (eType == _intType)
+                        il.Emit(OpCodes.Ldstr, IntToStr((int)value));
+                    else if (eType == _longType)
+                        il.Emit(OpCodes.Ldstr, LongToStr((long)value));
+                    else if (eType == typeof(ulong))
+                        il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
+                    else if (eType == typeof(uint))
+                        il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
+                    else if (eType == typeof(byte))
+                        il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
+                    else if (eType == typeof(ushort))
+                        il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
+                    else if (eType == typeof(short))
+                        il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
+                    
+                 
                     il.Emit(OpCodes.Ret);
 
                     il.MarkLabel(label);
                 }
 
-                il.Emit(OpCodes.Ldstr, "0");
             }
-            
+
+            il.Emit(OpCodes.Ldstr, "0");
 
             il.Emit(OpCodes.Ret);
 
@@ -1970,6 +2080,11 @@ namespace NetJSON {
         private static void LoadDefaultValueByType(ILGenerator il, Type type) {
             if (type == _intType)
                 il.Emit(OpCodes.Ldc_I4_0);
+            else if(type == typeof(byte) || type == typeof(short) || type == typeof(ushort)){
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(typeof(byte) == type ? OpCodes.Conv_U1 :
+                    typeof(short) == type ? OpCodes.Conv_I2 : OpCodes.Conv_U2);
+            }
             else if (type == typeof(uint))
                 il.Emit(OpCodes.Ldc_I4_0);
             else if (type == typeof(long))
@@ -2306,6 +2421,24 @@ namespace NetJSON {
             return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
         }
 
+        public static unsafe byte FastStringToByte(string str) {
+            unchecked {
+                return (byte)FastStringToInt(str);
+            }
+        }
+
+        public static unsafe short FastStringToShort(string str) {
+            unchecked {
+                return (short)FastStringToInt(str);
+            }
+        }
+
+        public static unsafe ushort FastStringToUShort(string str) {
+            unchecked {
+                return (ushort)FastStringToInt(str);
+            }
+        }
+
         public static unsafe int FastStringToInt(string strNum) {
             int val = 0;
             int neg = 1;
@@ -2543,7 +2676,7 @@ namespace NetJSON {
         }
 
         public static bool FastStringToBool(string value) {
-            return value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase);
+            return value == "1" || String.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         public static byte[] FastStringToByteArray(string value) {
@@ -2577,6 +2710,12 @@ namespace NetJSON {
 
             if (type == _intType)
                 il.Emit(OpCodes.Call, _fastStringToInt);
+            else if (type == typeof(short))
+                il.Emit(OpCodes.Call, _fastStringToShort);
+            else if (type == typeof(ushort))
+                il.Emit(OpCodes.Call, _fastStringToUShort);
+            else if (type == typeof(byte))
+                il.Emit(OpCodes.Call, _fastStringToByte);
             else if (type == typeof(uint))
                 il.Emit(OpCodes.Call, _fastStringToUInt);
             else if (type == _decimalType)
