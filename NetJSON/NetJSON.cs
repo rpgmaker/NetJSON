@@ -3103,6 +3103,7 @@ namespace NetJSON {
                 type, new[] { _charPtrType, _intType.MakeByRefType() });
             _readMethodBuilders[key] = method;
 
+            
             var il = method.GetILGenerator();
 
             var dict = il.DeclareLocal(_dictType);
@@ -3293,6 +3294,71 @@ namespace NetJSON {
                     il.Emit(OpCodes.Add);
                     il.Emit(OpCodes.Stloc, startIndex);
 
+
+                    //String Skipping Optimization
+                    var charCounts = new Dictionary<char, HashSet<int>>();
+
+                    var typeProps = type.GetTypeProperties();
+                    foreach (var prop in typeProps) {
+                        HashSet<int> charSet;
+                        var propName = prop.Name;
+                        char propChar = propName[0];
+                        if (!charCounts.TryGetValue(propChar, out charSet)) {
+                            charSet = charCounts[propChar] = new HashSet<int>();
+                        }
+                        charSet.Add(propName.Length);
+                    }
+
+                    var nextChar = il.DeclareLocal(_charType);
+                    var nextLabel = il.DefineLabel();
+
+                    il.Emit(OpCodes.Ldloc, ptr);
+                    il.Emit(OpCodes.Ldloc, startIndex);
+                    il.Emit(OpCodes.Ldc_I4_2);
+                    il.Emit(OpCodes.Mul);
+                    il.Emit(OpCodes.Conv_I);
+                    il.Emit(OpCodes.Add);
+                    il.Emit(OpCodes.Ldind_U2);
+                    il.Emit(OpCodes.Stloc, nextChar);
+
+                    foreach (var @char in charCounts) {
+                        var charKey = @char.Key;
+                        var hashSet = @char.Value;
+                        var checkChar = il.DefineLabel();
+
+
+                        il.Emit(OpCodes.Ldloc, nextChar);
+                        il.Emit(OpCodes.Ldc_I4, (int)charKey);
+                        il.Emit(OpCodes.Bne_Un, checkChar);
+
+
+                        foreach (var set in hashSet) {
+
+                            var checkCharByIndexLabel = il.DefineLabel();
+
+                            il.Emit(OpCodes.Ldloc, ptr);
+                            il.Emit(OpCodes.Ldloc, startIndex);
+                            il.Emit(OpCodes.Ldc_I4, set);
+                            il.Emit(OpCodes.Add);
+                            il.Emit(OpCodes.Ldc_I4_2);
+                            il.Emit(OpCodes.Mul);
+                            il.Emit(OpCodes.Conv_I);
+                            il.Emit(OpCodes.Add);
+                            il.Emit(OpCodes.Ldind_U2);
+                            il.Emit(OpCodes.Ldc_I4, (int)'"');
+                            il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
+
+                            IncrementIndexRef(il, count: set);
+                            il.Emit(OpCodes.Br, nextLabel);
+
+                            il.MarkLabel(checkCharByIndexLabel);
+
+                        }
+
+                        il.MarkLabel(checkChar);
+                    }
+
+                    il.MarkLabel(nextLabel);
                     il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
                     il.MarkLabel(currentQuoteLabel);
                     //else if(current == '"' && quotes > 0 && prev != '\\')
