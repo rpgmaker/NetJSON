@@ -944,6 +944,7 @@ namespace NetJSON {
                         case '\u001F': sb.Append(@"\u001F"); break;
                         default: sb.Append(c); break;
                     }
+
                 }
             }
         }
@@ -3295,70 +3296,43 @@ namespace NetJSON {
                     il.Emit(OpCodes.Stloc, startIndex);
 
 
-                    //String Skipping Optimization
-                    var charCounts = new Dictionary<char, HashSet<int>>();
+                    #region String Skipping Optimization
+                    var charSet = new HashSet<int>();
 
                     var typeProps = type.GetTypeProperties();
                     foreach (var prop in typeProps) {
-                        HashSet<int> charSet;
                         var propName = prop.Name;
-                        char propChar = propName[0];
-                        if (!charCounts.TryGetValue(propChar, out charSet)) {
-                            charSet = charCounts[propChar] = new HashSet<int>();
-                        }
                         charSet.Add(propName.Length);
                     }
 
-                    var nextChar = il.DeclareLocal(_charType);
                     var nextLabel = il.DefineLabel();
 
-                    il.Emit(OpCodes.Ldloc, ptr);
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Ldc_I4_2);
-                    il.Emit(OpCodes.Mul);
-                    il.Emit(OpCodes.Conv_I);
-                    il.Emit(OpCodes.Add);
-                    il.Emit(OpCodes.Ldind_U2);
-                    il.Emit(OpCodes.Stloc, nextChar);
+                    foreach (var set in charSet.OrderBy(x => x)) {
 
-                    foreach (var @char in charCounts) {
-                        var charKey = @char.Key;
-                        var hashSet = @char.Value;
-                        var checkChar = il.DefineLabel();
+                        var checkCharByIndexLabel = il.DefineLabel();
 
+                        il.Emit(OpCodes.Ldloc, ptr);
+                        il.Emit(OpCodes.Ldloc, startIndex);
+                        il.Emit(OpCodes.Ldc_I4, set);
+                        il.Emit(OpCodes.Add);
+                        il.Emit(OpCodes.Ldc_I4_2);
+                        il.Emit(OpCodes.Mul);
+                        il.Emit(OpCodes.Conv_I);
+                        il.Emit(OpCodes.Add);
+                        il.Emit(OpCodes.Ldind_U2);
+                        il.Emit(OpCodes.Ldc_I4, (int)'"');
+                        il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
 
-                        il.Emit(OpCodes.Ldloc, nextChar);
-                        il.Emit(OpCodes.Ldc_I4, (int)charKey);
-                        il.Emit(OpCodes.Bne_Un, checkChar);
+                        IncrementIndexRef(il, count: set);
+                        il.Emit(OpCodes.Br, nextLabel);
 
+                        il.MarkLabel(checkCharByIndexLabel);
 
-                        foreach (var set in hashSet) {
-
-                            var checkCharByIndexLabel = il.DefineLabel();
-
-                            il.Emit(OpCodes.Ldloc, ptr);
-                            il.Emit(OpCodes.Ldloc, startIndex);
-                            il.Emit(OpCodes.Ldc_I4, set);
-                            il.Emit(OpCodes.Add);
-                            il.Emit(OpCodes.Ldc_I4_2);
-                            il.Emit(OpCodes.Mul);
-                            il.Emit(OpCodes.Conv_I);
-                            il.Emit(OpCodes.Add);
-                            il.Emit(OpCodes.Ldind_U2);
-                            il.Emit(OpCodes.Ldc_I4, (int)'"');
-                            il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
-
-                            IncrementIndexRef(il, count: set);
-                            il.Emit(OpCodes.Br, nextLabel);
-
-                            il.MarkLabel(checkCharByIndexLabel);
-
-                        }
-
-                        il.MarkLabel(checkChar);
                     }
 
                     il.MarkLabel(nextLabel);
+                    #endregion String Skipping Optimization
+                    
                     il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
                     il.MarkLabel(currentQuoteLabel);
                     //else if(current == '"' && quotes > 0 && prev != '\\')
@@ -3382,6 +3356,9 @@ namespace NetJSON {
                     il.Emit(OpCodes.Newobj, _strCtorWithPtr);
                     //il.Emit(OpCodes.Call, _createString);
                     il.Emit(OpCodes.Stloc, keyLocal);
+
+                    //il.EmitWriteLine(String.Format("{0}", type));
+                    //il.EmitWriteLine(keyLocal);
 
                     //index++
                     IncrementIndexRef(il);
