@@ -163,6 +163,7 @@ namespace NetJSON {
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
             _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
+            _objectEquals = _objectType.GetMethod("Equals", new []{ _objectType}),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
@@ -228,8 +229,8 @@ namespace NetJSON {
         static readonly ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
             new ConcurrentDictionary<Type, Delegate>();
 
-        static readonly ConcurrentDictionary<Type, PropertyInfo[]> _typeProperties =
-            new ConcurrentDictionary<Type, PropertyInfo[]>();
+        static readonly ConcurrentDictionary<Type, MemberInfo[]> _typeProperties =
+            new ConcurrentDictionary<Type, MemberInfo[]>();
 
         static readonly ConcurrentDictionary<string, string> _fixes =
             new ConcurrentDictionary<string, string>();
@@ -470,9 +471,16 @@ namespace NetJSON {
             });
         }
 
-        internal static PropertyInfo[] GetTypeProperties(this Type type) {
-            return _typeProperties.GetOrAdd(type, key => key.GetProperties(PropertyBinding));
+        internal static MemberInfo[] GetTypeProperties(this Type type) {
+            return _typeProperties.GetOrAdd(type, key => {
+                var props = key.GetProperties(PropertyBinding).Cast<MemberInfo>();
+                if (_includeFields) {
+                    props = props.Union(key.GetFields(PropertyBinding));
+                }
+                return props.ToArray();
+            });
         }
+
 
         public static bool IsListType(this Type type) {
             Type interfaceType = null;
@@ -522,6 +530,14 @@ namespace NetJSON {
         public static bool UseEnumString {
             set {
                 _useEnumString = value;
+            }
+        }
+
+        private static bool _includeFields = false;
+
+        public static bool IncludeFields {
+            set {
+                _includeFields = value;
             }
         }
 
@@ -1513,8 +1529,25 @@ namespace NetJSON {
         internal static void WriteSerializeFor(TypeBuilder typeBuilder, Type type, ILGenerator methodIL) {
             var conditionLabel = methodIL.DefineLabel();
 
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Brtrue, conditionLabel);
+            if (type.IsValueType) {
+                var defaultValue = methodIL.DeclareLocal(type);
+
+                methodIL.Emit(OpCodes.Ldarga, 0);
+
+                methodIL.Emit(OpCodes.Ldloca, defaultValue);
+                methodIL.Emit(OpCodes.Initobj, type);
+                methodIL.Emit(OpCodes.Ldloc, defaultValue);
+                methodIL.Emit(OpCodes.Box, type);
+                methodIL.Emit(OpCodes.Constrained, type);
+
+                methodIL.Emit(OpCodes.Callvirt, _objectEquals);
+
+                methodIL.Emit(OpCodes.Brfalse, conditionLabel);
+            } else {
+                methodIL.Emit(OpCodes.Ldarg_0);
+                methodIL.Emit(OpCodes.Brtrue, conditionLabel);
+            }
+            
             methodIL.Emit(OpCodes.Ldarg_1);
             methodIL.Emit(OpCodes.Ldstr, NullStr);
             methodIL.Emit(OpCodes.Callvirt, _stringBuilderAppend);
@@ -1526,136 +1559,10 @@ namespace NetJSON {
 
                 throw new InvalidOperationException("Non-Public Types is not supported yet");
                 
-                var method = WriteNonPublicProperties(typeBuilder, type);
-
-                methodIL.Emit(OpCodes.Ldarg_0);
-                methodIL.Emit(OpCodes.Ldarg_1);
-
-                methodIL.Emit(OpCodes.Call, method);
-            }
-            else if (type.IsClassType()) WritePropertiesFor(typeBuilder, type, methodIL);
-            else WriteCollection(typeBuilder, type, methodIL);
-        }
-
-        internal static MethodInfo WriteNonPublicProperties(TypeBuilder typeBuilder, Type type) {
-            return _nonPublicBuilder.GetOrAdd(type, _ => {
-
-                var method = new DynamicMethod(String.Concat(WriteStr, type.Name), _voidType, new[] { type, _stringBuilderType }, typeBuilder.Module, true);
-
-                var il = method.GetILGenerator();
-
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldc_I4_S, ObjectOpen);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
-                il.Emit(OpCodes.Pop);
-
-                var hasValue = il.DeclareLocal(_boolType);
-                var props = type.GetTypeProperties();
-                var count = props.Length - 1;
-                var counter = 0;
-
-
-                il.Emit(OpCodes.Ldc_I4_0);
-                il.Emit(OpCodes.Stloc, hasValue);
-
-
-                foreach (var prop in props) {
-                    var name = prop.Name;
-                    var propType = prop.PropertyType;
-                    var originPropType = prop.PropertyType;
-                    var isPrimitive = propType.IsPrimitiveType();
-                    var nullableType = propType.GetNullableType();
-                    var isNullable = nullableType != null;
-
-                    propType = isNullable ? nullableType : propType;
-                    var isValueType = propType.IsValueType;
-                    var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
-                    var equalityMethod = propType.GetMethod("op_Equality");
-                    var propValue = il.DeclareLocal(propType);
-
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-                    if (isNullable) {
-                        var nullablePropValue = il.DeclareLocal(originPropType);
-                        il.Emit(OpCodes.Stloc, nullablePropValue);
-                        il.Emit(OpCodes.Ldloca, nullablePropValue);
-                        il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
-                    }
-
-                    il.Emit(OpCodes.Stloc, propValue);
-
-
-                    if (_skipDefaultValue) {
-                        il.Emit(OpCodes.Ldloc, propValue);
-                        if (isValueType && isPrimitive) {
-                            LoadDefaultValueByType(il, propType);
-                        } else {
-                            il.Emit(OpCodes.Ldnull);
-                        }
-
-                        if (equalityMethod != null) {
-                            il.Emit(OpCodes.Call, equalityMethod);
-                            il.Emit(OpCodes.Brtrue, propNullLabel);
-                        } else {
-                            il.Emit(OpCodes.Beq, propNullLabel);
-                        }
-                    }
-
-
-                    if (counter > 0) {
-
-                        var hasValueDelimeterLabel = il.DefineLabel();
-
-                        il.Emit(OpCodes.Ldloc, hasValue);
-                        il.Emit(OpCodes.Brfalse, hasValueDelimeterLabel);
-
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldc_I4, Delimeter);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
-                        il.Emit(OpCodes.Pop);
-
-                        il.MarkLabel(hasValueDelimeterLabel);
-                    }
-
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldstr, String.Concat(QuotChar, name, QuotChar, Colon));
-                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                    il.Emit(OpCodes.Pop);
-
-
-                    if (propType == _intType || propType == _longType) {
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldloc, propValue);
-
-                        il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        il.Emit(OpCodes.Pop);
-                    } else {
-                        il.Emit(OpCodes.Ldloc, propValue);
-
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
-                    }
-
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Stloc, hasValue);
-
-                    if (_skipDefaultValue) {
-                        il.MarkLabel(propNullLabel);
-                    }
-
-                    counter++;
-                }
-
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldc_I4_S, ObjectClose);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
-                il.Emit(OpCodes.Pop);
-
-                il.Emit(OpCodes.Ret);
-
-                return method.CreateDelegate(typeof(Action<,>).MakeGenericType(type, _stringBuilderType));
-            }).Method;
+            } 
+            else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
+            else WritePropertiesFor(typeBuilder, type, methodIL);
+            
         }
 
         internal static void WriteCollection(TypeBuilder typeBuilder, Type type, ILGenerator il) {
@@ -1978,16 +1885,20 @@ namespace NetJSON {
             var props = type.GetTypeProperties();
             var count = props.Length - 1;
             var counter = 0;
-
+            var isClass = type.IsClass;
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasValue);
-            
 
-            foreach (var prop in props) {
-                var name = prop.Name;
-                var propType = prop.PropertyType;
-                var originPropType = prop.PropertyType;
+
+            foreach (var member in props) {
+                var name = member.Name;
+                var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
+                var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
+                var isProp = prop != null;
+                var memberType = isProp ? prop.PropertyType : field.FieldType;
+                var propType = memberType;
+                var originPropType = memberType;
                 var isPrimitive = propType.IsPrimitiveType();
                 var nullableType = propType.GetNullableType();
                 var isNullable = nullableType != null;
@@ -1997,9 +1908,21 @@ namespace NetJSON {
                 var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
                 var equalityMethod = propType.GetMethod("op_Equality");
                 var propValue = il.DeclareLocal(propType);
+                var isStruct = isValueType && !isPrimitive;
 
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+                if (isClass) {
+                    il.Emit(OpCodes.Ldarg_0);
+                    if (isProp)
+                        il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+                    else
+                        il.Emit(OpCodes.Ldfld, field);
+                } else {
+                    il.Emit(OpCodes.Ldarga, 0);
+                    if (isProp)
+                        il.Emit(OpCodes.Call, prop.GetGetMethod());
+                    else il.Emit(OpCodes.Ldfld, field);
+                }
+
                 if (isNullable) {
                     var nullablePropValue = il.DeclareLocal(originPropType);
                     il.Emit(OpCodes.Stloc, nullablePropValue);
@@ -2011,18 +1934,37 @@ namespace NetJSON {
 
 
                 if (_skipDefaultValue) {
-                    il.Emit(OpCodes.Ldloc, propValue);
+                    if (isStruct)
+                        il.Emit(OpCodes.Ldloca, propValue);
+                    else
+                        il.Emit(OpCodes.Ldloc, propValue);
                     if (isValueType && isPrimitive) {
                         LoadDefaultValueByType(il, propType);
                     } else {
-                        il.Emit(OpCodes.Ldnull);
+                        if (!isValueType) 
+                            il.Emit(OpCodes.Ldnull);
                     }
 
                     if (equalityMethod != null) {
                         il.Emit(OpCodes.Call, equalityMethod);
                         il.Emit(OpCodes.Brtrue, propNullLabel);
                     } else {
-                        il.Emit(OpCodes.Beq, propNullLabel);
+                        if (isStruct) {
+                            
+                            var tempValue = il.DeclareLocal(propType);
+
+                            il.Emit(OpCodes.Ldloca, tempValue);
+                            il.Emit(OpCodes.Initobj, propType);
+                            il.Emit(OpCodes.Ldloc, tempValue);
+                            il.Emit(OpCodes.Box, propType);
+                            il.Emit(OpCodes.Constrained, propType);
+
+                            il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                            il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                        } else
+                            il.Emit(OpCodes.Beq, propNullLabel);
                     }
                 }
 
@@ -2139,8 +2081,12 @@ namespace NetJSON {
                 var genericSerialize = genericType.GetMethod(SerializeStr, new[] { type });
 
                 il.Emit(OpCodes.Call, genericMethod);
+
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Isinst, type);
+                if (type.IsClass) 
+                    il.Emit(OpCodes.Isinst, type);
+                else il.Emit(OpCodes.Unbox_Any, type);
+                
                 il.Emit(OpCodes.Callvirt, genericSerialize);
 
                 il.Emit(OpCodes.Ret);
@@ -2157,7 +2103,7 @@ namespace NetJSON {
 
             return _deserializeWithTypes.GetOrAdd(type.FullName, _ => {
                 var name = String.Concat(DeserializeStr, type.FullName);
-                var method = new DynamicMethod(name, type, new[] { _stringType }, restrictedSkipVisibility: true);
+                var method = new DynamicMethod(name, _objectType, new[] { _stringType }, restrictedSkipVisibility: true);
 
                 var il = method.GetILGenerator();
                 var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
@@ -2166,9 +2112,15 @@ namespace NetJSON {
                 var genericDeserialize = genericType.GetMethod(DeserializeStr, new[] { _stringType });
 
                 il.Emit(OpCodes.Call, genericMethod);
+
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Callvirt, genericDeserialize);
-                il.Emit(OpCodes.Isinst, type);
+
+                if (type.IsClass)
+                    il.Emit(OpCodes.Isinst, type);
+                else {
+                    il.Emit(OpCodes.Box, type);
+                }
 
                 il.Emit(OpCodes.Ret);
 
@@ -2749,22 +2701,27 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_setValueMethodBuilders.TryGetValue(key, out method))
                 return method;
+
+            var isTypeValueType = type.IsValueType;
             var methodName = String.Concat(SetStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                _voidType, new[] { _charPtrType, _intType.MakeByRefType(), type, _stringType });
+                _voidType, new[] { _charPtrType, _intType.MakeByRefType(), isTypeValueType ? type.MakeByRefType() : type, _stringType });
             _setValueMethodBuilders[key] = method;
 
             const bool Optimized = true;
 
-            var props = type.GetProperties();
+            var props = type.GetTypeProperties();
             var il = method.GetILGenerator();
 
             for (var i = 0; i < props.Length; i++) {
-                var prop = props[i];
-                var propName = prop.Name;
+                var member = props[i];
+                var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
+                var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
+                var isProp = prop != null;
+                var propName = member.Name;
                 var conditionLabel = il.DefineLabel();
-                var propType = prop.PropertyType;
+                var propType = isProp ? prop.PropertyType : field.FieldType;
                 var nullableType = propType.GetNullableType();
                 var isNullable = nullableType != null;
                 propType = isNullable ? nullableType : propType;
@@ -2785,10 +2742,14 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
-                    il.Emit(OpCodes.Callvirt, prop.GetSetMethod());
+                    if (isProp)
+                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
+                    else il.Emit(OpCodes.Ldfld, field);
                 } else {
                     var propValue = il.DeclareLocal(propType);
                     var isValueType = propType.IsValueType;
+                    var isPrimitiveType = propType.IsPrimitiveType();
+                    var isStruct = isValueType && !isPrimitiveType;
                     var propNullLabel = il.DefineLabel();
                     var equalityMethod = propType.GetMethod("op_Equality");
 
@@ -2797,11 +2758,16 @@ namespace NetJSON {
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
                     il.Emit(OpCodes.Stloc, propValue);
 
-                    il.Emit(OpCodes.Ldloc, propValue);
-                    if (isValueType) {
+                    if (isStruct)
+                        il.Emit(OpCodes.Ldloca, propValue);
+                    else
+                        il.Emit(OpCodes.Ldloc, propValue);
+
+                    if (isValueType && isPrimitiveType) {
                         LoadDefaultValueByType(il, propType);
                     } else {
-                        il.Emit(OpCodes.Ldnull);
+                        if (!isValueType)
+                            il.Emit(OpCodes.Ldnull);
                     }
 
                     if (equalityMethod != null) {
@@ -2809,6 +2775,21 @@ namespace NetJSON {
                         il.Emit(OpCodes.Brtrue, propNullLabel);
                     }
                     else {
+                        if (isStruct) {
+
+                            var tempValue = il.DeclareLocal(propType);
+
+                            il.Emit(OpCodes.Ldloca, tempValue);
+                            il.Emit(OpCodes.Initobj, propType);
+                            il.Emit(OpCodes.Ldloc, tempValue);
+                            il.Emit(OpCodes.Box, propType);
+                            il.Emit(OpCodes.Constrained, propType);
+
+                            il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                            il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                        } else
                         il.Emit(OpCodes.Beq, propNullLabel);
                     }
 
@@ -2817,7 +2798,10 @@ namespace NetJSON {
                     if (isNullable) {
                         il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
                     }
-                    il.Emit(OpCodes.Callvirt, prop.GetSetMethod());
+
+                    if (isProp)
+                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
+                    else il.Emit(OpCodes.Stfld, field);
 
                     il.Emit(OpCodes.Ret);
 
@@ -3138,6 +3122,7 @@ namespace NetJSON {
             }
 
             var isStringType = !isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
+            var isTypeValueType = type.IsValueType;
 
             MethodInfo addMethod = null;
 
@@ -3155,7 +3140,7 @@ namespace NetJSON {
             }
 
 
-            if (type.IsValueType) {
+            if (isTypeValueType) {
                 il.Emit(OpCodes.Ldloca, obj);
                 il.Emit(OpCodes.Initobj, type);
             } else {
@@ -3184,6 +3169,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldc_I4, (int)'\0');
             il.Emit(OpCodes.Stloc, prev);
 
+
             ILFixedWhile(il, whileAction: (msil, current, ptr, startLoop, bLabel) => {
 
                 il.Emit(OpCodes.Ldc_I4_0);
@@ -3202,7 +3188,18 @@ namespace NetJSON {
                 il.Emit(OpCodes.Bne_Un, isNullObjectLabel);
 
                 IncrementIndexRef(il, count: 3);
-                il.Emit(OpCodes.Ldnull);
+
+                if (isTypeValueType) {
+                    var nullLocal = il.DeclareLocal(type);
+
+                    il.Emit(OpCodes.Ldloca, nullLocal);
+                    il.Emit(OpCodes.Initobj, type);
+
+                    il.Emit(OpCodes.Ldloc, nullLocal);
+                } else {
+                    il.Emit(OpCodes.Ldnull);
+                }
+
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(isNullObjectLabel);
@@ -3227,7 +3224,6 @@ namespace NetJSON {
                 il.Emit(OpCodes.Bne_Un, openCloseBraceLabel);
                 il.MarkLabel(currentisCharTagLabel);
                 
-
                 //quotes == 0
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Ldloc, quotes);
@@ -3297,40 +3293,42 @@ namespace NetJSON {
 
 
                     #region String Skipping Optimization
-                    var charSet = new HashSet<int>();
+                    if (!isDict) {
+                        var charSet = new HashSet<int>();
 
-                    var typeProps = type.GetTypeProperties();
-                    foreach (var prop in typeProps) {
-                        var propName = prop.Name;
-                        charSet.Add(propName.Length);
+                        var typeProps = type.GetTypeProperties();
+                        foreach (var prop in typeProps) {
+                            var propName = prop.Name;
+                            charSet.Add(propName.Length);
+                        }
+
+                        var nextLabel = il.DefineLabel();
+
+                        foreach (var set in charSet.OrderBy(x => x)) {
+
+                            var checkCharByIndexLabel = il.DefineLabel();
+
+                            il.Emit(OpCodes.Ldloc, ptr);
+                            il.Emit(OpCodes.Ldloc, startIndex);
+                            il.Emit(OpCodes.Ldc_I4, set);
+                            il.Emit(OpCodes.Add);
+                            il.Emit(OpCodes.Ldc_I4_2);
+                            il.Emit(OpCodes.Mul);
+                            il.Emit(OpCodes.Conv_I);
+                            il.Emit(OpCodes.Add);
+                            il.Emit(OpCodes.Ldind_U2);
+                            il.Emit(OpCodes.Ldc_I4, (int)'"');
+                            il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
+
+                            IncrementIndexRef(il, count: set);
+                            il.Emit(OpCodes.Br, nextLabel);
+
+                            il.MarkLabel(checkCharByIndexLabel);
+
+                        }
+
+                        il.MarkLabel(nextLabel);
                     }
-
-                    var nextLabel = il.DefineLabel();
-
-                    foreach (var set in charSet.OrderBy(x => x)) {
-
-                        var checkCharByIndexLabel = il.DefineLabel();
-
-                        il.Emit(OpCodes.Ldloc, ptr);
-                        il.Emit(OpCodes.Ldloc, startIndex);
-                        il.Emit(OpCodes.Ldc_I4, set);
-                        il.Emit(OpCodes.Add);
-                        il.Emit(OpCodes.Ldc_I4_2);
-                        il.Emit(OpCodes.Mul);
-                        il.Emit(OpCodes.Conv_I);
-                        il.Emit(OpCodes.Add);
-                        il.Emit(OpCodes.Ldind_U2);
-                        il.Emit(OpCodes.Ldc_I4, (int)'"');
-                        il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
-
-                        IncrementIndexRef(il, count: set);
-                        il.Emit(OpCodes.Br, nextLabel);
-
-                        il.MarkLabel(checkCharByIndexLabel);
-
-                    }
-
-                    il.MarkLabel(nextLabel);
                     #endregion String Skipping Optimization
                     
                     il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
@@ -3371,15 +3369,13 @@ namespace NetJSON {
                         il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
                         if (isKeyValuePair) {
                             il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
-                            il.Emit(OpCodes.Callvirt, dictSetItem);
-                        } else {
-                            il.Emit(OpCodes.Callvirt, dictSetItem);
-                        }
+                        } 
+                        il.Emit(OpCodes.Callvirt, dictSetItem);
                     } else {
                         //Set property based on key
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldloc, obj);
+                        il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
                         il.Emit(OpCodes.Ldloc, keyLocal);
                         il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
                     }
