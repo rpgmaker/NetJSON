@@ -1586,8 +1586,18 @@ namespace NetJSON {
 
         internal static void WriteDictionary(TypeBuilder typeBuilder, Type type, ILGenerator il) {
             var arguments = type.GetGenericArguments();
-            var keyType = arguments[0];
-            var valueType = arguments.Length > 1 ? arguments[1] : null;
+            var keyType = arguments != null &&  arguments.Length > 0 ? arguments[0] : null;
+            var valueType = arguments != null && arguments.Length > 1 ? arguments[1] : null;
+
+
+            if (keyType == null || valueType == null) {
+                var baseType = type.BaseType;
+                if (!baseType.IsDictionaryType())
+                    throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
+                arguments = baseType.GetGenericArguments();
+                keyType = arguments[0];
+                valueType = arguments[1];
+            }
 
             if (keyType.Name == KeyValueStr) {
                 arguments = keyType.GetGenericArguments();
@@ -3110,9 +3120,16 @@ namespace NetJSON {
             var isDict = type.IsDictionaryType();
             var arguments = isDict ? type.GetGenericArguments() : null;
             var hasArgument = arguments != null;
-            var keyType = hasArgument ? arguments[0] : _objectType;
+            var keyType = hasArgument ? (arguments.Length > 0 ? arguments[0] : null) : _objectType;
             var valueType = hasArgument && arguments.Length > 1 ? arguments[1] : _objectType;
             var isKeyValuePair = false;
+
+            if (isDict && keyType == null) {
+                var baseType = type.BaseType;
+                arguments = baseType.GetGenericArguments();
+                keyType = arguments[0];
+                valueType = arguments[1];
+            }
 
             if (keyType.Name == KeyValueStr) {
                 arguments = keyType.GetGenericArguments();
