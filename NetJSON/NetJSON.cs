@@ -34,7 +34,7 @@ namespace NetJSON {
 
         const int BUFFER_SIZE = 11;
 
-        const int BUFFER_SIZE_DIFF = BUFFER_SIZE - 2;
+        const int BUFFER_SIZE_DIFF = BUFFER_SIZE - 2; // never used
 
         const TypeAttributes TypeAttribute =
            TypeAttributes.Public | TypeAttributes.Serializable | TypeAttributes.Sealed;
@@ -185,7 +185,7 @@ namespace NetJSON {
               Colon = ":",
               SerializeStr = "Serialize", DeserializeStr = "Deserialize";
 
-        static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
+        static readonly ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
 
         static readonly ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
@@ -330,12 +330,12 @@ namespace NetJSON {
             *ps++ = (char)('0' + (div = (num1 * 6554) >> 16));
             num1 -= div * 10;
         L1:
-            *ps++ = (char)('0' + (num1));
+            *ps = (char)('0' + (num1));
 
             return new string(s);
         }
 
-        public unsafe static string LongToStr(long snum) {
+        private unsafe static string LongToStr(long snum) {
             char* s = stackalloc char[21];
             char* ps = s;
             long num1 = snum, num2, num3, num4, num5, div;
@@ -562,7 +562,7 @@ namespace NetJSON {
             .Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
         }
 
-        private static DateTime Epoch = new DateTime(1970, 1, 1);
+        private static readonly DateTime Epoch = new DateTime(1970, 1, 1);
         
         public static string DateToString(DateTime date) {
             if (date == DateTime.MinValue)
@@ -2066,14 +2066,14 @@ namespace NetJSON {
         public delegate object DeserializeWithTypeDelegate(string value);
         public delegate string SerializeWithTypeDelegate(object value);
 
-        static ConcurrentDictionary<string, DeserializeWithTypeDelegate> _deserializeWithTypes =
+        static readonly ConcurrentDictionary<string, DeserializeWithTypeDelegate> _deserializeWithTypes =
             new ConcurrentDictionary<string, DeserializeWithTypeDelegate>();
 
-        static ConcurrentDictionary<Type, SerializeWithTypeDelegate> _serializeWithTypes =
+        static readonly ConcurrentDictionary<Type, SerializeWithTypeDelegate> _serializeWithTypes =
             new ConcurrentDictionary<Type, SerializeWithTypeDelegate>();
 
-        static MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
-        static Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
+        static readonly MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
+        static readonly Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
 
         public static string Serialize(Type type, object value) {
             return _serializeWithTypes.GetOrAdd(type, _ => {
