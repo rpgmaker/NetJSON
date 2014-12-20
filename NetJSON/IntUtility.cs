@@ -6,8 +6,8 @@ namespace NetJSON {
         const ulong ATOI_TAB_SZ = 10000UL;
         const ulong ATOI_TAB_SZ_LOG = 4UL;
 
-        static string[] digits_string = new string[]{
-            "0000000100020003000400050006000700080009",
+        static readonly string[] digits_string = {
+        "0000000100020003000400050006000700080009",
         "0010001100120013001400150016001700180019",
         "0020002100220023002400250026002700280029",
         "0030003100320033003400350036003700380039",
@@ -1009,9 +1009,9 @@ namespace NetJSON {
         "9990999199929993999499959996999799989999"
         };
 
-        static char* cstItoa = (char*)Marshal.StringToHGlobalAuto(String.Join(string.Empty, digits_string)).ToPointer();
+        static readonly char* cstItoa = (char*)Marshal.StringToHGlobalAuto(String.Join(string.Empty, digits_string)).ToPointer();
 
-        private static unsafe void memcpy(char* dmem, char* smem, int charCount) {
+        private static void memcpy(char* dmem, char* smem, int charCount) {
             if ((((int)dmem) & 2) != 0) {
                 dmem[0] = smem[0];
                 dmem++;
@@ -1045,65 +1045,65 @@ namespace NetJSON {
 
         static int ilog_10(uint aI) {
             if (aI == 0) return 0;
-            else if (aI >= 1 && aI <= 9) return 1;
-            else if (aI >= 10 && aI <= 99) return 2;
-            else if (aI >= 100 && aI <= 999) return 3;
+            if (aI >= 1 && aI <= 9) return 1;
+            if (aI >= 10 && aI <= 99) return 2;
+            if (aI >= 100 && aI <= 999) return 3;
 
-            else if (aI >= 1000 && aI <= 9999) return 4;
+            if (aI >= 1000 && aI <= 9999) return 4;
 
-            else if (aI >= 10000 && aI <= 99999) return 5;
+            if (aI >= 10000 && aI <= 99999) return 5;
 
-            else if (aI >= 100000 && aI <= 999999) return 6;
+            if (aI >= 100000 && aI <= 999999) return 6;
 
-            else if (aI >= 1000000 && aI <= 9999999) return 7;
-            else if (aI >= 10000000 && aI <= 99999999) return 8;
-            else if (aI >= 100000000 && aI <= 999999999) return 9;
+            if (aI >= 1000000 && aI <= 9999999) return 7;
+            if (aI >= 10000000 && aI <= 99999999) return 8;
+            if (aI >= 100000000 && aI <= 999999999) return 9;
 
             return 10;
         }
 
         static int lllog_10(ulong aI) {
             if (aI == 0) return 0;
-            else if (aI >= 1 && aI <= 9) return 1;
-            else if (aI >= 10 && aI <= 99) return 2;
-            else if (aI >= 100 && aI <= 999) return 3;
+            if (aI >= 1 && aI <= 9) return 1;
+            if (aI >= 10 && aI <= 99) return 2;
+            if (aI >= 100 && aI <= 999) return 3;
 
-            else if (aI >= 1000 && aI <= 9999) return 4;
+            if (aI >= 1000 && aI <= 9999) return 4;
 
-            else if (aI >= 10000 && aI <= 99999) return 5;
+            if (aI >= 10000 && aI <= 99999) return 5;
 
-            else if (aI >= 100000 && aI <= 999999) return 6;
+            if (aI >= 100000 && aI <= 999999) return 6;
 
-            else if (aI >= 1000000 && aI <= 9999999) return 7;
-            else if (aI >= 10000000 && aI <= 99999999) return 8;
-            else if (aI >= 100000000 && aI <= 999999999) return 9;
+            if (aI >= 1000000 && aI <= 9999999) return 7;
+            if (aI >= 10000000 && aI <= 99999999) return 8;
+            if (aI >= 100000000 && aI <= 999999999) return 9;
 
-            else if (aI >= 1000000000 && aI <= 9999999999) return 10;
-            else if (aI >= 10000000000 && aI <= 99999999999) return 11;
-            else if (aI >= 100000000000 && aI <= 999999999999) return 12;
-            else if (aI >= 1000000000000 && aI <= 9999999999999) return 13;
-            else if (aI >= 10000000000000 && aI <= 99999999999999) return 14;
-            else if (aI >= 100000000000000 && aI <= 999999999999999) return 15;
-            else if (aI >= 1000000000000000 && aI <= 9999999999999999) return 16;
-            else if (aI >= 10000000000000000 && aI <= 99999999999999999) return 17;
-            else if (aI >= 100000000000000000 && aI <= 999999999999999999) return 18;
-            else if (aI >= 1000000000000000000 && aI <= 9999999999999999999) return 19;
-            else if (aI >= 10000000000000000000 && aI <= 9) return 20;
+            if (aI >= 1000000000 && aI <= 9999999999) return 10;
+            if (aI >= 10000000000 && aI <= 99999999999) return 11;
+            if (aI >= 100000000000 && aI <= 999999999999) return 12;
+            if (aI >= 1000000000000 && aI <= 9999999999999) return 13;
+            if (aI >= 10000000000000 && aI <= 99999999999999) return 14;
+            if (aI >= 100000000000000 && aI <= 999999999999999) return 15;
+            if (aI >= 1000000000000000 && aI <= 9999999999999999) return 16;
+            if (aI >= 10000000000000000 && aI <= 99999999999999999) return 17;
+            if (aI >= 100000000000000000 && aI <= 999999999999999999) return 18;
+            if (aI >= 1000000000000000000 && aI <= 9999999999999999999) return 19;
+            if (aI >= 10000000000000000000 && aI <= 9) return 20;
 
             return 19 + ((aI >= 10000000000000000000UL) ? 1 : 0);
         }
 
         static string ustoa(char* aBuf, ushort aShort) {
-            ushort tmpShort = aShort > 9999 ? (ushort)(aShort / 10) : aShort;
+            var tmpShort = aShort > 9999 ? (ushort)(aShort / 10) : aShort;
 
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * tmpShort;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * tmpShort;
             if (tmpShort >= 1000 && tmpShort <= 9999) *aBuf++ = src[0];
             else if (tmpShort >= 100 && tmpShort <= 999) *aBuf++ = src[1];
             else if (tmpShort >= 10 && tmpShort <= 99) *aBuf++ = src[2];
-            else if (tmpShort >= 0 && tmpShort <= 9) *aBuf++ = src[3];
+            else if (tmpShort <= 9) *aBuf++ = src[3];
 
             if (tmpShort != aShort) {
-                char tmpRem = (char)(aShort % 10);
+                var tmpRem = (char)(aShort % 10);
                 *aBuf++ = (char)(tmpRem + '0');
             }
             *aBuf = '\0';
@@ -1120,16 +1120,16 @@ namespace NetJSON {
 
         static void uitoa_core(char* targetPtr, uint anInt) {
             while (anInt >= ATOI_TAB_SZ) {
-                uint myDiv10000 = (uint)(anInt / ATOI_TAB_SZ);
+                var myDiv10000 = (uint)(anInt / ATOI_TAB_SZ);
                 targetPtr -= 4;
                 memcpy(targetPtr, cstItoa + ATOI_TAB_SZ_LOG * (anInt % ATOI_TAB_SZ), 4);
                 anInt = myDiv10000;
             }
 
-            char* myTabPtr = cstItoa + (ATOI_TAB_SZ_LOG - 1) + ATOI_TAB_SZ_LOG * anInt;
+            var myTabPtr = cstItoa + (ATOI_TAB_SZ_LOG - 1) + ATOI_TAB_SZ_LOG * anInt;
 
-            if (anInt >= 100 && anInt <= 999) *(--targetPtr) = *myTabPtr--;
-            else if (anInt >= 10 && anInt <= 99) *(--targetPtr) = *myTabPtr--;
+            if (anInt >= 100 && anInt <= 999) *(--targetPtr) = *myTabPtr;
+            else if (anInt >= 10 && anInt <= 99) *(--targetPtr) = *myTabPtr;
             //else if (anInt >= 0 && anInt <= 9) *(--targetPtr) = *myTabPtr;
             //else *(--targetPtr) = *myTabPtr--;
 
@@ -1146,12 +1146,12 @@ namespace NetJSON {
         }
 
         static char* uitoa(char* aBuf, uint anInt) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
 
             if (anInt >= 1000 && anInt <= 9999) *aBuf++ = src[0];
             if (anInt >= 100 && anInt <= 999) *aBuf++ = src[1];
             else if (anInt >= 10 && anInt <= 99) *aBuf++ = src[2];
-            else if (anInt >= 0 && anInt <= 9) {
+            else if (anInt <= 9) {
                 *aBuf++ = src[3];
                 *aBuf = '\0';
                 return aBuf;
@@ -1161,33 +1161,30 @@ namespace NetJSON {
 
 
         static char* uitoa2_core(char* aBuf, uint anInt) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
 
             if (anInt >= 100 && anInt <= 999) *aBuf++ = src[1];
             else if (anInt >= 10 && anInt <= 99) *aBuf++ = src[2];
-            else if (anInt >= 0 && anInt <= 9) *aBuf++ = src[3];
+            else if (anInt <= 9) *aBuf++ = src[3];
             else *aBuf++ = src[0];
             return aBuf;
         }
 
         static char* uitoa2_general(char* aBuf, uint anInt) {
-            uint tmpInt = anInt / 10000;
-            if (anInt < 100000000)
-                aBuf = uitoa2_core(aBuf, tmpInt);
-            else
-                aBuf = uitoa2_general(aBuf, tmpInt);
+            var tmpInt = anInt / 10000;
+            aBuf = anInt < 100000000 ? uitoa2_core(aBuf, tmpInt) : uitoa2_general(aBuf, tmpInt);
 
             memcpy(aBuf, cstItoa + (anInt % 10000) * ATOI_TAB_SZ_LOG, 4);
             return aBuf + 4;
         }
 
         static char* uitoa2(char* aBuf, uint anInt) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * anInt;
 
             if (anInt >= 1000 && anInt <= 9999) *aBuf++ = src[0];
             else if (anInt >= 100 && anInt <= 999) *aBuf++ = src[1];
             else if (anInt >= 10 && anInt <= 99) *aBuf++ = src[2];
-            else if (anInt >= 0 && anInt <= 9) {
+            else if (anInt <= 9) {
                 *aBuf++ = src[3]; *aBuf = '\0';
                 return aBuf;
             }
@@ -1215,7 +1212,7 @@ namespace NetJSON {
             while (aLL >= ULONG_MAX) {
 
                 /* See div64_32 in Linux internals, for fast division. */
-                ulong myDiv10000 = aLL / ATOI_TAB_SZ;
+                var myDiv10000 = aLL / ATOI_TAB_SZ;
                 aBuf -= 4;
                 memcpy(aBuf, cstItoa + ATOI_TAB_SZ_LOG * (uint)(aLL % ATOI_TAB_SZ), 4);
                 aLL = myDiv10000;
@@ -1235,12 +1232,12 @@ namespace NetJSON {
         }
 
         static char* ulltoa(char* aBuf, ulong aLL) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
 
             if (aLL >= 1000 && aLL <= 9999) *aBuf++ = src[0];
             //else if (aLL >= 100 && aLL <= 999) *aBuf++ = src[1];
             //else if (aLL >= 10 && aLL <= 99) *aBuf++ = src[2];
-            else if (aLL >= 0 && aLL <= 9) {
+            else if (aLL <= 9) {
                 *aBuf++ = src[3]; *aBuf = '\0';
                 return aBuf;
             }
@@ -1249,32 +1246,29 @@ namespace NetJSON {
         }
 
         static char* ulltoa2_core(char* aBuf, ulong aLL) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
             if (aLL >= 100 && aLL <= 999) *aBuf++ = src[1];
             else if (aLL >= 10 && aLL <= 99) *aBuf++ = src[2];
-            else if (aLL >= 0 && aLL <= 9) *aBuf++ = src[3];
+            else if (aLL <= 9) *aBuf++ = src[3];
             else *aBuf++ = src[0];
             return aBuf;
         }
 
         static char* ulltoa2_general(char* aBuf, ulong aLL) {
-            ulong tmpLL = aLL / 10000;
-            if (aLL < 100000000)
-                aBuf = ulltoa2_core(aBuf, tmpLL);
-            else
-                aBuf = ulltoa2_general(aBuf, tmpLL);
+            var tmpLL = aLL / 10000;
+            aBuf = aLL < 100000000 ? ulltoa2_core(aBuf, tmpLL) : ulltoa2_general(aBuf, tmpLL);
 
             memcpy(aBuf, cstItoa + (aLL % 10000) * ATOI_TAB_SZ_LOG, 4);
             return aBuf + 4;
         }
 
         static char* ulltoa2(char* aBuf, ulong aLL) {
-            char* src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
+            var src = cstItoa + ATOI_TAB_SZ_LOG * aLL;
 
             if (aLL >= 1000 && aLL <= 9999) *aBuf++ = src[0];
             else if (aLL >= 100 && aLL <= 999) *aBuf++ = src[1];
             else if (aLL >= 10 && aLL <= 99) *aBuf++ = src[2];
-            else if (aLL >= 0 && aLL <= 9) {
+            else if (aLL <= 9) {
                 *aBuf++ = src[3]; *aBuf = '\0';
                 return aBuf;
             }
@@ -1283,63 +1277,57 @@ namespace NetJSON {
             return aBuf;
         }
 
-        static char* ulltoa3(char* aBuf, ulong aLL) {
-            if (aLL < ATOI_TAB_SZ_LOG) {
-                return uitoa(aBuf, (uint)aLL);
-            }
-            return ulltoa_general(aBuf, aLL);
-        }
+        static char* ulltoa3(char* aBuf, ulong aLL) => aLL < ATOI_TAB_SZ_LOG ? uitoa(aBuf, (uint)aLL) : ulltoa_general(aBuf, aLL);
 
         const int LLONG_DIGITS = 20;
 
-        static int szBuf = LLONG_DIGITS + 1;
+        static readonly int szBuf = LLONG_DIGITS + 1;
 
         static char* ulltoa4(char* aBuf, ulong aLL) {
 
             char* tmpBuf = stackalloc char[szBuf];
 
-            char* ptrOrg = tmpBuf + szBuf;
-            char* ptr = ptrOrg;
-            long nbDigs;
+            var ptrOrg = tmpBuf + szBuf;
+            var ptr = ptrOrg;
 
             do {
-                int rem = (int)(aLL % 10);
+                var rem = (int)(aLL % 10);
                 *--ptr = (char)(rem + '0');
                 aLL /= 10;
             } while (aLL != 0);
 
 
-            nbDigs = ptrOrg - ptr;
+            var nbDigs = ptrOrg - ptr;
             memcpy(aBuf, ptr, (int)nbDigs);
             aBuf += nbDigs;
             *aBuf = '\0';
             return aBuf;
         }
 
-        static char* lltoa(char* aBuf, long aLL) {
+        static void lltoa(char* aBuf, long aLL) {
             if (aLL < 0) {
                 *aBuf++ = '-';
                 aLL = -aLL;
             }
-            return ulltoa(aBuf, (ulong)aLL);
+            ulltoa(aBuf, (ulong)aLL);
         }
 
         static int biggestPowerOfTen = 1000000;
 
         static char* dtoa(char* aBuf, double aD) {
-            double tmpTrunc = Math.Round(aD);
-            int tmpTruncInt = (int)tmpTrunc;
-            char* tmpRes = itoa(aBuf, tmpTruncInt);
+            var tmpTrunc = Math.Round(aD);
+            var tmpTruncInt = (int)tmpTrunc;
+            var tmpRes = itoa(aBuf, tmpTruncInt);
             *tmpRes++ = '.';
 
-            double tmpMantissa = (tmpTruncInt < 0) ? aD - tmpTrunc : tmpTrunc - aD;
+            var tmpMantissa = (tmpTruncInt < 0) ? aD - tmpTrunc : tmpTrunc - aD;
 
             return uitoa(tmpRes, (uint)(biggestPowerOfTen * (int)tmpMantissa));
         }
 
         public static string ultoa(ulong value) {
             char* buf = stackalloc char[21];
-            char* bf = buf;
+            var bf = buf;
 
             ulltoa(bf, value);
 
@@ -1348,7 +1336,7 @@ namespace NetJSON {
 
         public static string ltoa(long value) {
             char* buf = stackalloc char[20];
-            char* bf = buf;
+            var bf = buf;
             lltoa(bf, value);
             //lltoa(buf, value);
             if (value < 0) {
