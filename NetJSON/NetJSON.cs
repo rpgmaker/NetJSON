@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -83,10 +84,12 @@ namespace NetJSON {
             _floatType = typeof(float),
             _doubleType = typeof(double),
             _enumeratorTypeNonGeneric = typeof(IEnumerator),
+            _idictStringObject = typeof(IDictionary<string, object>),
             _ienumerableType = typeof(IEnumerable<>),
             _enumeratorType = typeof(IEnumerator<>),
             _genericKeyValuePairType = typeof(KeyValuePair<,>),
             _serializerType = typeof(NetJSONSerializer<>),
+            _expandoObjectType = typeof(ExpandoObject),
             _genericDictionaryEnumerator =
                 Type.GetType("System.Collections.Generic.Dictionary`2+Enumerator"),
             _genericListEnumerator =
@@ -1592,11 +1595,17 @@ namespace NetJSON {
 
             if (keyType == null || valueType == null) {
                 var baseType = type.BaseType;
-                if (!baseType.IsDictionaryType())
+                if (baseType == _objectType) {
+                    baseType = type.GetInterface(IEnumerableStr);
+                    if (baseType == null) {
+                        throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
+                    }
+                }
+                if (baseType.Name != IEnumerableStr && !baseType.IsDictionaryType())
                     throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
                 arguments = baseType.GetGenericArguments();
                 keyType = arguments[0];
-                valueType = arguments[1];
+                valueType = arguments.Length > 1 ? arguments[1] : null;
             }
 
             if (keyType.Name == KeyValueStr) {
@@ -3123,12 +3132,18 @@ namespace NetJSON {
             var keyType = hasArgument ? (arguments.Length > 0 ? arguments[0] : null) : _objectType;
             var valueType = hasArgument && arguments.Length > 1 ? arguments[1] : _objectType;
             var isKeyValuePair = false;
+            var isExpandoObject = type == _expandoObjectType;
 
             if (isDict && keyType == null) {
                 var baseType = type.BaseType;
+                if (baseType == _objectType) {
+                    baseType = type.GetInterface(IEnumerableStr);
+                    if (baseType == null)
+                        throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
+                }
                 arguments = baseType.GetGenericArguments();
                 keyType = arguments[0];
-                valueType = arguments[1];
+                valueType = arguments.Length > 1 ? arguments[1] : null;
             }
 
             if (keyType.Name == KeyValueStr) {
@@ -3149,6 +3164,9 @@ namespace NetJSON {
                 (addMethod = type.GetMethod("Enqueue")) != null ? addMethod :
                 (addMethod = type.GetMethod("Push")) != null ? addMethod : null)
                 : type.GetMethod("set_Item")) : null;
+
+            if (isExpandoObject) 
+                dictSetItem = _idictStringObject.GetMethod("Add");
 
             if (isDict) {
                 if (type.Name == IDictStr) {
@@ -3380,11 +3398,13 @@ namespace NetJSON {
 
                     if (isDict) {
                         il.Emit(OpCodes.Ldloc, obj);
+                        if (isExpandoObject)
+                            il.Emit(OpCodes.Isinst, _idictStringObject);
                         il.Emit(OpCodes.Ldloc, keyLocal);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-                        if (isKeyValuePair) {
+                        if (isKeyValuePair && !isExpandoObject) {
                             il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
                         } 
                         il.Emit(OpCodes.Callvirt, dictSetItem);
@@ -3488,12 +3508,14 @@ namespace NetJSON {
                     IncrementIndexRef(il);
 
                     il.Emit(OpCodes.Ldloc, obj);
+                    if (isExpandoObject)
+                        il.Emit(OpCodes.Isinst, _idictStringObject);
                     il.Emit(OpCodes.Ldloc, keyLocal);
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
 
-                    if (isKeyValuePair) {
+                    if (isKeyValuePair && !isExpandoObject) {
                         il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
                         il.Emit(OpCodes.Callvirt, dictSetItem);
                     } else {
