@@ -2740,6 +2740,10 @@ namespace NetJSON {
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
                 var isProp = prop != null;
 
+                if (isProp && !prop.CanWrite) {
+                    continue;
+                }
+
                 var propName = member.Name;
                 var conditionLabel = il.DefineLabel();
                 var propType = isProp ? prop.PropertyType : field.FieldType;
