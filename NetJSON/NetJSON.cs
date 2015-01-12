@@ -1915,6 +1915,7 @@ namespace NetJSON {
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
                 var isProp = prop != null;
+
                 var memberType = isProp ? prop.PropertyType : field.FieldType;
                 var propType = memberType;
                 var originPropType = memberType;
@@ -2738,6 +2739,7 @@ namespace NetJSON {
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
                 var isProp = prop != null;
+
                 var propName = member.Name;
                 var conditionLabel = il.DefineLabel();
                 var propType = isProp ? prop.PropertyType : field.FieldType;
@@ -2761,9 +2763,12 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
-                    if (isProp)
-                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
-                    else il.Emit(OpCodes.Ldfld, field);
+                    if (isProp) {
+                        if (prop.CanWrite)
+                            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
+                        else
+                            il.Emit(OpCodes.Pop);
+                    } else il.Emit(OpCodes.Stfld, field);
                 } else {
                     var propValue = il.DeclareLocal(propType);
                     var isValueType = propType.IsValueType;
@@ -2818,9 +2823,13 @@ namespace NetJSON {
                         il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
                     }
 
-                    if (isProp)
-                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
-                    else il.Emit(OpCodes.Stfld, field);
+                    if (isProp) {
+                        if (prop.CanWrite)
+                            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
+                        else
+                            il.Emit(OpCodes.Pop);
+
+                    } else il.Emit(OpCodes.Stfld, field);
 
                     il.Emit(OpCodes.Ret);
 
