@@ -1,19 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace NetJSON {
     public static class AutomaticTypeConverter {
         public static object ToExpectedType(string value) {
-            if (String.IsNullOrWhiteSpace(value)) return value;
-            var typeRegExs = TypeRegExs;
-            var typeRuleFuncs = TypeRuleFuncs;
-            foreach (var regex in typeRegExs)
-                if (Regex.IsMatch(value, regex.Value))
-                    return typeRuleFuncs[regex.Key](value);
+            if (string.IsNullOrWhiteSpace(value)) return value;
+            foreach (var regex in TypeRegExs.Where(regex => Regex.IsMatch(value, regex.Value)))
+                return TypeRuleFuncs[regex.Key](value);
             return value;
         }
 
@@ -32,27 +27,25 @@ namespace NetJSON {
         }
 
         private static readonly long _epoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc).Ticks;
-        private static Regex _dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled);
+        private static readonly Regex _dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled);
 
         private static Dictionary<string, Func<string, object>> TypeRuleFuncs {
             get {
                 var rules = new Dictionary<string, Func<string, object>>();
-                rules["bool"] = new Func<string, object>(str => { return CastTo<bool>(str); });
-                rules["date"] = new Func<string, object>(str => { return CastTo<DateTime>(str); });
-                rules["date2"] = new Func<string, object>(str => {
-                    var ticks = long.Parse(_dateRegex.Match(str).Groups["ticks"].Value);
-                    return new DateTime(ticks + _epoch).ToLocalTime();
-                });
-                rules["date3"] = new Func<string, object>(str => { return DateTime.Parse(str); });
-                rules["int"] = new Func<string, object>(str => { return NetJSON.FastStringToInt(str); });
-                rules["long"] = new Func<string, object>(str => { return NetJSON.FastStringToLong(str); });
-                rules["double"] = new Func<string, object>(str => { return NetJSON.FastStringToDouble(str); });
+                rules["bool"] = str => CastTo<bool>(str);
+                rules["date"] = str => CastTo<DateTime>(str);
+                rules["date2"] = str => {
+                                            var ticks = long.Parse(_dateRegex.Match(str).Groups["ticks"].Value);
+                                            return new DateTime(ticks + _epoch).ToLocalTime();
+                };
+                rules["date3"] = str => DateTime.Parse(str);
+                rules["int"] = str => NetJSON.FastStringToInt(str);
+                rules["long"] = str => NetJSON.FastStringToLong(str);
+                rules["double"] = str => NetJSON.FastStringToDouble(str);
                 return rules;
             }
         }
 
-        private static T CastTo<T>(string str) {
-            return (T)Convert.ChangeType(str, typeof(T));
-        }
+        private static T CastTo<T>(string str) => (T)Convert.ChangeType(str, typeof(T));
     }
 }
