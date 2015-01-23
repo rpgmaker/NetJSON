@@ -1626,8 +1626,7 @@ namespace NetJSON {
             var endEnumeratorLabel = il.DefineLabel();
             var hasItem = il.DeclareLocal(_boolType);
             var hasItemLabel = il.DefineLabel();
-            var needQuote = (keyType == _stringType || keyType == _guidType || keyType == _timeSpanType || keyType == _dateTimeType || keyType == _byteArrayType || (_useEnumString && keyType.IsEnum));
-
+            
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasItem);
@@ -1657,10 +1656,8 @@ namespace NetJSON {
 
             il.Emit(OpCodes.Ldarg_1);
 
-            if (needQuote) {
-                il.Emit(OpCodes.Ldstr, QuotChar);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-            }
+            il.Emit(OpCodes.Ldstr, QuotChar);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend); 
 
             il.Emit(OpCodes.Ldloca, entryLocal);
             il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Key").GetGetMethod());
@@ -1676,10 +1673,8 @@ namespace NetJSON {
             }
 
 
-            if (needQuote) {
-                il.Emit(OpCodes.Ldstr, QuotChar);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-            }
+            il.Emit(OpCodes.Ldstr, QuotChar);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
             il.Emit(OpCodes.Ldstr, Colon);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
@@ -3166,7 +3161,7 @@ namespace NetJSON {
                 isKeyValuePair = true;
             }
 
-            var isStringType = !isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
+            var isStringType = isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
             var isTypeValueType = type.IsValueType;
 
             MethodInfo addMethod = null;
@@ -3413,7 +3408,12 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldloc, obj);
                         if (isExpandoObject)
                             il.Emit(OpCodes.Isinst, _idictStringObject);
-                        il.Emit(OpCodes.Ldloc, keyLocal);
+
+                        if (!keyType.IsStringBasedType())
+                            GenerateChangeTypeFor(typeBuilder, keyType, il, keyLocal);
+                        else
+                            il.Emit(OpCodes.Ldloc, keyLocal);
+                        
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
