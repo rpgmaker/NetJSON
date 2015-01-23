@@ -29,6 +29,12 @@ namespace NetJSON {
 
     }
 
+    public enum NetJSONDateFormat {
+        Default = 0,
+        ISO = 2,
+        EpochTime = 4
+    }
+
     public static class NetJSON {
 
         private static class NetJSONCachedSerializer<T> {
@@ -116,6 +122,7 @@ namespace NetJSON {
             _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
             _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
             _generatorDateToString = _jsonType.GetMethod("DateToString", MethodBinding),
+            _generatorDateToEpochTime = _jsonType.GetMethod("DateToEpochTime", MethodBinding),
             _generatorDateToISOFormat = _jsonType.GetMethod("DateToISOFormat", MethodBinding),
             _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
             _byteArrayToStr = _jsonType.GetMethod("ByteArrayToStr", MethodBinding),
@@ -514,9 +521,20 @@ namespace NetJSON {
 
         private static bool _useTickFormat = true;
 
+        [Obsolete("Use NetJSON.DateFormat = NetJSONDateFormat.ISO instead. UseISOFormat will be removed in the future")]
         public static bool UseISOFormat {
             set {
                 _useTickFormat = !value;
+                if (!_useTickFormat)
+                    _dateFormat = NetJSONDateFormat.ISO;
+            }
+        }
+
+        private static NetJSONDateFormat _dateFormat = NetJSONDateFormat.Default;
+
+        public static NetJSONDateFormat DateFormat {
+            set {
+                _dateFormat = value;
             }
         }
 
@@ -569,7 +587,8 @@ namespace NetJSON {
             .Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
         }
 
-        private static DateTime Epoch = new DateTime(1970, 1, 1);
+        private static DateTime Epoch = new DateTime(1970, 1, 1),
+            UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
         
         public static string DateToString(DateTime date) {
             if (date == DateTime.MinValue)
@@ -577,6 +596,12 @@ namespace NetJSON {
             else if (date == DateTime.MaxValue)
                 return "\\/Date(253402300800)\\/";
             return String.Concat("\\/Date(", IntUtility.ltoa((long)(date - Epoch).TotalSeconds), ")\\/");
+        }
+
+        public static string DateToEpochTime(DateTime date) {
+            long epochTime = (date.ToUniversalTime() - UnixEpoch).Ticks;
+            epochTime = (epochTime / TimeSpan.TicksPerSecond);
+            return IntUtility.ltoa(epochTime);
         }
 
         [ThreadStatic]
@@ -587,7 +612,7 @@ namespace NetJSON {
         }
 
         public static bool NeedQuotes(Type type) {
-            return type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType || (_useEnumString && type.IsEnum);
+            return type == _stringType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (_useEnumString && type.IsEnum);
         }
 
         private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
@@ -656,7 +681,7 @@ namespace NetJSON {
                 il.MarkLabel(needQuoteStartLabel);
 
                 var types = new[] { _stringType, _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
-                var methods = new[] { null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, _generatorDateToString, _byteArrayToStr, _guidToStr, null };
+                var methods = new[] { null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
 
                 for (var i = 0; i < types.Length; i++) {
                     var objType = types[i];
@@ -1325,7 +1350,7 @@ namespace NetJSON {
             if (type.IsPrimitiveType() || isTypeObject) {
                 var nullLabel = il.DefineLabel();
 
-                needQuote = needQuote && (type == _stringType || type == _guidType || type == _timeSpanType || type == _dateTimeType || type == _byteArrayType);
+                needQuote = needQuote && (type == _stringType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType);
 
                 if (type == _stringType || isTypeObject) {
 
@@ -1378,24 +1403,34 @@ namespace NetJSON {
                 } else {
 
                     if (type == _dateTimeType) {
+
+                        var needDateQuote = _dateFormat != NetJSONDateFormat.EpochTime;
+
+                        if (needDateQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        
+                        }
+
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Ldstr, IsoFormat);
                         il.Emit(OpCodes.Ldarg_0);
                         //il.Emit(OpCodes.Box, _dateTimeType);
                         //il.Emit(OpCodes.Call, _stringFormat);
-                        il.Emit(OpCodes.Call, _useTickFormat ? _generatorDateToString : _generatorDateToISOFormat);
+                        il.Emit(OpCodes.Call, _dateFormat == NetJSONDateFormat.Default ? _generatorDateToString :
+                            _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat :
+                            _generatorDateToEpochTime);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
+
+                        if (needDateQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
-                        
+                        }
+
                     } else if (type == _byteArrayType) {
 
                         il.Emit(OpCodes.Ldarg_0);
@@ -1409,21 +1444,21 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ret);
                         il.MarkLabel(nullLabel);
 
-                            il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Call, _convertBase64);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                            il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
                     } else if (type == _boolType) {
                         var boolLocal = il.DeclareLocal(_stringType);
                         var boolLabel = il.DefineLabel();
@@ -1497,8 +1532,7 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldstr, QuotChar);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                    }
-                    else {
+                    } else {
                         if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldstr, QuotChar);
@@ -1731,7 +1765,7 @@ namespace NetJSON {
             var endEnumeratorLabel = il.DefineLabel();
             var hasItem = il.DeclareLocal(_boolType);
             var hasItemLabel = il.DefineLabel();
-            var needQuote = (itemType == _stringType || itemType == _guidType || itemType == _timeSpanType || itemType == _dateTimeType || itemType == _byteArrayType || (_useEnumString && itemType.IsEnum));
+            var needQuote = (itemType == _stringType || itemType == _guidType || itemType == _timeSpanType || (itemType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || itemType == _byteArrayType || (_useEnumString && itemType.IsEnum));
 
 
             il.Emit(OpCodes.Ldc_I4_0);
@@ -2655,6 +2689,11 @@ namespace NetJSON {
         }
 
         public static DateTime FastStringToDate(string value) {
+            if (_dateFormat == NetJSONDateFormat.EpochTime) {
+                var unixTimeStamp = FastStringToLong(value);
+                var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
+                return date.AddSeconds(unixTimeStamp).ToLocalTime();
+            }
 
             if (value == "\\/Date(-62135596800)\\/")
                 return DateTime.MinValue;
@@ -2886,7 +2925,7 @@ namespace NetJSON {
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || elementType == _dateTimeType || elementType == _timeSpanType || isByteArray || (_useEnumString && elementType.IsEnum);
+            var isStringBased = isStringType || (elementType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || elementType == _timeSpanType || isByteArray || (_useEnumString && elementType.IsEnum);
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
 
 
@@ -3652,7 +3691,7 @@ namespace NetJSON {
         }
 
         public static bool IsStringBasedType(this Type type) {
-            return type == _stringType || type == _dateTimeType || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
+            return type == _stringType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
         }
     }
 }
