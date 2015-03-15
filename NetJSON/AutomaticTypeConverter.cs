@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace NetJSON {
+
     public static class AutomaticTypeConverter {
         public static object ToExpectedType(string value) {
+#if NET_35
+      if(value.IsNullOrWhiteSpace()) return value;      
+#else
             if (String.IsNullOrWhiteSpace(value)) return value;
+#endif
             var typeRegExs = TypeRegExs;
             var typeRuleFuncs = TypeRuleFuncs;
             foreach (var regex in typeRegExs)

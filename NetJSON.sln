@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON", "NetJSON\NetJSON.csproj", "{1308D326-02BB-45BD-8549-18F78A81F204}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.V3_5", "NetJSON.V3_5\NetJSON.V3_5.csproj", "{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{1308D326-02BB-45BD-8549-18F78A81F204}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1308D326-02BB-45BD-8549-18F78A81F204}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1308D326-02BB-45BD-8549-18F78A81F204}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
