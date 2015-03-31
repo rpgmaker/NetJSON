@@ -2866,6 +2866,7 @@ namespace NetJSON {
                 var propName = member.Name;
                 var conditionLabel = il.DefineLabel();
                 var propType = isProp ? prop.PropertyType : field.FieldType;
+                var originPropType = propType;
                 var nullableType = propType.GetNullableType();
                 var isNullable = nullableType != null;
                 propType = isNullable ? nullableType : propType;
@@ -2897,47 +2898,50 @@ namespace NetJSON {
                     var isValueType = propType.IsValueType;
                     var isPrimitiveType = propType.IsPrimitiveType();
                     var isStruct = isValueType && !isPrimitiveType;
-                    var propNullLabel = il.DefineLabel();
+                    var propNullLabel = !isNullable ? il.DefineLabel() : default(Label);
+                    var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
                     var equalityMethod = propType.GetMethod("op_Equality");
 
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
+
                     il.Emit(OpCodes.Stloc, propValue);
 
-                    if (isStruct)
-                        il.Emit(OpCodes.Ldloca, propValue);
-                    else
-                        il.Emit(OpCodes.Ldloc, propValue);
+                    if (!isNullable) {
+                        if (isStruct)
+                            il.Emit(OpCodes.Ldloca, propValue);
+                        else
+                            il.Emit(OpCodes.Ldloc, propValue);
 
-                    if (isValueType && isPrimitiveType) {
-                        LoadDefaultValueByType(il, propType);
-                    } else {
-                        if (!isValueType)
-                            il.Emit(OpCodes.Ldnull);
-                    }
+                        if (isValueType && isPrimitiveType) {
+                            LoadDefaultValueByType(il, propType);
+                        } else {
+                            if (!isValueType)
+                                il.Emit(OpCodes.Ldnull);
+                        }
 
-                    if (equalityMethod != null) {
-                        il.Emit(OpCodes.Call, equalityMethod);
-                        il.Emit(OpCodes.Brtrue, propNullLabel);
-                    }
-                    else {
-                        if (isStruct) {
-
-                            var tempValue = il.DeclareLocal(propType);
-
-                            il.Emit(OpCodes.Ldloca, tempValue);
-                            il.Emit(OpCodes.Initobj, propType);
-                            il.Emit(OpCodes.Ldloc, tempValue);
-                            il.Emit(OpCodes.Box, propType);
-                            il.Emit(OpCodes.Constrained, propType);
-
-                            il.Emit(OpCodes.Callvirt, _objectEquals);
-
+                        if (equalityMethod != null) {
+                            il.Emit(OpCodes.Call, equalityMethod);
                             il.Emit(OpCodes.Brtrue, propNullLabel);
+                        } else {
+                            if (isStruct) {
 
-                        } else
-                        il.Emit(OpCodes.Beq, propNullLabel);
+                                var tempValue = il.DeclareLocal(propType);
+
+                                il.Emit(OpCodes.Ldloca, tempValue);
+                                il.Emit(OpCodes.Initobj, propType);
+                                il.Emit(OpCodes.Ldloc, tempValue);
+                                il.Emit(OpCodes.Box, propType);
+                                il.Emit(OpCodes.Constrained, propType);
+
+                                il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                                il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                            } else
+                                il.Emit(OpCodes.Beq, propNullLabel);
+                        }
                     }
 
                     il.Emit(OpCodes.Ldarg_2);
@@ -2956,7 +2960,8 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Ret);
 
-                    il.MarkLabel(propNullLabel);
+                    if (!isNullable)
+                        il.MarkLabel(propNullLabel);
                 }
 
                 il.Emit(OpCodes.Ret);
