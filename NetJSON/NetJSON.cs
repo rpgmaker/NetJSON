@@ -72,6 +72,11 @@ namespace NetJSON {
     }
 #endif
 
+    public class NetJSONInvalidJSONException : Exception {
+        public NetJSONInvalidJSONException()
+            : base("Input is not a valid JSON.") {
+        }
+    }
 
     public abstract class NetJSONSerializer<T> {
 
@@ -148,6 +153,7 @@ namespace NetJSON {
             _ienumerableType = typeof(IEnumerable<>),
             _enumeratorType = typeof(IEnumerator<>),
             _genericKeyValuePairType = typeof(KeyValuePair<,>),
+            _invalidJSONExceptionType = typeof(NetJSONInvalidJSONException),
             _serializerType = typeof(NetJSONSerializer<>),
             _expandoObjectType =
             
@@ -263,6 +269,7 @@ namespace NetJSON {
               SerializeStr = "Serialize", DeserializeStr = "Deserialize";
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
+        static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
 
         static readonly ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
@@ -3259,6 +3266,7 @@ namespace NetJSON {
             
             var il = method.GetILGenerator();
 
+            var foundQuote = il.DeclareLocal(_boolType);
             var dict = il.DeclareLocal(_dictType);
             var prev = il.DeclareLocal(_charType);
             var count = il.DeclareLocal(_intType);
@@ -3353,6 +3361,8 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldc_I4, (int)'\0');
             il.Emit(OpCodes.Stloc, prev);
 
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Stloc, foundQuote);
 
             ILFixedWhile(il, whileAction: (msil, current, ptr, startLoop, bLabel) => {
 
@@ -3396,6 +3406,7 @@ namespace NetJSON {
 
                 
                 var currentisCharTagLabel = il.DefineLabel();
+                var countCheckLabel = il.DefineLabel();
 
                 //current == '{' || current == '}';
 
@@ -3430,6 +3441,25 @@ namespace NetJSON {
                 il.Emit(OpCodes.Stloc, count);
 
                 il.MarkLabel(isTagLabel);
+
+
+                //if(count > 0 && flag == false && quoteCount == 0 && char == ':')
+                //Err, No quotes was found
+                il.Emit(OpCodes.Ldloc, count);
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Ble, countCheckLabel);
+                il.Emit(OpCodes.Ldloc, isTag);
+                il.Emit(OpCodes.Brtrue, countCheckLabel);
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Ldc_I4, (int)':');
+                il.Emit(OpCodes.Bne_Un, countCheckLabel);
+                il.Emit(OpCodes.Ldloc, foundQuote);
+                il.Emit(OpCodes.Brtrue, countCheckLabel);
+
+                il.Emit(OpCodes.Newobj, _invalidJSONCtor);
+                il.Emit(OpCodes.Throw);
+
+                il.MarkLabel(countCheckLabel);
 
                 //count == 2
                 il.Emit(OpCodes.Ldloc, count);
@@ -3505,6 +3535,9 @@ namespace NetJSON {
                             il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
 
                             IncrementIndexRef(il, count: set);
+                            il.Emit(OpCodes.Ldc_I4_1);
+                            il.Emit(OpCodes.Stloc, foundQuote);
+
                             il.Emit(OpCodes.Br, nextLabel);
 
                             il.MarkLabel(checkCharByIndexLabel);
@@ -3527,7 +3560,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldloc, prev);
                     il.Emit(OpCodes.Ldc_I4, (int)'\\');
                     il.Emit(OpCodes.Beq, currentQuotePrevNotLabel);
-                    
+
                     //var key = new string(ptr, startIndex, index - startIndex)
                     il.Emit(OpCodes.Ldloc, ptr);
                     il.Emit(OpCodes.Ldloc, startIndex);
