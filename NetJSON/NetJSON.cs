@@ -78,6 +78,10 @@ namespace NetJSON {
         }
     }
 
+    public class NetJSONInvalidAssemblyGeneration : Exception {
+        public NetJSONInvalidAssemblyGeneration(string asmName) : base(String.Format("Could not generate assembly with name [{0}] due to empty list of types to include", asmName)) { }
+    }
+
     public abstract class NetJSONSerializer<T> {
 
         public abstract string Serialize(T value);
@@ -825,46 +829,50 @@ namespace NetJSON {
             });
         }
 
+        public static void GenerateTypesInto(string asmName, params Type[] types) {
+            if (!types.Any())
+                throw new NetJSONInvalidAssemblyGeneration(asmName);
+            
+            var assembly = GenerateAssemblyBuilder(asmName);
+            var module = GenerateModuleBuilder(assembly);
+
+            foreach (var type in types) {
+                GenerateTypeBuilder(type, module).CreateType();
+            }
+
+            assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
+        }
+
         internal static Type Generate(Type objType) {
 
             var returnType = default(Type);
             if (_types.TryGetValue(objType, out returnType))
                 return returnType;
 
-            var isPrimitive = objType.IsPrimitiveType();
+            var asmName = String.Concat(objType.GetName(), ClassStr);
+
+            var assembly = GenerateAssemblyBuilder(asmName);
+
+            var module = GenerateModuleBuilder(assembly);
+
+            var type = GenerateTypeBuilder(objType, module);
+
+            returnType = type.CreateType();
+            _types[objType] = returnType;
+
+            if (_generateAssembly)
+                assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
+
+            return returnType;
+        }
+
+        private static TypeBuilder GenerateTypeBuilder(Type objType, ModuleBuilder module) {
+
             var genericType = _serializerType.MakeGenericType(objType);
-            var typeName = String.Concat(objType.GetName(), ClassStr);//objType.Name;
-            var asmName = typeName;
-            var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(
-                new AssemblyName(asmName) {
-                    Version = new Version(1, 0, 0, 0)
-                },
-                AssemblyBuilderAccess.RunAndSave);
 
+            var type = module.DefineType(String.Concat(objType.GetName(), ClassStr), TypeAttribute, genericType);
 
-            //[assembly: CompilationRelaxations(8)]
-            assembly.SetCustomAttribute(new CustomAttributeBuilder(typeof(CompilationRelaxationsAttribute).GetConstructor(new [] { _intType }), new object[] { 8 }));
-
-            //[assembly: RuntimeCompatibility(WrapNonExceptionThrows=true)]
-            assembly.SetCustomAttribute(new CustomAttributeBuilder(
-                typeof(RuntimeCompatibilityAttribute).GetConstructor(Type.EmptyTypes),
-                new object[] {  },
-                new[] {  typeof(RuntimeCompatibilityAttribute).GetProperty("WrapNonExceptionThrows")
-                },
-                new object[] { true }));
-
-            //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
-            assembly.SetCustomAttribute(new CustomAttributeBuilder(
-                typeof(SecurityPermissionAttribute).GetConstructor(new []{ typeof(SecurityAction)}),
-                new object[] { SecurityAction.RequestMinimum },
-                new[] {  typeof(SecurityPermissionAttribute).GetProperty("SkipVerification")
-                },
-                new object[] { true }));
-
-            
-            var module = assembly.DefineDynamicModule(String.Concat(typeName, _dllStr));
-
-            var type = module.DefineType(typeName, TypeAttribute, genericType);
+            var isPrimitive = objType.IsPrimitiveType();
 
             var writeMethod = WriteSerializeMethodFor(type, objType, needQuote: !isPrimitive);
 
@@ -931,24 +939,51 @@ namespace NetJSON {
             rdil.Emit(OpCodes.Ret);
 
             type.DefineMethodOverride(serializeMethod,
-                genericType.GetMethod(SerializeStr, new []{ objType }));
+                genericType.GetMethod(SerializeStr, new[] { objType }));
 
             type.DefineMethodOverride(serializeWithTextWriterMethod,
-                genericType.GetMethod(SerializeStr, new []{ objType, _textWriterType }));
+                genericType.GetMethod(SerializeStr, new[] { objType, _textWriterType }));
 
             type.DefineMethodOverride(deserializeMethod,
-                genericType.GetMethod(DeserializeStr, new []{ _stringType }));
+                genericType.GetMethod(DeserializeStr, new[] { _stringType }));
 
             type.DefineMethodOverride(deserializeWithReaderMethod,
-                genericType.GetMethod(DeserializeStr, new [] { _textReaderType }));
+                genericType.GetMethod(DeserializeStr, new[] { _textReaderType }));
+            return type;
+        }
 
-            returnType = type.CreateType();
-            _types[objType] = returnType;
+        private static ModuleBuilder GenerateModuleBuilder(AssemblyBuilder assembly) {
+            var module = assembly.DefineDynamicModule(String.Concat(assembly.GetName().Name, _dllStr));
+            return module;
+        }
 
-            if (_generateAssembly)
-                assembly.Save(String.Concat(typeName, _dllStr));
+        private static AssemblyBuilder GenerateAssemblyBuilder(string asmName) {
+            var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(
+                new AssemblyName(asmName) {
+                    Version = new Version(1, 0, 0, 0)
+                },
+                AssemblyBuilderAccess.RunAndSave);
 
-            return returnType;
+
+            //[assembly: CompilationRelaxations(8)]
+            assembly.SetCustomAttribute(new CustomAttributeBuilder(typeof(CompilationRelaxationsAttribute).GetConstructor(new[] { _intType }), new object[] { 8 }));
+
+            //[assembly: RuntimeCompatibility(WrapNonExceptionThrows=true)]
+            assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                typeof(RuntimeCompatibilityAttribute).GetConstructor(Type.EmptyTypes),
+                new object[] { },
+                new[] {  typeof(RuntimeCompatibilityAttribute).GetProperty("WrapNonExceptionThrows")
+                },
+                new object[] { true }));
+
+            //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
+            assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
+                new object[] { SecurityAction.RequestMinimum },
+                new[] {  typeof(SecurityPermissionAttribute).GetProperty("SkipVerification")
+                },
+                new object[] { true }));
+            return assembly;
         }
 
 
