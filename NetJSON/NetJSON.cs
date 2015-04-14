@@ -139,6 +139,8 @@ namespace NetJSON {
             _charPtrType = typeof(char*),
             _guidType = typeof(Guid),
             _boolType = typeof(bool),
+            _byteType = typeof(byte),
+            _sbyteType = typeof(sbyte),
             _timeSpanType = typeof(TimeSpan),
             _stringBuilderType = typeof(StringBuilder),
             _listType = typeof(IList),
@@ -195,6 +197,7 @@ namespace NetJSON {
             _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
             _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
             _generatorDateToString = _jsonType.GetMethod("DateToString", MethodBinding),
+            _generatorSByteToStr = _jsonType.GetMethod("SByteToStr", MethodBinding),
             _generatorDateToEpochTime = _jsonType.GetMethod("DateToEpochTime", MethodBinding),
             _generatorDateToISOFormat = _jsonType.GetMethod("DateToISOFormat", MethodBinding),
             _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
@@ -328,6 +331,10 @@ namespace NetJSON {
         }
 
         public static string DoubleToStr(double value) {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static string SByteToStr(sbyte value) {
             return value.ToString(CultureInfo.InvariantCulture);
         }
 
@@ -1614,7 +1621,14 @@ namespace NetJSON {
                         il.Emit(OpCodes.Call, _generatorDoubleToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                    } else if (type == _decimalType) {
+                    } else if (type == _sbyteType) {
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Call, _generatorSByteToStr);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    }
+                    else if (type == _decimalType) {
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Call, _generatorDecimalToStr);
@@ -2186,9 +2200,10 @@ namespace NetJSON {
         private static void LoadDefaultValueByType(ILGenerator il, Type type) {
             if (type == _intType)
                 il.Emit(OpCodes.Ldc_I4_0);
-            else if(type == typeof(byte) || type == typeof(short) || type == typeof(ushort)){
+            else if(type == _sbyteType || type == _byteType || type == typeof(short) || type == typeof(ushort)){
                 il.Emit(OpCodes.Ldc_I4_0);
-                il.Emit(typeof(byte) == type ? OpCodes.Conv_U1 :
+                il.Emit(_byteType == type ? OpCodes.Conv_U1 :
+                    _sbyteType == type ? OpCodes.Conv_I1 :
                     typeof(short) == type ? OpCodes.Conv_I2 : OpCodes.Conv_U2);
             }
             else if (type == typeof(uint))
@@ -2841,7 +2856,6 @@ namespace NetJSON {
 
         private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value) {
             il.Emit(OpCodes.Ldloc, value);
-
             if (type == _intType)
                 il.Emit(OpCodes.Call, _fastStringToInt);
             else if (type == typeof(short))
@@ -2850,7 +2864,10 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, _fastStringToUShort);
             else if (type == typeof(byte))
                 il.Emit(OpCodes.Call, _fastStringToByte);
-            else if (type == typeof(uint))
+            else if (type == typeof(sbyte)) {
+                il.Emit(OpCodes.Call, _fastStringToShort);
+                il.Emit(OpCodes.Conv_I1);
+            } else if (type == typeof(uint))
                 il.Emit(OpCodes.Call, _fastStringToUInt);
             else if (type == _decimalType)
                 il.Emit(OpCodes.Call, _fastStringToDecimal);
