@@ -18,17 +18,49 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
+
+#if !NET_PCL
 using System.Security.Permissions;
+#endif
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace NetJSON {
 
-#if NET_35
+
+#if NET_PCL
+    public enum BindingFlags {
+        Default = 0,
+        IgnoreCase = 1,
+        DeclaredOnly = 2,
+        Instance = 4,
+        Static = 8,
+        Public = 16,
+        NonPublic = 32,
+        FlattenHierarchy = 64,
+        InvokeMethod = 256,
+        CreateInstance = 512,
+        GetField = 1024,
+        SetField = 2048,
+        GetProperty = 4096,
+        SetProperty = 8192,
+        PutDispProperty = 16384,
+        PutRefDispProperty = 32768,
+        ExactBinding = 65536,
+        SuppressChangeType = 131072,
+        OptionalParamBinding = 262144,
+        IgnoreReturn = 16777216
+    }
+#endif
+
+#if NET_35 || NET_PCL
+
+#if !NET_PCL
     public class ExpandoObject {
 
     }
+#endif
 
     public class ConcurrentDictionary<K,V> : Dictionary<K, V> {
 
@@ -62,6 +94,25 @@ namespace NetJSON {
     }
 
     public static class Type35Extension {
+        
+#if NET_PCL
+        public static FieldInfo[] GetFields(this Type type, BindingFlags binding) {
+            return type.GetRuntimeFields().ToArray();
+        }
+
+        public static MethodInfo GetMethod(this Type type, string name, Type[] types) {
+            return type.GetRuntimeMethod(name, types);
+        }
+
+        public static MethodInfo GetMethod(this Type type, string name, BindingFlags binding) {
+            return type.GetRuntimeMethods().FirstOrDefault(x => x.Name == name);
+        }
+
+        public static MethodInfo GetMethod(this Type type, string name) {
+            return GetMethod(type, name, BindingFlags.Public);
+        }
+#endif
+        
         public static Type GetEnumUnderlyingType(this Type type) {
             FieldInfo[] fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
             if ((fields == null) || (fields.Length != 1)) {
@@ -577,7 +628,9 @@ namespace NetJSON {
             Type interfaceType = null;
             return _listType.IsAssignableFrom(type) || type.Name == IListStr ||
                 (type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
-                ((interfaceType = type.GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr);
+                (type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+                ((interfaceType = type.GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
+                ((interfaceType = type.GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr);
         }
 
         public static bool IsDictionaryType(this Type type) {
@@ -1010,7 +1063,10 @@ namespace NetJSON {
                         isQuote = echar == '"';
                         if (echar == '\0') {
                             index--;
-                            GetNonStringValue(ptr, ref index);
+                            if (*(ptr + index) == '"')
+                                GetStringBasedValue(ptr, ref index);
+                            else
+                                GetNonStringValue(ptr, ref index);
                             return;
                         }
                         schar = current;

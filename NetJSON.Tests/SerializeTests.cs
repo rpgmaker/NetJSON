@@ -10,6 +10,13 @@ namespace NetJSON.Tests
     public class SerializeTests
     {
         [TestMethod]
+        public void StringSkippingCauseInfiniteLoop() {
+            string jsonData = "{\"jsonrpc\":\"2.0\",\"result\":{\"availableToBetBalance\":602.15,\"exposure\":0.0,\"retainedCommission\":0.0,\"exposureLimit\":-10000.0,\"discountRate\":2.0,\"pointsBalance\":1181,\"wallet\":\"UK\"},\"id\":1}";
+
+            var data = NetJSON.Deserialize<JsonRpcResponse<AccountFundsResponse>>(jsonData);
+        }
+
+        [TestMethod]
         public void NestedGraphDoesNotThrow()
         {
             var o = new GetTopWinsResponse()
@@ -97,7 +104,7 @@ namespace NetJSON.Tests
     {
         public GetTopWinsResponse()
         {
-            TopWins = new List<TopWinDto>();
+            //TopWins = new List<TopWinDto>();
         }
 
         public IEnumerable<TopWinDto> TopWins { get; set; }
