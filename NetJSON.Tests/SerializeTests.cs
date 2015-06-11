@@ -9,6 +9,20 @@ namespace NetJSON.Tests
     [TestClass]
     public class SerializeTests
     {
+        public enum MyEnumTest {
+            Test1,Test2
+        }
+
+        [TestMethod]
+        public void TestEnumInDictionaryObject() {
+            var dict = new Dictionary<string, object>();
+            dict["Test"] = MyEnumTest.Test2;
+
+            NetJSON.UseEnumString = true;
+
+            var json = NetJSON.Serialize(dict);
+        }
+
         [TestMethod]
         public void StringSkippingCauseInfiniteLoop() {
             string jsonData = "{\"jsonrpc\":\"2.0\",\"result\":{\"availableToBetBalance\":602.15,\"exposure\":0.0,\"retainedCommission\":0.0,\"exposureLimit\":-10000.0,\"discountRate\":2.0,\"pointsBalance\":1181,\"wallet\":\"UK\"},\"id\":1}";

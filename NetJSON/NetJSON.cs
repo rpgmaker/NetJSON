@@ -184,6 +184,7 @@ namespace NetJSON {
 
 
         static readonly Type _dateTimeType = typeof(DateTime),
+            _enumType = typeof(Enum),
             _stringType = typeof(String),
             _byteArrayType = typeof(byte[]),
             _charType = typeof(char),
@@ -243,6 +244,7 @@ namespace NetJSON {
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
             _generatorGetStringBuilder = _jsonType.GetMethod("GetStringBuilder", MethodBinding),
             _generatorIntToStr = _jsonType.GetMethod("IntToStr", MethodBinding),
+            _generatorEnumToStr = _jsonType.GetMethod("CustomEnumToStr", MethodBinding),
             _generatorLongToStr = _jsonType.GetMethod("LongToStr", MethodBinding),
             _generatorFloatToStr = _jsonType.GetMethod("FloatToStr", MethodBinding),
             _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
@@ -297,6 +299,7 @@ namespace NetJSON {
             _fastObjectToStr = _jsonType.GetMethod("FastObjectToString", MethodBinding),
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
             _typeopEquality = _typeType.GetMethod("op_Equality", MethodBinding),
+            _cTypeOpEquality = _jsonType.GetMethod("CustomTypeEquality", MethodBinding),
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
             _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
@@ -749,6 +752,20 @@ namespace NetJSON {
             return type == _stringType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (_useEnumString && type.IsEnum);
         }
 
+        public static bool CustomTypeEquality(Type type1, Type type2) {
+            if (type1.IsEnum) {
+                if(type1.IsEnum && type2 == typeof(Enum))
+                    return true;
+            }
+            return type1 == type2;
+        }
+
+        public static string CustomEnumToStr(Enum @enum) {
+            if (_useEnumString)
+                return @enum.ToString();
+            return IntToStr((int)((object)@enum));
+        }
+
         private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
 
             return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
@@ -814,8 +831,8 @@ namespace NetJSON {
 
                 il.MarkLabel(needQuoteStartLabel);
 
-                var types = new[] { _stringType, _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
-                var methods = new[] { null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
+                var types = new[] { _enumType, _stringType, _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
+                var methods = new[] { null, null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
 
                 for (var i = 0; i < types.Length; i++) {
                     var objType = types[i];
@@ -826,7 +843,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldtoken, objType);
                     il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
 
-                    il.Emit(OpCodes.Call, _typeopEquality);
+                    il.Emit(OpCodes.Call, _cTypeOpEquality);
 
                     il.Emit(OpCodes.Brfalse, compareLabel);
 
@@ -836,7 +853,15 @@ namespace NetJSON {
                         il.Emit(OpCodes.Castclass, _stringType);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                    } else if (objType == _boolType) {
+                    } else if (objType == _enumType) {
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Unbox_Any, objType);
+                        il.Emit(OpCodes.Call, _generatorEnumToStr);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    }
+                    else if (objType == _boolType) {
                         var boolLocal = il.DeclareLocal(_stringType);
                         var boolLabel = il.DefineLabel();
                         il.Emit(OpCodes.Ldstr, "true");
