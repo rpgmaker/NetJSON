@@ -839,7 +839,7 @@ namespace NetJSON {
                 il.MarkLabel(needQuoteStartLabel);
 
                 var types = new[] { _enumType, _stringType, _charType,  _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
-                var methods = new[] { null, null, null, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
+                var methods = new[] { null, null, _generatorCharToStr, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
 
                 for (var i = 0; i < types.Length; i++) {
                     var objType = types[i];
