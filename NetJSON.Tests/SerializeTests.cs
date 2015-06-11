@@ -14,6 +14,18 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void CanSerializeMccUserDataObject() {
+            var obj = new MccUserData() { arr = new int?[]{10, null, 20} };
+
+            NetJSON.IncludeFields = true;
+            NetJSON.GenerateAssembly = true;
+
+            var json = NetJSON.Serialize(obj);
+            //var mjson = NetJSON.Deserialize<MccUserData>(json);
+            //var r = mjson.arr.Length;
+        }
+
+        [TestMethod]
         public void TestEnumInDictionaryObject() {
             var dict = new Dictionary<string, object>();
             dict["Test"] = MyEnumTest.Test2;
