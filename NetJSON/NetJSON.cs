@@ -632,11 +632,12 @@ namespace NetJSON {
 
         public static bool IsListType(this Type type) {
             Type interfaceType = null;
-            return _listType.IsAssignableFrom(type) || type.Name == IListStr ||
+            //Skip type == typeof(String) since String is same as IEnumerable<Char>
+            return type != _stringType && ( _listType.IsAssignableFrom(type) || type.Name == IListStr ||
                 (type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
                 (type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
                 ((interfaceType = type.GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
-                ((interfaceType = type.GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr);
+                ((interfaceType = type.GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr));
         }
 
         public static bool IsDictionaryType(this Type type) {

@@ -29,8 +29,10 @@ namespace NetJSON.Tests
         public void TestEnumInDictionaryObject() {
             var dict = new Dictionary<string, object>();
             dict["Test"] = MyEnumTest.Test2;
+            dict["Text"] = "Hello World";
 
             NetJSON.UseEnumString = true;
+            NetJSON.GenerateAssembly = true;
 
             var json = NetJSON.Serialize(dict);
         }
