@@ -59,7 +59,13 @@ namespace NetJSON.Tests
             var bb = NetJSON.Deserialize<bool>(bjson);
         }
 
+        [TestMethod]
+        public void TestSerializeTuple() {
+            var tuple = new Tuple<int, string>(100, "Hello World");
 
+            var json = NetJSON.Serialize(tuple);
+            var ttuple = NetJSON.Deserialize<Tuple<int, string>>(json);
+        }
 
         [TestMethod]
         public void StringSkippingCauseInfiniteLoop() {

@@ -2673,6 +2673,62 @@ OpCodes.Call,
 
 #if NET_35
         public delegate void Action<T1, T2, T3, T4, T5>(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
+
+        public class Tuple<T1, T2> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3, T4> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+            public T4 Item4 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3, T4, T5> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+            public T4 Item4 { get; set;}
+            public T5 Item5 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3, T4, T5, T6> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+            public T4 Item4 { get; set;}
+            public T5 Item5 { get; set;}
+            public T6 Item6 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3, T4, T5, T6, T7> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+            public T4 Item4 { get; set;}
+            public T5 Item5 { get; set;}
+            public T6 Item6 { get; set;}
+            public T7 Item7 { get; set;}
+        }
+
+        public class Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> {
+            public T1 Item1 { get; set;}
+            public T2 Item2 { get; set;}
+            public T3 Item3 { get; set;}
+            public T4 Item4 { get; set;}
+            public T5 Item5 { get; set;}
+            public T6 Item6 { get; set;}
+            public T7 Item7 { get; set;}
+            public TRest Rest { get; set;}
+        }
 #endif
 
         private static void ILFixedWhile(ILGenerator il, Action<ILGenerator, LocalBuilder, LocalBuilder, Label, Label> whileAction,
@@ -3600,6 +3656,7 @@ OpCodes.Call,
             MethodInfo addMethod = null;
 
             var isNotTagLabel = il.DefineLabel();
+            //var isTuple = type.IsGenericType && type.Name.StartsWith("Tuple");
             var dictSetItem = isDict ? (isKeyValuePair ? 
                 ((addMethod = type.GetMethod("Add")) != null ? addMethod :
                 (addMethod = type.GetMethod("Enqueue")) != null ? addMethod :
