@@ -43,8 +43,6 @@ namespace NetJSON.Tests
             var s = "Hello World";
             var d = DateTime.Now;
 
-            NetJSON.GenerateAssembly = true;
-
             var xjson = NetJSON.Serialize(x);
             var xx = NetJSON.Deserialize<int>(xjson);
 
@@ -53,6 +51,12 @@ namespace NetJSON.Tests
             
             var djson = NetJSON.Serialize(d);
             var dd = NetJSON.Deserialize<DateTime>(djson);
+
+            var ejson = NetJSON.Serialize(SampleEnum.TestEnum1);
+            var ee = NetJSON.Deserialize<SampleEnum>(ejson);
+
+            var bjson = NetJSON.Serialize(true);
+            var bb = NetJSON.Deserialize<bool>(bjson);
         }
 
 
@@ -132,6 +136,10 @@ namespace NetJSON.Tests
                 return;
             this.InnerException = new ExceptionInfo(exception.InnerException);
         }
+    }
+
+    public enum SampleEnum {
+        TestEnum1, TestEnum2
     }
 
     public class Response

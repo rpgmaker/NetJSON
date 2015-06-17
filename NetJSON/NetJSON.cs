@@ -974,7 +974,7 @@ namespace NetJSON {
 
             var isPrimitive = objType.IsPrimitiveType();
 
-            var writeMethod = WriteSerializeMethodFor(type, objType, needQuote: !isPrimitive);
+            var writeMethod = WriteSerializeMethodFor(type, objType, needQuote: !isPrimitive || objType == _stringType);
 
             var readMethod = WriteDeserializeMethodFor(type, objType);
 
@@ -1545,10 +1545,14 @@ OpCodes.Call,
 
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
-                if(isArray)
+                if (isArray)
                     il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, type));
-                else
-                    il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, type));
+                else {
+                    if (type.IsPrimitiveType()) {
+                        il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, type));
+                    }else
+                        il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, type));
+                }
             }
             
             il.Emit(OpCodes.Ret);
@@ -4097,7 +4101,7 @@ OpCodes.Call,
                 if (current != ' ' && current != ':') {
                     if (startIndex == -1)
                         startIndex = index;
-                    if (current == ',' || current == ']' || current == '}') {
+                    if (current == ',' || current == ']' || current == '}' || current == '\0') {
                         value = new string(ptr, startIndex, index - startIndex - indexDiff);
                         --index;
                         break;
