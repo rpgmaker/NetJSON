@@ -240,7 +240,14 @@ namespace NetJSON {
             _stringBuilderAppend = _stringBuilderType.GetMethod("Append", new[] { _stringType }),
             _stringBuilderAppendObject = _stringBuilderType.GetMethod("Append", new[] { _objectType }),
             _stringBuilderAppendChar = _stringBuilderType.GetMethod("Append", new[] { _charType }),
+
+
+#if NET_35
+            _stringBuilderClear = typeof(StringBuilder35Extension).GetMethod("Clear"),
+#else
             _stringBuilderClear = _stringBuilderType.GetMethod("Clear"),
+#endif       
+            
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
             _generatorGetStringBuilder = _jsonType.GetMethod("GetStringBuilder", MethodBinding),
             _generatorIntToStr = _jsonType.GetMethod("IntToStr", MethodBinding),
@@ -988,7 +995,15 @@ namespace NetJSON {
 
             var sbLocal = il.DeclareLocal(_stringBuilderType);
             il.Emit(OpCodes.Call, _generatorGetStringBuilder);
-            il.Emit(OpCodes.Callvirt, _stringBuilderClear);
+
+            il.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+                    OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+
             il.Emit(OpCodes.Stloc, sbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);
@@ -1004,7 +1019,13 @@ namespace NetJSON {
 
             var wsbLocal = wil.DeclareLocal(_stringBuilderType);
             wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
-            wil.Emit(OpCodes.Callvirt, _stringBuilderClear);
+            wil.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+                    OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
             wil.Emit(OpCodes.Stloc, wsbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);

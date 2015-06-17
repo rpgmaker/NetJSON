@@ -38,6 +38,26 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void TestSerializePrimitveTypes() {
+            var x = 10;
+            var s = "Hello World";
+            var d = DateTime.Now;
+
+            NetJSON.GenerateAssembly = true;
+
+            var xjson = NetJSON.Serialize(x);
+            var xx = NetJSON.Deserialize<int>(xjson);
+
+            var sjson = NetJSON.Serialize(s);
+            var ss = NetJSON.Deserialize<string>(sjson);
+            
+            var djson = NetJSON.Serialize(d);
+            var dd = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+
+
+        [TestMethod]
         public void StringSkippingCauseInfiniteLoop() {
             string jsonData = "{\"jsonrpc\":\"2.0\",\"result\":{\"availableToBetBalance\":602.15,\"exposure\":0.0,\"retainedCommission\":0.0,\"exposureLimit\":-10000.0,\"discountRate\":2.0,\"pointsBalance\":1181,\"wallet\":\"UK\"},\"id\":1}";
 
