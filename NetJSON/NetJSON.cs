@@ -123,6 +123,112 @@ namespace NetJSON {
     }
 #endif
 
+    public class TupleContainer {
+        private int _size;
+        private int _index;
+
+        private object _1, _2, _3, _4, _5, _6, _7, _8;
+
+        public TupleContainer(int size) {
+            _size = size;
+        }
+
+
+#if NET_35
+        public NetJSON.Tuple<T1> ToTuple<T1>() {
+            return new NetJSON.Tuple<T1>((T1)_1);
+        }
+        
+        public NetJSON.Tuple<T1, T2> ToTuple<T1, T2>() {
+            return new NetJSON.Tuple<T1, T2>((T1)_1, (T2)_2);
+        }
+
+        public NetJSON.Tuple<T1, T2, T3> ToTuple<T1, T2, T3>() {
+            return new NetJSON.Tuple<T1, T2, T3>((T1)_1, (T2)_2, (T3)_3);
+        }
+
+        public NetJSON.Tuple<T1, T2, T3, T4> ToTuple<T1, T2, T3, T4>() {
+            return new NetJSON.Tuple<T1, T2, T3, T4>((T1)_1, (T2)_2, (T3)_3, (T4)_4);
+        }
+
+
+        public NetJSON.Tuple<T1, T2, T3, T4, T5> ToTuple<T1, T2, T3, T4, T5>() {
+            return new NetJSON.Tuple<T1, T2, T3, T4, T5>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5);
+        }
+
+        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6> ToTuple<T1, T2, T3, T4, T5, T6>() {
+            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6);
+        }
+
+        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7> ToTuple<T1, T2, T3, T4, T5, T6, T7>() {
+            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7);
+        }
+
+        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> ToTuple<T1, T2, T3, T4, T5, T6, T7, TRest>() {
+            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7, (TRest)_8);
+        }
+#else
+        public Tuple<T1, T2> ToTuple<T1, T2>() {
+            return new Tuple<T1, T2>((T1)_1, (T2)_2);
+        }
+
+        public Tuple<T1, T2, T3> ToTuple<T1, T2, T3>() {
+            return new Tuple<T1, T2, T3>((T1)_1, (T2)_2, (T3)_3);
+        }
+
+        public Tuple<T1, T2, T3, T4> ToTuple<T1, T2, T3, T4>() {
+            return new Tuple<T1, T2, T3, T4>((T1)_1, (T2)_2, (T3)_3, (T4)_4);
+        }
+
+
+        public Tuple<T1, T2, T3, T4, T5> ToTuple<T1, T2, T3, T4, T5>() {
+            return new Tuple<T1, T2, T3, T4, T5>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5);
+        }
+
+        public Tuple<T1, T2, T3, T4, T5, T6> ToTuple<T1, T2, T3, T4, T5, T6>() {
+            return new Tuple<T1, T2, T3, T4, T5, T6>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6);
+        }
+
+        public Tuple<T1, T2, T3, T4, T5, T6, T7> ToTuple<T1, T2, T3, T4, T5, T6, T7>() {
+            return new Tuple<T1, T2, T3, T4, T5, T6, T7>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7);
+        }
+
+        public Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> ToTuple<T1, T2, T3, T4, T5, T6, T7, TRest>() {
+            return new Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7, (TRest)_8);
+        }
+#endif
+
+        public void Add(object value) {
+            switch (_index) {
+                case 0:
+                    _1 = value;
+                    break;
+                case 1:
+                    _2 = value;
+                    break;
+                case 2:
+                    _3 = value;
+                    break;
+                case 3:
+                    _4 = value;
+                    break;
+                case 4:
+                    _5 = value;
+                    break;
+                case 5:
+                    _6 = value;
+                    break;
+                case 6:
+                    _7 = value;
+                    break;
+                case 7:
+                    _8 = value;
+                    break;
+            }
+            _index++;
+        }
+    }
+
     public class NetJSONInvalidJSONException : Exception {
         public NetJSONInvalidJSONException()
             : base("Input is not a valid JSON.") {
@@ -233,6 +339,7 @@ namespace NetJSON {
             _longType = typeof(long),
             _jsonType = typeof(NetJSON),
             _textWriterType = typeof(TextWriter),
+            _tupleContainerType = typeof(TupleContainer),
             _textReaderType = typeof(TextReader);
 
         static readonly MethodInfo _stringBuilderToString =
@@ -249,6 +356,7 @@ namespace NetJSON {
 #endif       
             
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
+            _tupleContainerAdd = _tupleContainerType.GetMethod("Add"),
             _generatorGetStringBuilder = _jsonType.GetMethod("GetStringBuilder", MethodBinding),
             _generatorIntToStr = _jsonType.GetMethod("IntToStr", MethodBinding),
             _generatorCharToStr = _jsonType.GetMethod("CharToStr", MethodBinding),
@@ -337,6 +445,7 @@ namespace NetJSON {
               ArrayStr = "Array", AnonymousBracketStr = "<>",
               ArrayLiteral = "[]",
               Colon = ":",
+              ToTupleStr = "ToTuple",
               SerializeStr = "Serialize", DeserializeStr = "Deserialize";
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
@@ -2535,157 +2644,208 @@ OpCodes.Call,
 
         private static MethodBuilder GenerateExtractObject(TypeBuilder type) {
 
-            return _readMethodBuilders.GetOrAdd("ExtractObjectValue", _ => {
+            /*
+              private static MethodInfo GenerateExtractValueFor(TypeBuilder typeBuilder, Type type) {
+            MethodBuilder method;
+            var key = type.FullName;
+            var typeName = type.GetName().Fix();
+            if (_extractMethodBuilders.TryGetValue(key, out method))
+                return method;
+            var methodName = String.Concat(ExtractStr, typeName);
+            var isObjectType = type == _objectType;
+            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+                type, new[] { _charPtrType, _intType.MakeByRefType() });
+            _extractMethodBuilders[key] = method;
 
-                var method = type.DefineMethod("ExtractObjectValue", StaticMethodAttribute, _objectType,
+
+             */
+
+            MethodBuilder method;
+            var key = "ExtractObjectValue";
+            if (_readMethodBuilders.TryGetValue(key, out method))
+                return method;
+
+            method = type.DefineMethod("ExtractObjectValue", StaticMethodAttribute, _objectType,
                     new[] { _charPtrType, _intType.MakeByRefType() });
 
-                var il = method.GetILGenerator();
 
-                var obj = il.DeclareLocal(_objectType);
-                var @return = il.DefineLabel();
+            _readMethodBuilders[key] = method;
 
-                ILFixedWhile(il, whileAction: (msil, current, ptr, startLoop, bLabel) => {
-                    var valueLocal = il.DeclareLocal(_stringType);
+            var il = method.GetILGenerator();
 
-                    var tokenLabel = il.DefineLabel();
-                    var quoteLabel = il.DefineLabel();
-                    var bracketLabel = il.DefineLabel();
-                    var curlyLabel = il.DefineLabel();
-                    var dateLabel = il.DefineLabel();
+            var obj = il.DeclareLocal(_objectType);
+            var @return = il.DefineLabel();
 
-                    il.Emit(OpCodes.Ldc_I4, (int)' ');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+            ILFixedWhile(il, whileAction: (msil, current, ptr, startLoop, bLabel) => {
+                var valueLocal = il.DeclareLocal(_stringType);
 
-                    il.Emit(OpCodes.Ldc_I4, (int)':');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+                var tokenLabel = il.DefineLabel();
+                var quoteLabel = il.DefineLabel();
+                var bracketLabel = il.DefineLabel();
+                var curlyLabel = il.DefineLabel();
+                var dateLabel = il.DefineLabel();
 
-                    il.Emit(OpCodes.Ldc_I4, (int)',');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+                il.Emit(OpCodes.Ldc_I4, (int)' ');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
-                    il.Emit(OpCodes.Ldc_I4, (int)'\n');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+                il.Emit(OpCodes.Ldc_I4, (int)':');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
-                    il.Emit(OpCodes.Ldc_I4, (int)'\t');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+                il.Emit(OpCodes.Ldc_I4, (int)',');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
-                    il.Emit(OpCodes.Ldc_I4, (int)'\r');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Beq, tokenLabel);
+                il.Emit(OpCodes.Ldc_I4, (int)'\n');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
+                il.Emit(OpCodes.Ldc_I4, (int)'\t');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
-                    //if(current == '"') {
-                    il.Emit(OpCodes.Ldc_I4, (int)'"');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Bne_Un, quoteLabel);
-
-                    //value = GetStringBasedValue(json, ref index)
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, _getStringBasedValue);
-                    il.Emit(OpCodes.Stloc, valueLocal);
-
-                    //if(IsDateValue(value)){
-                    il.Emit(OpCodes.Ldloc, valueLocal);
-                    il.Emit(OpCodes.Call, _isDateValue);
-                    il.Emit(OpCodes.Brfalse, dateLabel);
-
-                    il.Emit(OpCodes.Ldloc, valueLocal);
-                    il.Emit(OpCodes.Call, _toExpectedType);
-                    il.Emit(OpCodes.Stloc, obj);
-
-                    il.Emit(OpCodes.Leave, @return);
-
-                    il.MarkLabel(dateLabel);
-                    //}
-
-                    il.Emit(OpCodes.Ldloc, valueLocal);
-                    il.Emit(OpCodes.Stloc, obj);
-
-                    il.Emit(OpCodes.Leave, @return);
-
-                    il.MarkLabel(quoteLabel);
-                    //}
+                il.Emit(OpCodes.Ldc_I4, (int)'\r');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, tokenLabel);
 
 
-                    //if(current == '[')
-                    il.Emit(OpCodes.Ldc_I4, (int)'[');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Bne_Un, bracketLabel);
+                //if(current == '"') {
+                il.Emit(OpCodes.Ldc_I4, (int)'"');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Bne_Un, quoteLabel);
 
-                    //CreateList(json, typeof(List<object>), ref index)
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, GenerateCreateListFor(type, typeof(List<object>)));
+                //value = GetStringBasedValue(json, ref index)
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, _getStringBasedValue);
+                il.Emit(OpCodes.Stloc, valueLocal);
 
-                    il.Emit(OpCodes.Stloc, obj);
+                //if(IsDateValue(value)){
+                il.Emit(OpCodes.Ldloc, valueLocal);
+                il.Emit(OpCodes.Call, _isDateValue);
+                il.Emit(OpCodes.Brfalse, dateLabel);
 
-                    il.Emit(OpCodes.Leave, @return);
+                il.Emit(OpCodes.Ldloc, valueLocal);
+                il.Emit(OpCodes.Call, _toExpectedType);
+                il.Emit(OpCodes.Stloc, obj);
 
-                    il.MarkLabel(bracketLabel);
-                    //}
+                il.Emit(OpCodes.Leave, @return);
 
-                    //if(current == '{')
-                    il.Emit(OpCodes.Ldc_I4, (int)'{');
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Bne_Un, curlyLabel);
+                il.MarkLabel(dateLabel);
+                //}
 
-                    //GetClassOrDict(json, typeof(Dictionary<string, object>), ref index)
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(type, typeof(Dictionary<string, object>)));
+                il.Emit(OpCodes.Ldloc, valueLocal);
+                il.Emit(OpCodes.Stloc, obj);
 
-                    il.Emit(OpCodes.Stloc, obj);
+                il.Emit(OpCodes.Leave, @return);
 
-                    il.Emit(OpCodes.Leave, @return);
+                il.MarkLabel(quoteLabel);
+                //}
 
-                    il.MarkLabel(curlyLabel);
-                    //}
 
-                    //value = GetNonStringValue(json, ref index)
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, _getNonStringValue);
-                    il.Emit(OpCodes.Stloc, valueLocal);
+                //if(current == '[')
+                il.Emit(OpCodes.Ldc_I4, (int)'[');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Bne_Un, bracketLabel);
 
-                    il.Emit(OpCodes.Ldloc, valueLocal);
-                    il.Emit(OpCodes.Call, _toExpectedType);
+                //CreateList(json, typeof(List<object>), ref index)
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, GenerateCreateListFor(type, typeof(List<object>)));
 
-                    il.Emit(OpCodes.Stloc, obj);
+                il.Emit(OpCodes.Stloc, obj);
 
-                    il.Emit(OpCodes.Leave, @return);
+                il.Emit(OpCodes.Leave, @return);
 
-                    il.MarkLabel(tokenLabel);
-                },
-                returnAction: msil => {
-                    il.MarkLabel(@return);
-                    il.Emit(OpCodes.Ldloc, obj);
-                });
+                il.MarkLabel(bracketLabel);
+                //}
 
-                return method;
+                //if(current == '{')
+                il.Emit(OpCodes.Ldc_I4, (int)'{');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Bne_Un, curlyLabel);
+
+                //GetClassOrDict(json, typeof(Dictionary<string, object>), ref index)
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(type, typeof(Dictionary<string, object>)));
+
+                il.Emit(OpCodes.Stloc, obj);
+
+                il.Emit(OpCodes.Leave, @return);
+
+                il.MarkLabel(curlyLabel);
+                //}
+
+                //value = GetNonStringValue(json, ref index)
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Call, _getNonStringValue);
+                il.Emit(OpCodes.Stloc, valueLocal);
+
+                il.Emit(OpCodes.Ldloc, valueLocal);
+                il.Emit(OpCodes.Call, _toExpectedType);
+
+                il.Emit(OpCodes.Stloc, obj);
+
+                il.Emit(OpCodes.Leave, @return);
+
+                il.MarkLabel(tokenLabel);
+            },
+            returnAction: msil => {
+                il.MarkLabel(@return);
+                il.Emit(OpCodes.Ldloc, obj);
             });
+
+            return method;
         }
 
 #if NET_35
         public delegate void Action<T1, T2, T3, T4, T5>(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
 
+        public class Tuple<T1> {
+
+            public Tuple(T1 item1) {
+                Item1 = item1;
+            }
+
+            public T1 Item1 { get; set; }
+        }
+
         public class Tuple<T1, T2> {
+
+            public Tuple(T1 item1, T2 item2) {
+                Item1 = item1;
+                Item2 = item2;
+            }
+
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
         }
 
         public class Tuple<T1, T2, T3> {
+
+            public Tuple(T1 item1, T2 item2, T3 item3) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
         }
 
         public class Tuple<T1, T2, T3, T4> {
+
+            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+                Item4 = item4;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
@@ -2693,6 +2853,15 @@ OpCodes.Call,
         }
 
         public class Tuple<T1, T2, T3, T4, T5> {
+
+            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+                Item4 = item4;
+                Item5 = item5;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
@@ -2701,6 +2870,16 @@ OpCodes.Call,
         }
 
         public class Tuple<T1, T2, T3, T4, T5, T6> {
+
+            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+                Item4 = item4;
+                Item5 = item5;
+                Item6 = item6;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
@@ -2710,6 +2889,17 @@ OpCodes.Call,
         }
 
         public class Tuple<T1, T2, T3, T4, T5, T6, T7> {
+
+            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+                Item4 = item4;
+                Item5 = item5;
+                Item6 = item6;
+                Item7 = item7;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
@@ -2720,6 +2910,19 @@ OpCodes.Call,
         }
 
         public class Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> {
+
+
+            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, TRest rest) {
+                Item1 = item1;
+                Item2 = item2;
+                Item3 = item3;
+                Item4 = item4;
+                Item5 = item5;
+                Item6 = item6;
+                Item7 = item7;
+                Rest = rest;
+            }
+            
             public T1 Item1 { get; set;}
             public T2 Item2 { get; set;}
             public T3 Item3 { get; set;}
@@ -3613,8 +3816,7 @@ OpCodes.Call,
             var startIndex = il.DeclareLocal(_intType);
             var quotes = il.DeclareLocal(_intType);
             var isTag = il.DeclareLocal(_boolType);
-            var obj = il.DeclareLocal(type);
-
+            
             var incLabel = il.DefineLabel();
             var openCloseBraceLabel = il.DefineLabel();
             var isTagLabel = il.DefineLabel();
@@ -3650,13 +3852,24 @@ OpCodes.Call,
                 isKeyValuePair = true;
             }
 
-            var isStringType = isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
+
+            var isTuple = type.IsGenericType && type.Name.StartsWith("Tuple");
+            var tupleType = isTuple ? type : null;
+            var tupleCount = tupleType != null ? type.GetGenericArguments().Length : 0;
+
+            if (isTuple) {
+                type = _tupleContainerType;
+            }
+
+            var obj = il.DeclareLocal(type);
+            var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
             var isTypeValueType = type.IsValueType;
 
             MethodInfo addMethod = null;
 
             var isNotTagLabel = il.DefineLabel();
-            //var isTuple = type.IsGenericType && type.Name.StartsWith("Tuple");
+
+            
             var dictSetItem = isDict ? (isKeyValuePair ? 
                 ((addMethod = type.GetMethod("Add")) != null ? addMethod :
                 (addMethod = type.GetMethod("Enqueue")) != null ? addMethod :
@@ -3677,8 +3890,14 @@ OpCodes.Call,
                 il.Emit(OpCodes.Ldloca, obj);
                 il.Emit(OpCodes.Initobj, type);
             } else {
-                il.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes));
-                il.Emit(OpCodes.Stloc, obj);
+                if (isTuple) {
+                    il.Emit(OpCodes.Ldc_I4, tupleCount);
+                    il.Emit(OpCodes.Newobj, type.GetConstructor(new []{ _intType}));
+                    il.Emit(OpCodes.Stloc, obj);
+                } else {
+                    il.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes));
+                    il.Emit(OpCodes.Stloc, obj);
+                }
             }
 
             if (isDict) {
@@ -3937,12 +4156,22 @@ OpCodes.Call,
                         } 
                         il.Emit(OpCodes.Callvirt, dictSetItem);
                     } else {
-                        //Set property based on key
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
-                        il.Emit(OpCodes.Ldloc, keyLocal);
-                        il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+                        if (!isTuple) {
+                            //Set property based on key
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                            il.Emit(OpCodes.Ldloc, keyLocal);
+                            il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+                        } else {
+                            il.Emit(OpCodes.Ldloc, obj);
+                            
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Call, GenerateExtractObject(typeBuilder));
+
+                            il.Emit(OpCodes.Callvirt, _tupleContainerAdd);
+                        }
                     }
 
                     il.Emit(OpCodes.Ldc_I4_0);
@@ -4067,7 +4296,16 @@ OpCodes.Call,
 
             }, needBreak: true,
             returnAction: msil => {
-                il.Emit(OpCodes.Ldloc, obj);
+                if (isTuple) {
+                    var toTupleMethod = _tupleContainerType.GetMethods().FirstOrDefault(x => x.Name == ToTupleStr && x.GetGenericArguments().Length == tupleCount);
+                    if (toTupleMethod != null) {
+                        toTupleMethod = toTupleMethod.MakeGenericMethod(tupleType.GetGenericArguments());
+                        il.Emit(OpCodes.Ldloc, obj);
+                        il.Emit(OpCodes.Callvirt, toTupleMethod);
+                    }
+                }
+                else                
+                    il.Emit(OpCodes.Ldloc, obj);
             },
             beginIndexIf: (msil, current) => {
                 il.Emit(OpCodes.Ldloc, current);

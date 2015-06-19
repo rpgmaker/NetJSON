@@ -61,6 +61,9 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void TestSerializeTuple() {
+
+            NetJSON.GenerateAssembly = true;
+
             var tuple = new Tuple<int, string>(100, "Hello World");
 
             var json = NetJSON.Serialize(tuple);
