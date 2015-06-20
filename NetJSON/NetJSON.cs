@@ -3855,7 +3855,8 @@ OpCodes.Call,
 
             var isTuple = type.IsGenericType && type.Name.StartsWith("Tuple");
             var tupleType = isTuple ? type : null;
-            var tupleCount = tupleType != null ? type.GetGenericArguments().Length : 0;
+            var tupleArguments = tupleType != null ? tupleType.GetGenericArguments() : null;
+            var tupleCount = tupleType != null ? tupleArguments.Length : 0;
 
             if (isTuple) {
                 type = _tupleContainerType;
@@ -3864,6 +3865,7 @@ OpCodes.Call,
             var obj = il.DeclareLocal(type);
             var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
             var isTypeValueType = type.IsValueType;
+            var tupleCountLocal = isTuple ? il.DeclareLocal(_intType) : null;
 
             MethodInfo addMethod = null;
 
@@ -3883,6 +3885,11 @@ OpCodes.Call,
                 if (type.Name == IDictStr) {
                     type = _genericDictType.MakeGenericType(keyType, valueType);
                 }
+            }
+
+            if (tupleCountLocal != null) {
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Stloc, tupleCountLocal);
             }
 
 
@@ -4164,13 +4171,14 @@ OpCodes.Call,
                             il.Emit(OpCodes.Ldloc, keyLocal);
                             il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
                         } else {
-                            il.Emit(OpCodes.Ldloc, obj);
-                            
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Call, GenerateExtractObject(typeBuilder));
 
-                            il.Emit(OpCodes.Callvirt, _tupleContainerAdd);
+                            for (var i = 0; i < tupleCount; i++)
+                                GenerateTupleConvert(typeBuilder, i, il, tupleArguments, obj, tupleCountLocal);
+
+                            il.Emit(OpCodes.Ldloc, tupleCountLocal);
+                            il.Emit(OpCodes.Ldc_I4_1);
+                            il.Emit(OpCodes.Add);
+                            il.Emit(OpCodes.Stloc, tupleCountLocal);
                         }
                     }
 
@@ -4318,6 +4326,27 @@ OpCodes.Call,
 
 
             return method;
+        }
+
+        private static void GenerateTupleConvert(TypeBuilder typeBuilder, int tupleIndex, ILGenerator il, Type[] tupleArguments, LocalBuilder obj, LocalBuilder tupleCountLocal) {
+            var compareTupleIndexLabel = il.DefineLabel();
+            var tupleItemType = tupleArguments[tupleIndex];
+            
+            il.Emit(OpCodes.Ldloc, tupleCountLocal);
+            il.Emit(OpCodes.Ldc_I4, tupleIndex);
+            il.Emit(OpCodes.Bne_Un, compareTupleIndexLabel);
+
+            il.Emit(OpCodes.Ldloc, obj);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, tupleItemType));
+            if (tupleItemType.IsValueType)
+                il.Emit(OpCodes.Box, tupleItemType);
+
+            il.Emit(OpCodes.Callvirt, _tupleContainerAdd);
+
+            il.MarkLabel(compareTupleIndexLabel);
         }
 
         /// <summary>

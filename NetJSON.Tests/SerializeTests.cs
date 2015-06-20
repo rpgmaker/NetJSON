@@ -71,6 +71,19 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void TestSerializeComplexTuple() {
+
+            NetJSON.GenerateAssembly = true;
+
+            var tuple = new Tuple<int, DateTime, string,
+                          Tuple<double, List<string>>>(1, DateTime.Now, "xisbound",
+                    new Tuple<double, List<string>>(45.45, new List<string> { "hi", "man" }));
+
+            var json = NetJSON.Serialize(tuple);
+            var ttuple = NetJSON.Deserialize<Tuple<int, DateTime, string, Tuple<double, List<string>>>>(json);
+        }
+
+        [TestMethod]
         public void StringSkippingCauseInfiniteLoop() {
             string jsonData = "{\"jsonrpc\":\"2.0\",\"result\":{\"availableToBetBalance\":602.15,\"exposure\":0.0,\"retainedCommission\":0.0,\"exposureLimit\":-10000.0,\"discountRate\":2.0,\"pointsBalance\":1181,\"wallet\":\"UK\"},\"id\":1}";
 
