@@ -13,7 +13,6 @@ namespace NetJSON.Tests
             Test1,Test2
         }
 
-        [TestMethod]
         public void CanSerializeMccUserDataObject() {
             var obj = new MccUserData() { arr = new int?[]{10, null, 20} };
 
@@ -35,6 +34,17 @@ namespace NetJSON.Tests
             NetJSON.GenerateAssembly = true;
 
             var json = NetJSON.Serialize(dict);
+        }
+
+
+        [TestMethod]
+        public void TestSkippingProperty() {
+
+            NetJSON.GenerateAssembly = true;
+
+            var ss = "{\"aaaaaaaaaa\":\"52\",\"aaaaaURL\":\"x\"}";
+
+            var yy = NetJSON.Deserialize<Foo>(ss);
         }
 
         [TestMethod]
@@ -96,7 +106,7 @@ namespace NetJSON.Tests
             var data = NetJSON.Deserialize<JsonRpcResponse<AccountFundsResponse>>(jsonData);
         }
 
-        [TestMethod]
+        //[TestMethod]
         public void NestedGraphDoesNotThrow()
         {
             var o = new GetTopWinsResponse()
@@ -202,6 +212,12 @@ namespace NetJSON.Tests
 
             return sb.ToString();
         }
+    }
+
+    public class Foo {
+        public string aaaaaURL { get; set; }
+
+        public string XXXXXXXXXXXXURL { get; set; }
     }
 
     public class TopWinDto

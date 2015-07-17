@@ -407,6 +407,7 @@ namespace NetJSON {
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
             _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
             _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
+            _isInRange = _jsonType.GetMethod("IsInRange", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
             _getChars = _stringType.GetMethod("get_Chars"),
@@ -3805,6 +3806,14 @@ OpCodes.Call,
                 return new string(ptr, startIndex, length);
         }
 
+        public unsafe static bool IsInRange(char* ptr, int index) {
+            var inRange = false;
+            var inRangeChr = *(ptr + index + 1);
+
+            inRange = *(ptr + index) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r');
+
+            return inRange;
+        }
         
         private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
             MethodBuilder method;
@@ -4102,16 +4111,9 @@ OpCodes.Call,
                             var checkCharByIndexLabel = il.DefineLabel();
 
                             il.Emit(OpCodes.Ldloc, ptr);
-                            il.Emit(OpCodes.Ldloc, startIndex);
                             il.Emit(OpCodes.Ldc_I4, set);
-                            il.Emit(OpCodes.Add);
-                            il.Emit(OpCodes.Ldc_I4_2);
-                            il.Emit(OpCodes.Mul);
-                            il.Emit(OpCodes.Conv_I);
-                            il.Emit(OpCodes.Add);
-                            il.Emit(OpCodes.Ldind_U2);
-                            il.Emit(OpCodes.Ldc_I4, (int)'"');
-                            il.Emit(OpCodes.Bne_Un, checkCharByIndexLabel);
+                            il.Emit(OpCodes.Call, _isInRange);
+                            il.Emit(OpCodes.Brfalse, checkCharByIndexLabel);
 
                             IncrementIndexRef(il, count: set);
                             il.Emit(OpCodes.Ldc_I4_1);
