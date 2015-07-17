@@ -38,6 +38,12 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void TestSNDouble() {
+            var value = "1.23e14";
+            var dValue = NetJSON.FastStringToDouble(value);
+        }
+
+        [TestMethod]
         public void TestSerializePrimitveTypes() {
             var x = 10;
             var s = "Hello World";
@@ -225,6 +231,19 @@ namespace NetJSON.Tests
         public string Location { get; set; }
 
         public string MachineName { get; set; }
+    }
+
+    public class SubscriptionInfo {
+        public string Name { get; set; }
+        public string Topic { get; set; }
+        public string ClientToken { get; set; }
+        public string AppToken { get; set; }
+
+        public string Key {
+            get {
+                return String.Concat(Name, Topic);
+            }
+        }
     }
 
     public class TopWinOnlineSports

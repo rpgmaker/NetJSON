@@ -3098,15 +3098,27 @@ OpCodes.Call,
                     neg = -1;
                     ++p;
                 }
+                int count = 0;
                 while (*p != '\0') {
                     if (*p == '.') {
                         double rem = 0.0;
                         double div = 1;
                         ++p;
                         while (*p != '\0') {
+                            if (*p == 'E' || *p == 'e') {
+                                var e = 0;
+                                val += rem * (Math.Pow(10, -1 * count));
+                                ++p;
+                                while (*p != '\0') {
+                                    e = e * 10 + (*p++ - '0');
+                                }
+                                val *= Math.Pow(10, e);
+                                return val * neg;
+                            }
                             rem = (rem * 10.0) + (*p - '0');
                             div *= 10.0;
                             ++p;
+                            count++;
                         }
                         val += rem / div;
                         return val * neg;
