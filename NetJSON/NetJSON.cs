@@ -3110,10 +3110,16 @@ OpCodes.Call,
                                 var e = 0;
                                 val += rem * (Math.Pow(10, -1 * count));
                                 ++p;
+                                var ePlusMinus = 1;
+                                if (*p == '-' || *p == '+') {
+                                    if (*p == '-')
+                                        ePlusMinus = -1;
+                                    ++p;
+                                }
                                 while (*p != '\0') {
                                     e = e * 10 + (*p++ - '0');
                                 }
-                                val *= Math.Pow(10, e);
+                                val *= Math.Pow(10, e * ePlusMinus);
                                 return val * neg;
                             }
                             rem = (rem * 10.0) + (*p - '0');
@@ -3122,42 +3128,17 @@ OpCodes.Call,
                             count++;
                         }
                         val += rem / div;
-                        return val * neg;
+                        return ((double)(decimal)val) * neg;
                     }
-                    val = (val * 10.0) + (*p - '0');
+                    val = (val * 10) + (*p - '0');
                     ++p;
                 }
             }
-            return val * neg;
+            return ((double)(decimal)val) * neg;
         }
         
         public static unsafe float FastStringToFloat(string numStr) {
-            float val = 0.0f;
-            float neg = 1;
-            fixed (char* ptr = numStr) {
-                char* p = ptr;
-                if (*p == '-') {
-                    neg = -1;
-                    ++p;
-                }
-                while (*p != '\0') {
-                    if (*p == '.') {
-                        float rem = 0.0f;
-                        float div = 1;
-                        ++p;
-                        while (*p != '\0') {
-                            rem = (rem * 10.0f) + (*p - '0');
-                            div *= 10.0f;
-                            ++p;
-                        }
-                        val += rem / div;
-                        return val * neg;
-                    }
-                    val = (val * 10.0f) + (*p - '0');
-                    ++p;
-                }
-            }
-            return val * neg;
+            return (float)FastStringToDouble(numStr);
         }
 
         public static decimal FastStringToDecimal(string numStr) {

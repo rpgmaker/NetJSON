@@ -49,7 +49,8 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void TestSNDouble() {
-            var value = "1.23e14";
+            var value = "1.18909";
+
             var dValue = NetJSON.FastStringToDouble(value);
         }
 
