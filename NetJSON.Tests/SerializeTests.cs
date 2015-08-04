@@ -54,6 +54,13 @@ namespace NetJSON.Tests
             var dValue = NetJSON.FastStringToDouble(value);
         }
 
+        public class BaseApiResponse {
+            public string @token { get; set; }
+            public string @product { get; set; }
+            public string @status { get; set; }
+            public string @error { get; set; }
+        }
+
         [TestMethod]
         public void StringSkippingCauseInfiniteLoop2() {
 
@@ -157,12 +164,7 @@ namespace NetJSON.Tests
         }
     }
 
-    public class BaseApiResponse {
-        public string token { get; set; }
-        public string product { get; set; }
-        public string status { get; set; }
-        public string error { get; set; }
-    }
+
 
     public enum ExceptionType
     {
