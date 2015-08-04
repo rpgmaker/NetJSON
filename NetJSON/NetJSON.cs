@@ -3814,11 +3814,11 @@ OpCodes.Call,
                 return new string(ptr, startIndex, length);
         }
 
-        public unsafe static bool IsInRange(char* ptr, int index) {
+        public unsafe static bool IsInRange(char* ptr, ref int index, int offset) {
             var inRange = false;
-            var inRangeChr = *(ptr + index + 1);
+            var inRangeChr = *(ptr + index + offset + 1);
 
-            inRange = *(ptr + index) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r');
+            inRange = *(ptr + index + offset) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r');
 
             return inRange;
         }
@@ -4119,11 +4119,12 @@ OpCodes.Call,
                             var checkCharByIndexLabel = il.DefineLabel();
 
                             il.Emit(OpCodes.Ldloc, ptr);
+                            il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldc_I4, set);
                             il.Emit(OpCodes.Call, _isInRange);
                             il.Emit(OpCodes.Brfalse, checkCharByIndexLabel);
 
-                            IncrementIndexRef(il, count: set);
+                            IncrementIndexRef(il, count: set - 1);
                             il.Emit(OpCodes.Ldc_I4_1);
                             il.Emit(OpCodes.Stloc, foundQuote);
 

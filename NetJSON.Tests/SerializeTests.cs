@@ -55,6 +55,13 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void StringSkippingCauseInfiniteLoop2() {
+            string jsonData = "{ \"token\":\"sFdDNKjLPZJSm0+gvsD1PokoJd3YzbbsClttbWLWz50=\",\"product\":\"productblabla\",\"status\":\"SUCCESS\",\"error\":\"\" }";
+
+            var data = NetJSON.Deserialize<BaseApiResponse>(jsonData);
+        }
+
+        [TestMethod]
         public void TestObjectDeserialize() {
             var value = "\"Test\"";
             var obj = NetJSON.Deserialize<object>(value);
@@ -145,6 +152,13 @@ namespace NetJSON.Tests
             
             var actual = NetJSON.Serialize(o.GetType(), o);
         }
+    }
+
+    public class BaseApiResponse {
+        public string token { get; set; }
+        public string product { get; set; }
+        public string status { get; set; }
+        public string error { get; set; }
     }
 
     public enum ExceptionType
