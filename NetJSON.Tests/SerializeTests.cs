@@ -55,6 +55,12 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void TestObjectDeserialize() {
+            var value = "\"Test\"";
+            var obj = NetJSON.Deserialize<object>(value);
+        }
+
+        [TestMethod]
         public void TestSerializePrimitveTypes() {
             var x = 10;
             var s = "Hello World";

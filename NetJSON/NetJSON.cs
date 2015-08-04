@@ -407,6 +407,7 @@ namespace NetJSON {
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
             _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
             _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
+            _isRawPrimitive = _jsonType.GetMethod("IsRawPrimitive", MethodBinding),
             _isInRange = _jsonType.GetMethod("IsInRange", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
@@ -769,6 +770,11 @@ namespace NetJSON {
 
         public static bool IsClassType(this Type type) {
             return !type.IsCollectionType() && !type.IsPrimitiveType();
+        }
+
+        public static bool IsRawPrimitive(string value) {
+            value = value.Trim();
+            return !value.StartsWith("{") && !value.StartsWith("[");
         }
 
         [ThreadStatic]
@@ -1620,11 +1626,30 @@ OpCodes.Call,
                 var startsWithLabel = il.DefineLabel();
                 var notStartsWithLabel = il.DefineLabel();
                 var startsWith = il.DeclareLocal(_boolType);
+                var notDictOrArrayLabel = il.DefineLabel();
+                var notDictOrArray = il.DeclareLocal(_boolType);
+
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Call, _isRawPrimitive);
+                il.Emit(OpCodes.Stloc, notDictOrArray);
 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldstr, "[");
                 il.Emit(OpCodes.Callvirt, _stringType.GetMethod("StartsWith", new []{ _stringType }));
                 il.Emit(OpCodes.Stloc, startsWith);
+
+                il.Emit(OpCodes.Ldloc, notDictOrArray);
+                il.Emit(OpCodes.Brfalse, notDictOrArrayLabel);
+
+                //IsPrimitive
+                il.Emit(OpCodes.Ldloc, ptr);
+                il.Emit(OpCodes.Ldloca, index);
+                il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, type));
+                il.Emit(OpCodes.Ret);
+
+                il.MarkLabel(notDictOrArrayLabel);
+
 
                 il.Emit(OpCodes.Ldloc, startsWith);
                 il.Emit(OpCodes.Brfalse, startsWithLabel);
@@ -1639,6 +1664,8 @@ OpCodes.Call,
 
                 il.Emit(OpCodes.Ldloc, startsWith);
                 il.Emit(OpCodes.Brtrue, notStartsWithLabel);
+
+
 
                 //IsDictionary
                 il.Emit(OpCodes.Ldloc, ptr);
