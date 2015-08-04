@@ -3,6 +3,10 @@ NetJSON
 
 Faster than Any Binary?
 
+Quick Guide
+===========
+https://github.com/rpgmaker/NetJSON/wiki/Quick-Guide
+
 Benchmark How Fast?
 ===================
 
