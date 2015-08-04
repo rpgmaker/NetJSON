@@ -56,6 +56,9 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void StringSkippingCauseInfiniteLoop2() {
+
+            NetJSON.UseStringOptimization = true;
+
             string jsonData = "{ \"token\":\"sFdDNKjLPZJSm0+gvsD1PokoJd3YzbbsClttbWLWz50=\",\"product\":\"productblabla\",\"status\":\"SUCCESS\",\"error\":\"\" }";
 
             var data = NetJSON.Deserialize<BaseApiResponse>(jsonData);

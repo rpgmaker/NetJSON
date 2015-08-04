@@ -834,6 +834,14 @@ namespace NetJSON {
             }
         }
 
+        private static bool _useStringOptimization = true;
+
+        public static bool UseStringOptimization {
+            set {
+                _useStringOptimization = value;
+            }
+        }
+
         private static bool _generateAssembly = false;
         public static bool GenerateAssembly {
             set {
@@ -4103,7 +4111,7 @@ OpCodes.Call,
 
 
                     #region String Skipping Optimization
-                    if (!isDict) {
+                    if (!isDict && _useStringOptimization) {
                         var charSet = new HashSet<int>();
 
                         var typeProps = type.GetTypeProperties();
