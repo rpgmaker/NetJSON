@@ -81,6 +81,21 @@ namespace NetJSON.Tests
             var exceptionResult = NetJSON.Deserialize<ExceptionInfoEx>(json);
         }
 
+        public class SimpleObjectWithNull {
+            public int Id { get; set; }
+            public string EmailAddress { get; set; }
+            public string FirstName { get; set; }
+            public string Surname { get; set; }
+            public int TitleId { get; set; }
+            public string Address { get; set; }
+        }
+
+        [TestMethod]
+        public void TestSimpleObjectSerializationWithNull() {
+            var json = "{\"Id\":108591,\"EmailAddress\":\"james.brown@dummy.com\",\"FirstName\":\"James\",\"Surname\":\"Brown\",\"TitleId\":597,\"Address\":null}";
+            var simple = NetJSON.Deserialize<SimpleObjectWithNull>(json);
+        }
+
         [TestMethod]
         public void TestSerializeTypeClass() {
 
