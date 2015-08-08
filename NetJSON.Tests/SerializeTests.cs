@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -59,6 +60,39 @@ namespace NetJSON.Tests
             public string @product { get; set; }
             public string @status { get; set; }
             public string @error { get; set; }
+        }
+
+        public class TypeHolder {
+            public Type Type { get; set; }
+        }
+
+        [TestMethod]
+        public void TestSerializeException() {
+            NetJSON.UseStringOptimization = true;
+            var exception = new ExceptionInfoEx {
+                Data = new Dictionary<string, string> { { "Test1", "Hello" } },
+                ExceptionType = typeof(InvalidCastException),
+                HelpLink = "HelloWorld",
+                InnerException = new ExceptionInfoEx { HelpLink = "Inner" },
+             Message = "Nothing here", Source = "Not found", StackTrace = "I am all here"};
+
+            var json = NetJSON.Serialize(exception);
+
+            var exceptionResult = NetJSON.Deserialize<ExceptionInfoEx>(json);
+        }
+
+        [TestMethod]
+        public void TestSerializeTypeClass() {
+
+            var type = typeof(String);
+            var value = NetJSON.Serialize(type);
+
+            var typeType = NetJSON.Deserialize<Type>(value);
+
+            var typeHolder = new TypeHolder { Type = typeof(int) };
+            var valueHolder = NetJSON.Serialize(typeHolder);
+
+            var typeHolderType = NetJSON.Deserialize<TypeHolder>(valueHolder);
         }
 
         [TestMethod]
@@ -204,6 +238,32 @@ namespace NetJSON.Tests
 
     public enum SampleEnum {
         TestEnum1, TestEnum2
+    }
+
+    public class ExceptionInfoEx {
+        public Type ExceptionType { get; set; }
+        public Dictionary<string, string> Data { get; set; }
+        public string HelpLink { get; set; }
+        public ExceptionInfoEx InnerException { get; set; }
+        public string Message { get; set; }
+        public string Source { get; set; }
+        public string StackTrace { get; set; }
+
+        public static implicit operator ExceptionInfoEx(System.Exception ex) {
+            if (ex == null) return null;
+
+            var res = new ExceptionInfoEx {
+                ExceptionType = ex.GetType(),
+                Data = ex.Data as Dictionary<string, string>,
+                HelpLink = ex.HelpLink,
+                InnerException = ex.InnerException,
+                Message = ex.Message,
+                Source = ex.Source,
+                StackTrace = ex.StackTrace
+            };
+
+            return res;
+        }
     }
 
     public class Response

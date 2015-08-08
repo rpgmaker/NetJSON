@@ -394,6 +394,7 @@ namespace NetJSON {
             _fastStringToDouble = _jsonType.GetMethod("FastStringToDouble", MethodBinding),
             _fastStringToBool = _jsonType.GetMethod("FastStringToBool", MethodBinding),
             _fastStringToGuid = _jsonType.GetMethod("FastStringToGuid", MethodBinding),
+            _fastStringToType = _jsonType.GetMethod("FastStringToType", MethodBinding),
             _moveToArrayBlock = _jsonType.GetMethod("MoveToArrayBlock", MethodBinding),
             _fastStringToByteArray = _jsonType.GetMethod("FastStringToByteArray", MethodBinding),
             _listToListObject = _jsonType.GetMethod("ListToListObject", MethodBinding),
@@ -418,6 +419,7 @@ namespace NetJSON {
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
             _typeopEquality = _typeType.GetMethod("op_Equality", MethodBinding),
             _cTypeOpEquality = _jsonType.GetMethod("CustomTypeEquality", MethodBinding),
+            _assemblyQualifiedName = _typeType.GetProperty("AssemblyQualifiedName").GetGetMethod(),
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
             _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
@@ -727,6 +729,7 @@ namespace NetJSON {
                     key.IsPrimitive || key == _dateTimeType ||
                     key == _decimalType || key == _timeSpanType ||
                     key == _guidType || key == _charType ||
+                    key == _typeType ||
                     key.IsEnum || key == _byteArrayType;
             });
         }
@@ -1724,7 +1727,7 @@ OpCodes.Call,
 
             if (type.IsPrimitiveType() || isTypeObject) {
                 var nullLabel = il.DefineLabel();
-                var valueLocal = isNullable ? il.DeclareLocal(type) : null; 
+                var valueLocal = isNullable ? il.DeclareLocal(type) : null;
 
                 if (isNullable) {
                     var nullableValue = il.DeclareLocal(originalType);
@@ -1762,9 +1765,9 @@ OpCodes.Call,
 
                 if (type == _stringType || isTypeObject) {
 
-                    if(isNullable)
+                    if (isNullable)
                         il.Emit(OpCodes.Ldloc, valueLocal);
-                    else 
+                    else
                         il.Emit(OpCodes.Ldarg_0);
                     if (type == _stringType) {
                         il.Emit(OpCodes.Ldnull);
@@ -1787,11 +1790,11 @@ OpCodes.Call,
                         il.Emit(OpCodes.Ldstr, QuotChar);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         //il.Emit(OpCodes.Pop);
-                    } 
+                    }
 
                     //il.Emit(OpCodes.Ldarg_2);
 
-                    if (type == _objectType){
+                    if (type == _objectType) {
                         if (isNullable)
                             il.Emit(OpCodes.Ldloc, valueLocal);
                         else
@@ -1800,8 +1803,7 @@ OpCodes.Call,
                         il.Emit(OpCodes.Call, GenerateFastObjectToString(typeBuilder));
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Pop);
-                    }
-                    else if (type == _stringType) {
+                    } else if (type == _stringType) {
                         if (isNullable)
                             il.Emit(OpCodes.Ldloc, valueLocal);
                         else
@@ -1956,14 +1958,25 @@ OpCodes.Call,
                         il.Emit(OpCodes.Call, _generatorSByteToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                    }
-                    else if (type == _decimalType) {
+                    } else if (type == _decimalType) {
                         il.Emit(OpCodes.Ldarg_1);
                         if (isNullable)
                             il.Emit(OpCodes.Ldloc, valueLocal);
                         else
                             il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Call, _generatorDecimalToStr);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                    } else if (type == _typeType) {
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Callvirt, _assemblyQualifiedName);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
+                        il.Emit(OpCodes.Ldstr, QuotChar);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (type == _guidType) {
@@ -2050,9 +2063,7 @@ OpCodes.Call,
             methodIL.MarkLabel(conditionLabel);
 
             if (type.IsNotPublic && type.IsClass) {
-
                 throw new InvalidOperationException("Non-Public Types is not supported yet");
-                
             } 
             else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
             else WritePropertiesFor(typeBuilder, type, methodIL);
@@ -3340,9 +3351,13 @@ OpCodes.Call,
             return new Guid(value);
         }
 
+        public static Type FastStringToType(string value) {
+            return Type.GetType(value, false);
+        }
+
         private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value, Type originalType = null) {
 
-            //Logic to properly result nullable type when null is returned(Currently throws FatalEngineException)
+            //Logic to properly resolve nullable type when null is returned(Currently throws FatalEngineException)
             /*
             var local = il.DeclareLocal(originalType ?? type);
 
@@ -3399,6 +3414,9 @@ OpCodes.Call,
                 il.Emit(OpCodes.Call, _fastStringToGuid);
             } else if (type.IsEnum)
                 il.Emit(OpCodes.Call, ReadStringToEnumFor(typeBuilder, type));
+            else if (type == _typeType) {
+                il.Emit(OpCodes.Call, _fastStringToType);
+            }
 
             /*
             il.Emit(OpCodes.Stloc, local);
@@ -3822,11 +3840,13 @@ OpCodes.Call,
                 return new string(ptr, startIndex, length);
         }
 
-        public unsafe static bool IsInRange(char* ptr, ref int index, int offset) {
+        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key) {
             var inRange = false;
-            var inRangeChr = *(ptr + index + offset + 1);
+            var inRangeChr = *(ptr + index + offset + 2);
 
-            inRange = *(ptr + index + offset) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r');
+            var value = new String(ptr, index + 1, offset);
+
+            inRange = (*(ptr + index) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
 
             return inRange;
         }
@@ -4112,23 +4132,20 @@ OpCodes.Call,
 
                     #region String Skipping Optimization
                     if (!isDict && _useStringOptimization) {
-                        var charSet = new HashSet<int>();
-
                         var typeProps = type.GetTypeProperties();
-                        foreach (var prop in typeProps) {
-                            var propName = prop.Name;
-                            charSet.Add(propName.Length);
-                        }
 
                         var nextLabel = il.DefineLabel();
 
-                        foreach (var set in charSet.OrderBy(x => x)) {
+                        foreach (var prop in typeProps) {
 
+                            var propName = prop.Name;
+                            var set = propName.Length;
                             var checkCharByIndexLabel = il.DefineLabel();
 
                             il.Emit(OpCodes.Ldloc, ptr);
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldc_I4, set);
+                            il.Emit(OpCodes.Ldstr, propName);
                             il.Emit(OpCodes.Call, _isInRange);
                             il.Emit(OpCodes.Brfalse, checkCharByIndexLabel);
 
@@ -4470,7 +4487,7 @@ OpCodes.Call,
         }
 
         public static bool IsStringBasedType(this Type type) {
-            return type == _stringType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
+            return type == _stringType || type == _typeType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
         }
     }
 }
