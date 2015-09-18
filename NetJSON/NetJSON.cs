@@ -255,13 +255,24 @@ namespace NetJSON {
         EpochTime = 4
     }
 
+    public enum NetJSONQuote {
+        Default = 0,
+        Double = Default,
+        Single = 2
+    }
+
     public static class NetJSON {
 
         private static class NetJSONCachedSerializer<T> {
             public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
         }
         
-        const string QuotChar = "\"";
+        //const string QuotChar = "\"";
+        private static string QuotChar {
+            get {
+                return _ThreadQuoteString;
+            }
+        }
 
         const int BUFFER_SIZE = 11;
 
@@ -428,7 +439,8 @@ namespace NetJSON {
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
-        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty");
+        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
+                _quoteCharField = _jsonType.GetField("_ThreadQuoteChar", MethodBinding);
 
         const int Delimeter = (int)',',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
@@ -446,12 +458,15 @@ namespace NetJSON {
               ExtractStr = "Extract",
               SetStr = "Set",
               WriteStr = "Write", ReadStr = "Read", ReadEnumStr = "ReadEnum",
-              QuoteChar = "`",
+              CarrotQuoteChar = "`",
               ArrayStr = "Array", AnonymousBracketStr = "<>",
               ArrayLiteral = "[]",
               Colon = ":",
               ToTupleStr = "ToTuple",
               SerializeStr = "Serialize", DeserializeStr = "Deserialize";
+
+        const char QuotDoubleChar = '"',
+                   QuotSingleChar = '\'';
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
@@ -475,6 +490,7 @@ namespace NetJSON {
                         {_guidType, _guidToStr},
                         {_objectType, null}
                     };
+
 
         static readonly ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
@@ -807,6 +823,12 @@ namespace NetJSON {
             return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
 
+        [ThreadStatic]
+        public static char _ThreadQuoteChar = QuotDoubleChar;
+
+        [ThreadStatic]
+        public static string _ThreadQuoteString = QuotDoubleChar.ToString();
+
         private static bool _useTickFormat = true;
 
         [Obsolete("Use NetJSON.DateFormat = NetJSONDateFormat.ISO instead. UseISOFormat will be removed in the future")]
@@ -823,6 +845,15 @@ namespace NetJSON {
         public static NetJSONDateFormat DateFormat {
             set {
                 _dateFormat = value;
+            }
+        }
+
+        private static NetJSONQuote _quoteType = NetJSONQuote.Default;
+
+        public static NetJSONQuote QuoteType {
+            set {
+                _quoteType = value;
+                _ThreadQuoteString = (_ThreadQuoteChar = value == NetJSONQuote.Single ? QuotSingleChar : _ThreadQuoteChar).ToString();
             }
         }
 
@@ -1268,13 +1299,13 @@ OpCodes.Call,
                 var hasChar = schar != '\0';
                 if (!hasChar) {
                     if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
-                        echar = current == '"' ? '"' :
+                        echar = current == _ThreadQuoteChar ? _ThreadQuoteChar :
                                 current == '{' ? '}' :
                                 current == '[' ? ']' : '\0';
-                        isQuote = echar == '"';
+                        isQuote = echar == _ThreadQuoteChar;
                         if (echar == '\0') {
                             index--;
-                            if (*(ptr + index) == '"')
+                            if (*(ptr + index) == _ThreadQuoteChar)
                                 GetStringBasedValue(ptr, ref index);
                             else
                                 GetNonStringValue(ptr, ref index);
@@ -1298,7 +1329,7 @@ OpCodes.Call,
                 }
                 if (!isTag) {
                     if (isQuote) {
-                        if (current == '"' && charCount > 0 && prev != '\\') {
+                        if (current == _ThreadQuoteChar && charCount > 0 && prev != '\\') {
                             //++index;
                             charCount = 0;
                             goto endLabel;
@@ -1331,7 +1362,7 @@ OpCodes.Call,
                 char* ptr = chr;
                 while ((c = *(ptr++)) != '\0') {
                     switch (c) {
-                        case '"': sb.Append("\\\""); break;
+                        //case '"': sb.Append("\\\""); break;
                         case '\\': sb.Append(@"\\"); break;
                         case '\u0000': sb.Append(@"\u0000"); break;
                         case '\u0001': sb.Append(@"\u0001"); break;
@@ -1365,7 +1396,15 @@ OpCodes.Call,
                         case '\u001D': sb.Append(@"\u001D"); break;
                         case '\u001E': sb.Append(@"\u001E"); break;
                         case '\u001F': sb.Append(@"\u001F"); break;
-                        default: sb.Append(c); break;
+                        default:
+                            if (_ThreadQuoteChar == c) {
+                                if (_ThreadQuoteChar == '"')
+                                    sb.Append("\\\"");
+                                else if (_ThreadQuoteChar == '\'')
+                                    sb.Append("\\\'");
+                            }
+                            sb.Append(c);
+                            break;
                     }
 
                 }
@@ -1389,10 +1428,10 @@ OpCodes.Call,
 
         public static string Fix(this string name) {
             return _fixes.GetOrAdd(name, key => {
-                var index = key.IndexOf(QuoteChar, StringComparison.OrdinalIgnoreCase);
-                var quoteText = index > -1 ? key.Substring(index, 2) : QuoteChar;
+                var index = key.IndexOf(CarrotQuoteChar, StringComparison.OrdinalIgnoreCase);
+                var quoteText = index > -1 ? key.Substring(index, 2) : CarrotQuoteChar;
                 var value = key.Replace(quoteText, string.Empty).Replace(ArrayLiteral, ArrayStr).Replace(AnonymousBracketStr, string.Empty);
-                if (value.Contains(QuoteChar))
+                if (value.Contains(CarrotQuoteChar))
                     value = Fix(value);
                 return value;
             });
@@ -2791,8 +2830,10 @@ OpCodes.Call,
                 il.Emit(OpCodes.Beq, tokenLabel);
 
 
-                //if(current == '"') {
-                il.Emit(OpCodes.Ldc_I4, (int)'"');
+                //if(current == _ThreadQuoteChar) {
+                //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                il.Emit(OpCodes.Ldsfld, _quoteCharField);
+
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
 
@@ -3231,6 +3272,7 @@ OpCodes.Call,
         public unsafe static string DecodeJSONString(char* ptr, ref int index) {
             char current = '\0', next = '\0';
             bool hasQuote = false;
+            char currentQuote = _ThreadQuoteChar;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
 
             while (true) {
@@ -3239,7 +3281,7 @@ OpCodes.Call,
                 if (hasQuote) {
                     //if (current == '\0') break;
 
-                    if (current == '"') {
+                    if (current == _ThreadQuoteChar) {
                         ++index;
                         break;
                     } else {
@@ -3252,7 +3294,6 @@ OpCodes.Call,
                                 case 'n': sb.Append('\n'); break;
                                 case 't': sb.Append('\t'); break;
                                 case 'f': sb.Append('\f'); break;
-                                case '"': sb.Append('"'); break;
                                 case '\\': sb.Append('\\'); break;
                                 case '/': sb.Append('/'); break;
                                 case 'b': sb.Append('\b'); break;
@@ -3270,12 +3311,17 @@ OpCodes.Call,
                                     sb.Append(u);
                                     index += 4;
                                     break;
+                                default:
+                                    if (_ThreadQuoteChar == next)
+                                        sb.Append(_ThreadQuoteChar);
+
+                                    break;
                             }
 
                         }
                     }
                 } else {
-                    if (current == '"') {
+                    if (current == _ThreadQuoteChar) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
@@ -3880,7 +3926,7 @@ OpCodes.Call,
 
             var value = new String(ptr, index + 1, offset);
 
-            inRange = (*(ptr + index) == '"' && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
+            inRange = (*(ptr + index) == _ThreadQuoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
 
             return inRange;
         }
@@ -4142,9 +4188,11 @@ OpCodes.Call,
                     var currentQuotePrevNotLabel = il.DefineLabel();
                     var keyLocal = il.DeclareLocal(_stringType);
 
-                    //if(current == '"' && quotes == 0)
+                    //if(current == _ThreadQuoteChar && quotes == 0)
                     il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'"');
+                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    il.Emit(OpCodes.Ldsfld, _quoteCharField);
+
                     il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
                     il.Emit(OpCodes.Ldloc, quotes);
                     il.Emit(OpCodes.Ldc_I4_0);
@@ -4199,9 +4247,11 @@ OpCodes.Call,
                     
                     il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
                     il.MarkLabel(currentQuoteLabel);
-                    //else if(current == '"' && quotes > 0 && prev != '\\')
+                    //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
                     il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'"');
+                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    il.Emit(OpCodes.Ldsfld, _quoteCharField);
+
                     il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
                     il.Emit(OpCodes.Ldloc, quotes);
                     il.Emit(OpCodes.Ldc_I4_0);
@@ -4467,10 +4517,10 @@ OpCodes.Call,
 
             while (true) {
                 current = ptr[index];
-                if (count == 0 && current == '"') {
+                if (count == 0 && current == _ThreadQuoteChar) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && current == '"' && prev != '\\') {
+                } else if (count > 0 && current == _ThreadQuoteChar && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
