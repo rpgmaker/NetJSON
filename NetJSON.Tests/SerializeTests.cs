@@ -120,6 +120,26 @@ namespace NetJSON.Tests
             var data = NetJSON.Deserialize<BaseApiResponse>(jsonData);
         }
 
+        public static string ToShortString(short value) {
+            return value.ToString();
+        }
+
+        [TestMethod]
+        public void SerializeDictionaryWithShortType() {
+
+            //This is not required since short is already handled
+            //NetJSON.RegisterTypeSerializer<short>(ToShortString);
+
+            short shortVar = 1;
+            int intVar = 1;
+            Dictionary<string, object> diccionario = new Dictionary<string, object>();
+            diccionario.Add("exampleKey one", shortVar);
+            string result = NetJSON.Serialize(diccionario);
+            Console.WriteLine(result);
+            diccionario.Add("exampleKey two", intVar);
+            result = NetJSON.Serialize(diccionario);
+        }
+
         [TestMethod]
         public void TestObjectDeserialize() {
             var value = "\"Test\"";

@@ -336,6 +336,7 @@ namespace NetJSON {
             _typeType = typeof(Type),
             _voidType = typeof(void),
             _intType = typeof(int),
+            _shortType = typeof(short),
             _longType = typeof(long),
             _jsonType = typeof(NetJSON),
             _textWriterType = typeof(TextWriter),
@@ -454,6 +455,26 @@ namespace NetJSON {
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
+
+        static ConcurrentDictionary<Type, MethodInfo> _registeredSerializerMethods =
+            new ConcurrentDictionary<Type, MethodInfo>();
+
+        static Dictionary<Type, MethodInfo> _defaultSerializerTypes =
+            new Dictionary<Type, MethodInfo> { 
+                        {_enumType, null},
+                        {_stringType, null},
+                        {_charType, _generatorCharToStr},
+                        {_intType, _generatorIntToStr},
+                        {_shortType, _generatorIntToStr},
+                        {_longType, _generatorLongToStr},
+                        {_decimalType, _generatorDecimalToStr},
+                        {_boolType, null},
+                        {_doubleType, _generatorDoubleToStr},
+                        {_floatType, _generatorFloatToStr},
+                        {_byteArrayType, _byteArrayToStr},
+                        {_guidType, _guidToStr},
+                        {_objectType, null}
+                    };
 
         static readonly ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
@@ -973,11 +994,20 @@ namespace NetJSON {
 
                 il.MarkLabel(needQuoteStartLabel);
 
-                var types = new[] { _enumType, _stringType, _charType,  _intType, _longType, _decimalType, _boolType, _doubleType, _floatType, _dateTimeType, _byteArrayType, _guidType, _objectType };
-                var methods = new[] { null, null, _generatorCharToStr, _generatorIntToStr, _generatorLongToStr, _generatorDecimalToStr, null, _generatorDoubleToStr, _generatorFloatToStr, (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime), _byteArrayToStr, _guidToStr, null };
+                _defaultSerializerTypes[_dateTimeType] = (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime);
 
-                for (var i = 0; i < types.Length; i++) {
-                    var objType = types[i];
+                var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
+                
+                foreach (var kv in _defaultSerializerTypes) {
+                    serializerTypeMethods[kv.Key] = kv.Value;
+                }
+
+                foreach (var kv in _registeredSerializerMethods) {
+                    serializerTypeMethods[kv.Key] = kv.Value;
+                }
+
+                foreach (var kv in serializerTypeMethods) {
+                    var objType = kv.Key;
                     var compareLabel = il.DefineLabel();
 
                     il.Emit(OpCodes.Ldloc, typeLocal);
@@ -1032,7 +1062,7 @@ namespace NetJSON {
                         if (objType.IsValueType)
                             il.Emit(OpCodes.Unbox_Any, objType);
                         else il.Emit(OpCodes.Castclass, objType);
-                        il.Emit(OpCodes.Call, methods[i]);
+                        il.Emit(OpCodes.Call, kv.Value);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     }
@@ -2657,6 +2687,26 @@ OpCodes.Call,
             })(value);
         }
 
+        /// <summary>
+        /// Register serializer primitive method
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="serializeFunc"></param>
+        public static void RegisterTypeSerializer<T>(Func<T, string> serializeFunc) {
+            var type = typeof(T);
+
+            if (serializeFunc == null)
+                throw new InvalidOperationException("serializeFunc cannot be null");
+
+            var method = serializeFunc.Method;
+
+            if (!(method.IsPublic && method.IsStatic)) {
+                throw new InvalidOperationException("serializeFun must be a public and static method");
+            }
+
+            _registeredSerializerMethods[type] = method;
+        }
+
         public static string Serialize<T>(T value) {
            return GetSerializer<T>().Serialize(value);
         }
@@ -2690,22 +2740,6 @@ OpCodes.Call,
             _dateISORegex = new Regex(@"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}.(\d){3}Z", RegexOptions.Compiled);
 
         private static MethodBuilder GenerateExtractObject(TypeBuilder type) {
-
-            /*
-              private static MethodInfo GenerateExtractValueFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
-            var typeName = type.GetName().Fix();
-            if (_extractMethodBuilders.TryGetValue(key, out method))
-                return method;
-            var methodName = String.Concat(ExtractStr, typeName);
-            var isObjectType = type == _objectType;
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _charPtrType, _intType.MakeByRefType() });
-            _extractMethodBuilders[key] = method;
-
-
-             */
 
             MethodBuilder method;
             var key = "ExtractObjectValue";
