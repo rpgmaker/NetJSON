@@ -267,12 +267,13 @@ namespace NetJSON {
             public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
         }
         
-        //const string QuotChar = "\"";
         private static string QuotChar {
             get {
                 return _ThreadQuoteString;
             }
         }
+
+        
 
         const int BUFFER_SIZE = 11;
 
@@ -439,8 +440,7 @@ namespace NetJSON {
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
 
-        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
-                _quoteCharField = _jsonType.GetField("_ThreadQuoteChar", MethodBinding);
+        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty");
 
         const int Delimeter = (int)',',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
@@ -823,10 +823,8 @@ namespace NetJSON {
             return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
 
-        [ThreadStatic]
         public static char _ThreadQuoteChar = QuotDoubleChar;
 
-        [ThreadStatic]
         public static string _ThreadQuoteString = QuotDoubleChar.ToString();
 
         private static bool _useTickFormat = true;
@@ -853,7 +851,7 @@ namespace NetJSON {
         public static NetJSONQuote QuoteType {
             set {
                 _quoteType = value;
-                _ThreadQuoteString = (_ThreadQuoteChar = value == NetJSONQuote.Single ? QuotSingleChar : _ThreadQuoteChar).ToString();
+                _ThreadQuoteString = (_ThreadQuoteChar = value == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString();
             }
         }
 
@@ -1305,8 +1303,8 @@ OpCodes.Call,
                         isQuote = echar == _ThreadQuoteChar;
                         if (echar == '\0') {
                             index--;
-                            if (*(ptr + index) == _ThreadQuoteChar)
-                                GetStringBasedValue(ptr, ref index);
+                            if (*(ptr + index) == _ThreadQuoteChar) 
+                               GetStringBasedValue(ptr, ref index);
                             else
                                 GetNonStringValue(ptr, ref index);
                             return;
@@ -2831,8 +2829,7 @@ OpCodes.Call,
 
 
                 //if(current == _ThreadQuoteChar) {
-                //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                il.Emit(OpCodes.Ldsfld, _quoteCharField);
+                il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
 
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
@@ -4190,8 +4187,7 @@ OpCodes.Call,
 
                     //if(current == _ThreadQuoteChar && quotes == 0)
                     il.Emit(OpCodes.Ldloc, current);
-                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                    il.Emit(OpCodes.Ldsfld, _quoteCharField);
+                    il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
 
                     il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
                     il.Emit(OpCodes.Ldloc, quotes);
@@ -4249,8 +4245,7 @@ OpCodes.Call,
                     il.MarkLabel(currentQuoteLabel);
                     //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
                     il.Emit(OpCodes.Ldloc, current);
-                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                    il.Emit(OpCodes.Ldsfld, _quoteCharField);
+                    il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
 
                     il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
                     il.Emit(OpCodes.Ldloc, quotes);

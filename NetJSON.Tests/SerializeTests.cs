@@ -3,7 +3,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace NetJSON.Tests
 {
@@ -124,6 +126,30 @@ namespace NetJSON.Tests
             return value.ToString();
         }
 
+        public class InvalidJsonStringClass {
+            public string ScreenId { get; set; }
+            public string StepType { get; set; }
+            public string Text { get; set; }
+            public string Title { get; set; }
+        }
+
+        [TestMethod]
+        public void TestInvalidJson() {
+            var @string = @"{
+    ""ScreenId"": ""Error"",
+    ""StepType"": ""Message"",
+    ""Text"": ""No se ha encontrado la pagina a la que usted queria ingresar."",
+    ""Title"": ""Pagina no encontrada""
+}";
+            var @string2 = @"{
+    ""ScreenId"": ""CRM.IDENTIFICADOR"",
+    ""StepType"": ""Screen"",
+    ""Title"": ""Identificaci&oacute;n de cliente""
+}";
+            var data = NetJSON.Deserialize<InvalidJsonStringClass>(@string);
+            var data2 = NetJSON.Deserialize<Dictionary<string, string>>(@string2);
+        }
+
         [TestMethod]
         public void SerializeDictionaryWithShortType() {
 
@@ -166,6 +192,14 @@ namespace NetJSON.Tests
 
             var bjson = NetJSON.Serialize(true);
             var bb = NetJSON.Deserialize<bool>(bjson);
+        }
+
+        [TestMethod]
+        public void TestJsonFile() {
+            NetJSON.CaseSensitive = false;
+            using (var file = File.OpenText("json.txt")) {
+                var evnts = NetJSON.Deserialize<EvntsRoot>(file.ReadToEnd());
+            }
         }
 
         [TestMethod]
@@ -407,5 +441,72 @@ namespace NetJSON.Tests
         OnlineCasinoWin,
         OnlineSportsWin,
         LandBasedCasinoWin
+    }
+
+    public class Group {
+        public int id { get; set; }
+        public string name { get; set; }
+        public List<Group> groups { get; set; }
+    }
+
+    public class Root {
+        public Group group { get; set; }
+    }
+
+    public class Path {
+        public string englishName { get; set; }
+    }
+
+    public class Event {
+        public int id { get; set; }
+        public string name { get; set; }
+        public string homeName { get; set; }
+        public string awayName { get; set; }
+        public string start { get; set; }
+        public string group { get; set; }
+        public string type { get; set; }
+        public string boUri { get; set; }
+        public List<Path> path { get; set; }
+        public string state { get; set; }
+    }
+
+    public class Criterion {
+        public int id { get; set; }
+        public string label { get; set; }
+    }
+
+    public class BetOfferType {
+        public string name { get; set; }
+    }
+
+    public class Outcome {
+        public int id { get; set; }
+        public string label { get; set; }
+        public int odds { get; set; }
+        public int line { get; set; }
+        public string type { get; set; }
+        public int betOfferId { get; set; }
+        public string oddsFractional { get; set; }
+    }
+
+    public class BetOffer {
+        public int id { get; set; }
+        public string closed { get; set; }
+        public Criterion criterion { get; set; }
+        public BetOfferType betOfferType { get; set; }
+        public List<Outcome> outcomes { get; set; }
+        public int eventId { get; set; }
+        //Test remove when NetJSON fixe arrives.
+        //public CombinableOutcomes combinableOutcomes { get; set; }
+    }
+
+    //Test remove when NetJSON fixe arrives.
+    public class CombinableOutcomes {
+
+    }
+
+    public class EvntsRoot {
+        public List<BetOffer> betoffers { get; set; }
+        public List<Event> events { get; set; }
     }
 }
