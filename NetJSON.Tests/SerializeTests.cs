@@ -39,6 +39,34 @@ namespace NetJSON.Tests
             var json = NetJSON.Serialize(dict);
         }
 
+        [TestMethod]
+        public void TestAutoDetectQuotes() {
+            
+            var dict = new Dictionary<string, string>();
+            dict["Test"] = "Test2";
+            dict["Test2"] = "Test3";
+
+            var list = new List<string>{
+                "Test",
+                "Test2"
+            };
+
+            var str = "Test";
+
+            NetJSON.QuoteType = NetJSONQuote.Single;
+            var json = NetJSON.Serialize(dict);
+            var jsonList = NetJSON.Serialize(list);
+            var jsonStr = NetJSON.Serialize(str);
+
+            var jsonWithDouble = json.Replace("'", "\"");
+            var jsonListWithDouble = jsonList.Replace("'", "\"");
+            var jsonStrWithDouble = jsonStr.Replace("'", "\"");
+
+            var result = NetJSON.Deserialize<Dictionary<string, string>>(jsonWithDouble);
+            var result2 = NetJSON.Deserialize<List<string>>(jsonListWithDouble);
+            var result3 = NetJSON.Deserialize<string>(jsonStrWithDouble);
+        }
+
 
         [TestMethod]
         public void TestSkippingProperty() {
@@ -146,8 +174,16 @@ namespace NetJSON.Tests
     ""StepType"": ""Screen"",
     ""Title"": ""Identificaci&oacute;n de cliente""
 }";
-            var data = NetJSON.Deserialize<InvalidJsonStringClass>(@string);
-            var data2 = NetJSON.Deserialize<Dictionary<string, string>>(@string2);
+            var tasks = new List<Task>();
+
+            for (var i = 0; i < 10; i++) {
+                tasks.Add(Task.Run(() => {
+                    var data = NetJSON.Deserialize<InvalidJsonStringClass>(@string);
+                    var data2 = NetJSON.Deserialize<Dictionary<string, string>>(@string2);
+                }));
+            }
+
+            Task.WaitAll(tasks.ToArray());
         }
 
         [TestMethod]

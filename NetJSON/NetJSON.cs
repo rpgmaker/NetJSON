@@ -267,7 +267,7 @@ namespace NetJSON {
             public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
         }
         
-        private static string QuotChar {
+        public static string QuotChar {
             get {
                 return _ThreadQuoteString;
             }
@@ -438,9 +438,14 @@ namespace NetJSON {
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
             _objectEquals = _objectType.GetMethod("Equals", new []{ _objectType}),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
-            _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType });
+            _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
+            _threadQuoteCharGet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetGetMethod(),
+            _threadQuoteCharSet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetSetMethod(),
+            _QuotCharGet = _jsonType.GetProperty("QuotChar", MethodBinding).GetGetMethod(),
+            _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding);
 
-        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty");
+        private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
+            _hasOverrideQuoteField = _jsonType.GetField("_hasOverrideQuoteChar", MethodBinding);
 
         const int Delimeter = (int)',',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
@@ -817,15 +822,44 @@ namespace NetJSON {
             return !value.StartsWith("{") && !value.StartsWith("[");
         }
 
+        private static void LoadQuotChar(ILGenerator il) {
+            il.Emit(OpCodes.Call, _QuotCharGet);
+            //il.Emit(OpCodes.Ldstr, QuotChar);
+        }
+
         [ThreadStatic]
         private static StringBuilder _cachedStringBuilder;
         public static StringBuilder GetStringBuilder() {
             return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
 
-        public static char _ThreadQuoteChar = QuotDoubleChar;
+        [ThreadStatic]
+        public static bool _hasOverrideQuoteChar;
 
-        public static string _ThreadQuoteString = QuotDoubleChar.ToString();
+        [ThreadStatic]
+        private static char _threadQuoteChar;
+        public static char _ThreadQuoteChar {
+            get {
+                return _threadQuoteChar == '\0' ? (_threadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar) : _threadQuoteChar;
+            }
+            set{
+                _threadQuoteChar = value;
+                _threadQuoteString = _threadQuoteChar == '\'' ? "'" : "\"";
+            }
+        }
+
+        [ThreadStatic]
+        private static string _threadQuoteString;
+        public static string _ThreadQuoteString {
+            get {
+                return _threadQuoteString ?? (_threadQuoteString = (_ThreadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString());
+            }
+            set {
+                _threadQuoteString = value;
+                _threadQuoteChar = _threadQuoteString == "'" ? '\'' : '"';
+            }
+        }
+
 
         private static bool _useTickFormat = true;
 
@@ -1017,7 +1051,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Brfalse, needQuoteStartLabel);
 
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldstr, QuotChar);
+                LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
 
@@ -1103,7 +1137,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Brfalse, needQuoteEndLabel);
 
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldstr, QuotChar);
+                LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
 
@@ -1226,16 +1260,27 @@ OpCodes.Call,
             wil.Emit(OpCodes.Ret);
 
             var dil = deserializeMethod.GetILGenerator();
+            var dilLocal = dil.DeclareLocal(objType);
 
             dil.Emit(OpCodes.Ldarg_1);
             dil.Emit(OpCodes.Call, readMethod);
+            dil.Emit(OpCodes.Stloc, dilLocal);
+            dil.Emit(OpCodes.Ldc_I4_0);
+            dil.Emit(OpCodes.Stsfld, _hasOverrideQuoteField);
+            dil.Emit(OpCodes.Ldloc, dilLocal);
             dil.Emit(OpCodes.Ret);
 
             var rdil = deserializeWithReaderMethod.GetILGenerator();
+            var rdilLocal = rdil.DeclareLocal(objType);
+
 
             rdil.Emit(OpCodes.Ldarg_1);
             rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
             rdil.Emit(OpCodes.Call, readMethod);
+            rdil.Emit(OpCodes.Stloc, rdilLocal);
+            rdil.Emit(OpCodes.Ldc_I4_0);
+            rdil.Emit(OpCodes.Stsfld, _hasOverrideQuoteField);
+            rdil.Emit(OpCodes.Ldloc, rdilLocal);           
             rdil.Emit(OpCodes.Ret);
 
             type.DefineMethodOverride(serializeMethod,
@@ -1297,7 +1342,7 @@ OpCodes.Call,
                 var hasChar = schar != '\0';
                 if (!hasChar) {
                     if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
-                        echar = current == _ThreadQuoteChar ? _ThreadQuoteChar :
+                        echar = IsCurrentAQuot(current) ? _ThreadQuoteChar :
                                 current == '{' ? '}' :
                                 current == '[' ? ']' : '\0';
                         isQuote = echar == _ThreadQuoteChar;
@@ -1327,7 +1372,7 @@ OpCodes.Call,
                 }
                 if (!isTag) {
                     if (isQuote) {
-                        if (current == _ThreadQuoteChar && charCount > 0 && prev != '\\') {
+                        if (IsCurrentAQuot(current) && charCount > 0 && prev != '\\') {
                             //++index;
                             charCount = 0;
                             goto endLabel;
@@ -1854,7 +1899,7 @@ OpCodes.Call,
 
                     if (needQuote) {
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         //il.Emit(OpCodes.Pop);
                     }
@@ -1882,7 +1927,7 @@ OpCodes.Call,
 
                     if (needQuote) {
                         //il.Emit(OpCodes.Ldarg_2);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else il.Emit(OpCodes.Pop);
@@ -1894,7 +1939,7 @@ OpCodes.Call,
 
                         if (needDateQuote) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -1915,7 +1960,7 @@ OpCodes.Call,
 
                         if (needDateQuote) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -1937,7 +1982,7 @@ OpCodes.Call,
                         il.MarkLabel(nullLabel);
 
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
@@ -1950,7 +1995,7 @@ OpCodes.Call,
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
@@ -1977,7 +2022,7 @@ OpCodes.Call,
 
                         if (_useEnumString) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -1993,7 +2038,7 @@ OpCodes.Call,
 
                         if (_useEnumString) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -2036,20 +2081,20 @@ OpCodes.Call,
                         il.Emit(OpCodes.Pop);
                     } else if (type == _typeType) {
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Callvirt, _assemblyQualifiedName);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (type == _guidType) {
 
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
@@ -2063,13 +2108,13 @@ OpCodes.Call,
                         il.Emit(OpCodes.Pop);
 
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldstr, QuotChar);
+                        LoadQuotChar(il);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else {
                         if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -2085,7 +2130,7 @@ OpCodes.Call,
 
                         if (needQuote) {
                             il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldstr, QuotChar);
+                            LoadQuotChar(il);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         }
@@ -2225,7 +2270,7 @@ OpCodes.Call,
 
             il.Emit(OpCodes.Ldarg_1);
 
-            il.Emit(OpCodes.Ldstr, QuotChar);
+            LoadQuotChar(il);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend); 
 
             il.Emit(OpCodes.Ldloca, entryLocal);
@@ -2242,7 +2287,7 @@ OpCodes.Call,
             }
 
 
-            il.Emit(OpCodes.Ldstr, QuotChar);
+            LoadQuotChar(il);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
             il.Emit(OpCodes.Ldstr, Colon);
@@ -2578,7 +2623,14 @@ OpCodes.Call,
                 }
 
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldstr, String.Concat(QuotChar, name, QuotChar, Colon));
+                //il.Emit(OpCodes.Ldstr, String.Concat(QuotChar, name, QuotChar, Colon));
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Ldstr, name);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Ldstr, Colon);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
 
@@ -2829,7 +2881,8 @@ OpCodes.Call,
 
 
                 //if(current == _ThreadQuoteChar) {
-                il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                il.Emit(OpCodes.Call, _threadQuoteCharGet);
 
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
@@ -3318,7 +3371,7 @@ OpCodes.Call,
                         }
                     }
                 } else {
-                    if (current == _ThreadQuoteChar) {
+                    if (IsCurrentAQuot(current)) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
@@ -3927,6 +3980,16 @@ OpCodes.Call,
 
             return inRange;
         }
+
+        public static bool IsCurrentAQuot(char current) {
+            var isQuote = _hasOverrideQuoteChar ? current == _ThreadQuoteChar : (current == QuotSingleChar || current == QuotDoubleChar);
+            if (!_hasOverrideQuoteChar && isQuote) {
+                if (_ThreadQuoteChar != current)
+                    _ThreadQuoteChar = current;
+                _hasOverrideQuoteChar = true;
+            }
+            return isQuote;
+        }
         
         private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
             MethodBuilder method;
@@ -4187,9 +4250,13 @@ OpCodes.Call,
 
                     //if(current == _ThreadQuoteChar && quotes == 0)
                     il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    //il.Emit(OpCodes.Call, _threadQuoteCharGet);
 
-                    il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
+                    //il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
+                    il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
+                    il.Emit(OpCodes.Brfalse, currentQuoteLabel);
+
                     il.Emit(OpCodes.Ldloc, quotes);
                     il.Emit(OpCodes.Ldc_I4_0);
                     il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
@@ -4245,7 +4312,8 @@ OpCodes.Call,
                     il.MarkLabel(currentQuoteLabel);
                     //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
                     il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+                    il.Emit(OpCodes.Call, _threadQuoteCharGet);
 
                     il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
                     il.Emit(OpCodes.Ldloc, quotes);
@@ -4512,10 +4580,10 @@ OpCodes.Call,
 
             while (true) {
                 current = ptr[index];
-                if (count == 0 && current == _ThreadQuoteChar) {
+                if (count == 0 && IsCurrentAQuot(current)) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && current == _ThreadQuoteChar && prev != '\\') {
+                } else if (count > 0 && IsCurrentAQuot(current) && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
