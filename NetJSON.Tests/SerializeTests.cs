@@ -154,6 +154,26 @@ namespace NetJSON.Tests
             return value.ToString();
         }
 
+        public class SampleSubstitionClass {
+            [NetJSONProperty("blahblah")]
+            public string Name { get; set; }
+            [NetJSONProperty("foobar")]
+            public int ID { get; set; }
+
+            [NetJSONProperty("barfoo")]
+            public int Number;
+        }
+
+        [TestMethod]
+        public void TestNetJSONProperty() {
+            NetJSON.IncludeFields = true;
+
+            var sample = new SampleSubstitionClass { ID = 100, Name = "Test Property", Number = 504 };
+
+            var json = NetJSON.Serialize(sample);
+            var sData = NetJSON.Deserialize<SampleSubstitionClass>(json);
+        }
+
         public class InvalidJsonStringClass {
             public string ScreenId { get; set; }
             public string StepType { get; set; }

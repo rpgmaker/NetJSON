@@ -28,6 +28,18 @@ using System.Threading;
 
 namespace NetJSON {
 
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class NetJSONPropertyAttribute : Attribute {
+        public string Name { get; private set; }
+        public NetJSONPropertyAttribute(string name) {
+            Name = name;
+        }
+    }
+
+    public class NetJSONMemberInfo {
+        public MemberInfo Member { get; set; }
+        public NetJSONPropertyAttribute Attribute { get; set; }
+    }
 
 #if NET_PCL
     public enum BindingFlags {
@@ -235,6 +247,12 @@ namespace NetJSON {
         }
     }
 
+    public class NetJSONInvalidJSONPropertyException : Exception {
+        public NetJSONInvalidJSONPropertyException()
+            : base("Class cannot contain any NetJSONProperty with null or blank space character") {
+        }
+    }
+
     public class NetJSONInvalidAssemblyGeneration : Exception {
         public NetJSONInvalidAssemblyGeneration(string asmName) : base(String.Format("Could not generate assembly with name [{0}] due to empty list of types to include", asmName)) { }
     }
@@ -353,6 +371,7 @@ namespace NetJSON {
             _jsonType = typeof(NetJSON),
             _textWriterType = typeof(TextWriter),
             _tupleContainerType = typeof(TupleContainer),
+            _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
             _textReaderType = typeof(TextReader);
 
         static readonly MethodInfo _stringBuilderToString =
@@ -535,8 +554,8 @@ namespace NetJSON {
         static readonly ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
             new ConcurrentDictionary<Type, Delegate>();
 
-        static readonly ConcurrentDictionary<Type, MemberInfo[]> _typeProperties =
-            new ConcurrentDictionary<Type, MemberInfo[]>();
+        static readonly ConcurrentDictionary<Type, NetJSONMemberInfo[]> _typeProperties =
+            new ConcurrentDictionary<Type, NetJSONMemberInfo[]>();
 
         static readonly ConcurrentDictionary<string, string> _fixes =
             new ConcurrentDictionary<string, string>();
@@ -782,13 +801,23 @@ namespace NetJSON {
             });
         }
 
-        internal static MemberInfo[] GetTypeProperties(this Type type) {
+        internal static NetJSONMemberInfo[] GetTypeProperties(this Type type) {
             return _typeProperties.GetOrAdd(type, key => {
-                var props = key.GetProperties(PropertyBinding).Cast<MemberInfo>();
+                var props = key.GetProperties(PropertyBinding).Select(x => new NetJSONMemberInfo{ Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault()});
                 if (_includeFields) {
-                    props = props.Union(key.GetFields(PropertyBinding));
+                    props = props.Union(key.GetFields(PropertyBinding).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() }));
                 }
-                return props.ToArray();
+                var result = props.ToArray();
+
+#if NET_35
+                if (result.Where(x => x.Attribute != null).Any(x => x.Attribute.Name.IsNullOrWhiteSpace() || x.Attribute.Name.Contains(" ")))
+                    throw new NetJSONInvalidJSONPropertyException();
+#else
+                if (result.Where(x => x.Attribute != null).Any(x => string.IsNullOrWhiteSpace(x.Attribute.Name) || x.Attribute.Name.Contains(" ")))
+                    throw new NetJSONInvalidJSONPropertyException();
+#endif
+
+                return result;
             });
         }
 
@@ -2519,11 +2548,16 @@ OpCodes.Call,
             il.Emit(OpCodes.Stloc, hasValue);
 
 
-            foreach (var member in props) {
+            foreach (var mem in props) {
+                var member = mem.Member;
                 var name = member.Name;
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
+                var attr = mem.Attribute;
                 var isProp = prop != null;
+
+                if (attr != null)
+                    name = attr.Name ?? name;
 
                 var memberType = isProp ? prop.PropertyType : field.FieldType;
                 var propType = memberType;
@@ -3577,9 +3611,11 @@ OpCodes.Call,
             var il = method.GetILGenerator();
 
             for (var i = 0; i < props.Length; i++) {
-                var member = props[i];
+                var mem = props[i];
+                var member = mem.Member;
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
+                var attr = mem.Attribute;
                 var isProp = prop != null;
 
                 if (isProp && !prop.CanWrite) {
@@ -3595,7 +3631,7 @@ OpCodes.Call,
                 propType = isNullable ? nullableType : propType;
 
                 il.Emit(OpCodes.Ldarg_3);
-                il.Emit(OpCodes.Ldstr, propName);
+                il.Emit(OpCodes.Ldstr, attr != null ? (attr.Name ?? propName) : propName);
                 if (_caseSensitive)
                     il.Emit(OpCodes.Call, _stringOpEquality);
                 else {
@@ -4282,8 +4318,10 @@ OpCodes.Call,
                         var nextLabel = il.DefineLabel();
 
                         foreach (var prop in typeProps) {
-
-                            var propName = prop.Name;
+                            var propName = prop.Member.Name;
+                            var attr = prop.Attribute;
+                            if (attr != null)
+                                propName = attr.Name ?? propName;
                             var set = propName.Length;
                             var checkCharByIndexLabel = il.DefineLabel();
 
