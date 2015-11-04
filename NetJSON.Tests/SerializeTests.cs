@@ -174,6 +174,22 @@ namespace NetJSON.Tests
             var sData = NetJSON.Deserialize<SampleSubstitionClass>(json);
         }
 
+        public class TestJSON {
+            public List<Rec> d { get; set; }
+            public List<int?> v { get; set; }
+            public Dictionary<string, int?> b { get; set; }
+        }
+
+        public class Rec {
+            public int? val { get; set; }
+        }
+
+        [TestMethod]
+        public void TestDeserializeNullable() {
+            NetJSON.GenerateAssembly = true;
+            var data = NetJSON.Deserialize<TestJSON>("{\"b\": {\"val1\":1,\"val2\":null,\"val3\":3}, \"v\": [1,2,null,4,null,6], \"d\":[{\"val\":5},{\"val\":null}]}");
+        }
+
         public class InvalidJsonStringClass {
             public string ScreenId { get; set; }
             public string StepType { get; set; }

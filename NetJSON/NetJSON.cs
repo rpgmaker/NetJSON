@@ -3521,24 +3521,35 @@ OpCodes.Call,
 
         private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value, Type originalType = null) {
 
-            //Logic to properly resolve nullable type when null is returned(Currently throws FatalEngineException)
-            /*
-            var local = il.DeclareLocal(originalType ?? type);
+            var nullableType = type;
+            type = nullableType.GetNullableType();
 
-            var nullLabelCheck = il.DefineLabel();
-            var notNullLabel = il.DefineLabel();
+            var isNullable = type != null;
+            if (type == null)
+                type = nullableType;
+
+            var local = il.DeclareLocal(originalType ?? nullableType);
+
+            var defaultLabel = default(Label);
+            var nullLabelCheck = isNullable ? il.DefineLabel() : defaultLabel;
+            var notNullLabel = isNullable ? il.DefineLabel() : defaultLabel;
 
             //Check for null
-            il.Emit(OpCodes.Ldloc, value);
-            il.Emit(OpCodes.Ldstr, NullStr);
-            il.Emit(OpCodes.Call, _stringOpEquality);
-            il.Emit(OpCodes.Brfalse, nullLabelCheck);
-            il.Emit(OpCodes.Ldnull);
-            il.Emit(OpCodes.Stloc, local);
-            il.Emit(OpCodes.Br, notNullLabel);
+            if (isNullable) {
+                il.Emit(OpCodes.Ldloc, value);
+                il.Emit(OpCodes.Ldnull);
+                il.Emit(OpCodes.Call, _stringOpEquality);
+                il.Emit(OpCodes.Brfalse, nullLabelCheck);
 
-            il.MarkLabel(nullLabelCheck);
-            */
+                il.Emit(OpCodes.Ldloca, local);
+                il.Emit(OpCodes.Initobj, _nullableType.MakeGenericType(type));
+                
+                il.Emit(OpCodes.Br, notNullLabel);
+
+                il.MarkLabel(nullLabelCheck);
+            }
+
+           
 
             il.Emit(OpCodes.Ldloc, value);
             if (type == _intType)
@@ -3582,13 +3593,14 @@ OpCodes.Call,
                 il.Emit(OpCodes.Call, _fastStringToType);
             }
 
-            /*
-            il.Emit(OpCodes.Stloc, local);
+            if (isNullable) {
+                il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(type).GetConstructor(new[] { type }));
+                il.Emit(OpCodes.Stloc, local);
 
-            il.MarkLabel(notNullLabel);
+                il.MarkLabel(notNullLabel);
 
-            il.Emit(OpCodes.Ldloc, local);
-            */ 
+                il.Emit(OpCodes.Ldloc, local);
+            }
         }
 
         private static MethodInfo GenerateSetValueFor(TypeBuilder typeBuilder, Type type) {
@@ -3653,7 +3665,7 @@ OpCodes.Call,
                             il.Emit(OpCodes.Pop);
                     } else il.Emit(OpCodes.Stfld, field);
                 } else {
-                    var propValue = il.DeclareLocal(propType);
+                    var propValue = il.DeclareLocal(originPropType);
                     var isValueType = propType.IsValueType;
                     var isPrimitiveType = propType.IsPrimitiveType();
                     var isStruct = isValueType && !isPrimitiveType;
@@ -3663,7 +3675,7 @@ OpCodes.Call,
 
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
+                    il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, originPropType));
 
                     il.Emit(OpCodes.Stloc, propValue);
 
@@ -3705,9 +3717,9 @@ OpCodes.Call,
 
                     il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldloc, propValue);
-                    if (isNullable) {
-                        il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
-                    }
+                    //if (isNullable) {
+                    //    il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
+                    //}
 
                     if (isProp) {
                         if (prop.CanWrite)
@@ -3771,14 +3783,13 @@ OpCodes.Call,
 
             var isArray = type.IsArray;
             var elementType = isArray ? type.GetElementType() : type.GetGenericArguments()[0];
-            var originalElementType = elementType;
             var nullableType = elementType.GetNullableType();
-            elementType = nullableType != null ? nullableType : elementType;
+            nullableType = nullableType != null ? nullableType : elementType;
 
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || (elementType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || elementType == _timeSpanType || isByteArray || (_useEnumString && elementType.IsEnum);
+            var isStringBased = isStringType || (nullableType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || nullableType == _timeSpanType || isByteArray || (_useEnumString && nullableType.IsEnum);
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
 
 
@@ -3788,7 +3799,7 @@ OpCodes.Call,
             var startIndex = il.DeclareLocal(_intType);
             var endIndex = il.DeclareLocal(_intType);
             var prev = il.DeclareLocal(_charType);
-            var addMethod = _genericCollectionType.MakeGenericType(originalElementType).GetMethod("Add");
+            var addMethod = _genericCollectionType.MakeGenericType(elementType).GetMethod("Add");
 
             var prevLabel = il.DefineLabel();
             
@@ -3918,7 +3929,7 @@ OpCodes.Call,
                         il.Emit(OpCodes.Stloc, text);
 
                         il.Emit(OpCodes.Ldloc, obj);
-                        GenerateChangeTypeFor(typeBuilder, elementType, il, text, originalElementType);
+                        GenerateChangeTypeFor(typeBuilder, elementType, il, text);
                         il.Emit(OpCodes.Callvirt, addMethod);
 
                         il.MarkLabel(blankNewLineLabel);
