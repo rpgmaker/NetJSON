@@ -3513,37 +3513,58 @@ OpCodes.Call,
                 return date.AddSeconds(unixTimeStamp).ToLocalTime();
             }
 
+            DateTime dt;
+            string[] tokens = null;
+            bool negative = false;
+            string offsetText = null;
+
             if (value == "\\/Date(-62135596800)\\/")
                 return DateTime.MinValue;
             else if (value == "\\/Date(253402300800)\\/")
                 return DateTime.MaxValue;
             else if (value[0] == '\\') {
                 var dateText = value.Substring(7, value.IndexOf(')', 7) - 7);
-                var negative = dateText.IndexOf('-') >= 0;
-                var tokens = negative ? dateText.Split(_dateNegChars, StringSplitOptions.RemoveEmptyEntries)
+                negative = dateText.IndexOf('-') >= 0;
+                tokens = negative ? dateText.Split(_dateNegChars, StringSplitOptions.RemoveEmptyEntries)
                     : dateText.Split(_datePosChars, StringSplitOptions.RemoveEmptyEntries);
                 dateText = tokens[0];
 
                 var ticks = FastStringToLong(dateText);
-                var date = new DateTime((ticks * 10000) + 621355968000000000, DateTimeKind.Utc);
-
-                if (tokens.Length > 1) {
-                    var offsetText = tokens[1];
-                    var hours = FastStringToInt(offsetText.Substring(0, 2));
-                    var minutes = offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0;
-                    if(negative)
-                        hours *= -1;
-                    var offsetHour = TimeSpan.FromHours(hours);
-                    var offsetMinute = TimeSpan.FromMinutes(minutes);
-                    var offset = offsetHour + offsetMinute;
-                    var dateOffset = new DateTimeOffset(date.Add(offset).Ticks, offset);
-                    return dateOffset.UtcDateTime;
+                dt = new DateTime((ticks * 10000) + 621355968000000000, DateTimeKind.Utc);
+                offsetText = tokens.Length > 1 ? tokens[1] : offsetText;
+            } else {
+                var dateText = value.Substring(0, value.Length - 6);
+                var diff = value.Length - dateText.Length;
+                var hasOffset = diff > 0;
+                var utcOffsetText = hasOffset ? value.Substring(value.Length - 6, 6) : string.Empty;
+                negative = diff > 0 && utcOffsetText[0] == '-';
+                if (hasOffset) {
+                    offsetText = utcOffsetText.Substring(1, 5).Replace(":", string.Empty);
                 }
-
-                return date;
+                dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
             }
 
-            return DateTime.Parse(value, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
+            var isNullOrWhiteSpace = false;
+
+#if NET_35
+            isNullOrWhiteSpace = offsetText.IsNullOrWhiteSpace();
+#else
+            isNullOrWhiteSpace = string.IsNullOrWhiteSpace(offsetText);
+#endif
+
+            if (!isNullOrWhiteSpace) {
+                var hours = FastStringToInt(offsetText.Substring(0, 2));
+                var minutes = offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0;
+                if (negative)
+                    hours *= -1;
+                var offsetHour = TimeSpan.FromHours(hours);
+                var offsetMinute = TimeSpan.FromMinutes(minutes);
+                var offset = offsetHour + offsetMinute;
+                var dateOffset = new DateTimeOffset(dt.Add(offset).Ticks, offset);
+                dt = dateOffset.DateTime;
+            }
+
+            return dt;
         }
 
         public static Guid FastStringToGuid(string value) {

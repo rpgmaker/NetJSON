@@ -181,7 +181,7 @@ namespace NetJSON.Tests
         [TestMethod]
         public void TestDateTimeFormat() {
             var json = "{\"DateTimeValue\":\"\\/Date(1447003080000+0200)\\/\"}";
-            var json2 = "{\"DateTimeValue\":\"2015-11-08T19:18:00\"}";
+            var json2 = "{\"DateTimeValue\":\"2015-11-08T19:18:00+02:00\"}";
 
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             var obj = NetJSON.Deserialize<TestDateTimeFormatting>(json);
