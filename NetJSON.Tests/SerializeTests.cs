@@ -174,6 +174,24 @@ namespace NetJSON.Tests
             var sData = NetJSON.Deserialize<SampleSubstitionClass>(json);
         }
 
+        public class TestDateTimeFormatting {
+            public DateTime DateTimeValue { get; set; }
+        }
+
+        [TestMethod]
+        public void TestDateTimeFormat() {
+            var json = "{\"DateTimeValue\":\"\\/Date(1447003080000+0200)\\/\"}";
+            var json2 = "{\"DateTimeValue\":\"2015-11-08T19:18:00\"}";
+
+            NetJSON.DateFormat = NetJSONDateFormat.Default;
+            var obj = NetJSON.Deserialize<TestDateTimeFormatting>(json);
+            var sobj = NetJSON.Serialize(obj);
+
+            NetJSON.DateFormat = NetJSONDateFormat.JsonNetISO;
+            var obj2 = NetJSON.Deserialize<TestDateTimeFormatting>(json2);
+            var sobj2 = NetJSON.Serialize(obj2);
+        }
+
         public class TestJSON {
             public List<Rec> d { get; set; }
             public List<int?> v { get; set; }

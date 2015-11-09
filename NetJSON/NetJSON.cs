@@ -270,7 +270,8 @@ namespace NetJSON {
     public enum NetJSONDateFormat {
         Default = 0,
         ISO = 2,
-        EpochTime = 4
+        EpochTime = 4,
+        JsonNetISO = 6
     }
 
     public enum NetJSONQuote {
@@ -969,10 +970,17 @@ namespace NetJSON {
         private static StringBuilder _cachedDateStringBuilder;
 
         public static string DateToISOFormat(DateTime date) {
-            return (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
-                .Clear().Append(IntToStr(date.Year)).Append('-').Append(IntToStr(date.Month))
-            .Append('-').Append(IntToStr(date.Day)).Append('T').Append(IntToStr(date.Hour)).Append(':').Append(IntToStr(date.Minute)).Append(':')
-            .Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
+            var value = (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
+                .Clear().Append(IntToStr(date.Year)).Append('-')
+                .Append(date.Month < 10 ? "0" : string.Empty)
+                .Append(IntToStr(date.Month))
+            .Append('-').Append(date.Day < 10 ? "0" : string.Empty).Append(IntToStr(date.Day)).Append('T').Append(IntToStr(date.Hour)).Append(':')
+            .Append(IntToStr(date.Minute)).Append(':');
+
+            if(_dateFormat == NetJSONDateFormat.ISO)
+                return value.Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
+
+            return value.Append(date.Second < 10 ? "0" : string.Empty).Append(IntToStr(date.Second)).ToString();
         }
 
         private static DateTime Epoch = new DateTime(1970, 1, 1),
@@ -983,7 +991,12 @@ namespace NetJSON {
                 return "\\/Date(-62135596800)\\/";
             else if (date == DateTime.MaxValue)
                 return "\\/Date(253402300800)\\/";
-            return String.Concat("\\/Date(", IntUtility.ltoa((long)(date - Epoch).TotalSeconds), ")\\/");
+            var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+            var hours = Math.Abs(offset.Hours);
+            var minutes = Math.Abs(offset.Minutes);
+            var offsetText = string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
+                hours, minutes < 10 ? "0" : string.Empty, minutes);
+            return String.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
         }
 
         public static string DateToEpochTime(DateTime date) {
@@ -1086,7 +1099,7 @@ namespace NetJSON {
 
                 il.MarkLabel(needQuoteStartLabel);
 
-                _defaultSerializerTypes[_dateTimeType] = (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat : _generatorDateToEpochTime);
+                _defaultSerializerTypes[_dateTimeType] = (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO || _dateFormat == NetJSONDateFormat.JsonNetISO ? _generatorDateToISOFormat : _generatorDateToEpochTime);
 
                 var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
                 
@@ -1982,7 +1995,7 @@ OpCodes.Call,
                         //il.Emit(OpCodes.Box, _dateTimeType);
                         //il.Emit(OpCodes.Call, _stringFormat);
                         il.Emit(OpCodes.Call, _dateFormat == NetJSONDateFormat.Default ? _generatorDateToString :
-                            _dateFormat == NetJSONDateFormat.ISO ? _generatorDateToISOFormat :
+                            _dateFormat == NetJSONDateFormat.ISO || _dateFormat == NetJSONDateFormat.JsonNetISO ? _generatorDateToISOFormat :
                             _generatorDateToEpochTime);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
@@ -3491,6 +3504,8 @@ OpCodes.Call,
             return value[0];
         }
 
+        private static char[] _dateNegChars = new[] { '-' },
+            _datePosChars = new[] { '+' };
         public static DateTime FastStringToDate(string value) {
             if (_dateFormat == NetJSONDateFormat.EpochTime) {
                 var unixTimeStamp = FastStringToLong(value);
@@ -3503,11 +3518,32 @@ OpCodes.Call,
             else if (value == "\\/Date(253402300800)\\/")
                 return DateTime.MaxValue;
             else if (value[0] == '\\') {
-                var ticks = FastStringToLong(value.Substring(7, value.IndexOf(')',7) - 7));
-                return new DateTime(1970, 1, 1).AddSeconds(ticks);
+                var dateText = value.Substring(7, value.IndexOf(')', 7) - 7);
+                var negative = dateText.IndexOf('-') >= 0;
+                var tokens = negative ? dateText.Split(_dateNegChars, StringSplitOptions.RemoveEmptyEntries)
+                    : dateText.Split(_datePosChars, StringSplitOptions.RemoveEmptyEntries);
+                dateText = tokens[0];
+
+                var ticks = FastStringToLong(dateText);
+                var date = new DateTime((ticks * 10000) + 621355968000000000, DateTimeKind.Utc);
+
+                if (tokens.Length > 1) {
+                    var offsetText = tokens[1];
+                    var hours = FastStringToInt(offsetText.Substring(0, 2));
+                    var minutes = offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0;
+                    if(negative)
+                        hours *= -1;
+                    var offsetHour = TimeSpan.FromHours(hours);
+                    var offsetMinute = TimeSpan.FromMinutes(minutes);
+                    var offset = offsetHour + offsetMinute;
+                    var dateOffset = new DateTimeOffset(date.Add(offset).Ticks, offset);
+                    return dateOffset.UtcDateTime;
+                }
+
+                return date;
             }
 
-            return DateTime.Parse(value);
+            return DateTime.Parse(value, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
         }
 
         public static Guid FastStringToGuid(string value) {
