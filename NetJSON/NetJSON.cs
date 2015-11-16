@@ -1373,8 +1373,52 @@ OpCodes.Call,
             return assembly;
         }
 
-
         public static unsafe void SkipProperty(char* ptr, ref int index) {
+            var currentIndex = index;
+            char current = '\0';
+            char bchar = '\0';
+            char echar = '\0';
+            bool isStringType = false;
+            bool isNonStringType = false;
+            int counter = 0;
+            bool hasChar = false;
+
+            while (true) {
+                current = *(ptr + index);
+                if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
+                    if (!hasChar) {
+                        isStringType = IsCurrentAQuot(current);
+                        if (!isStringType)
+                            isNonStringType = current != '{' && current != '[';
+                        if (isStringType || isNonStringType)
+                            break;
+                        bchar = current;
+                        echar = current == '{' ? '}' :
+                            current == '[' ? ']' : '\0';
+                        counter = 1;
+                        hasChar = true;
+                    } else {
+                        if ((current == '{' && bchar == '{') || (current == '[' && bchar == '['))
+                            counter++;
+                        else if ((current == '}' && echar == '}') || (current == ']' && echar == ']'))
+                            counter--;
+                    }
+                }
+                index++;
+                if (hasChar && counter == 0)
+                    break;
+            }
+
+            if (isStringType || isNonStringType) {
+                index = currentIndex;
+                if (isStringType)
+                    GetStringBasedValue(ptr, ref index);
+                else if (isNonStringType)
+                    GetNonStringValue(ptr, ref index);
+            }
+        }
+
+        public static unsafe void SkipPropertyOld(char* ptr, ref int index) {
             char current = '\0', schar = '\0', echar = '\0', prev = '\0';
             int count = 0, charCount = 0;
             bool isBeginEnd = false, isTag = false, isQuote = false;
