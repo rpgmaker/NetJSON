@@ -20,7 +20,6 @@ namespace NetJSON.Tests
             var obj = new MccUserData() { arr = new int?[]{10, null, 20} };
 
             NetJSON.IncludeFields = true;
-            NetJSON.GenerateAssembly = true;
 
             var json = NetJSON.Serialize(obj);
             //var mjson = NetJSON.Deserialize<MccUserData>(json);
@@ -34,7 +33,6 @@ namespace NetJSON.Tests
             dict["Text"] = "Hello World";
 
             NetJSON.UseEnumString = true;
-            NetJSON.GenerateAssembly = true;
 
             var json = NetJSON.Serialize(dict);
         }
@@ -71,7 +69,6 @@ namespace NetJSON.Tests
         [TestMethod]
         public void TestSkippingProperty() {
 
-            NetJSON.GenerateAssembly = true;
 
             var ss = "{\"aaaaaaaaaa\":\"52\",\"aaaaaURL\":\"x\"}";
 
@@ -124,6 +121,14 @@ namespace NetJSON.Tests
         public void TestSimpleObjectSerializationWithNull() {
             var json = "{\"Id\":108591,\"EmailAddress\":\"james.brown@dummy.com\",\"FirstName\":\"James\",\"Surname\":\"Brown\",\"TitleId\":597,\"Address\":null}";
             var simple = NetJSON.Deserialize<SimpleObjectWithNull>(json);
+        }
+
+        [TestMethod]
+        public void TestDictionaryWithColon() {
+            var dict = new Dictionary<string, string>();
+            dict["Test:Key"] = "Value";
+            var json = NetJSON.Serialize(dict);
+            var ddict = NetJSON.Deserialize<Dictionary<string, string>>(json);
         }
 
         [TestMethod]
@@ -204,7 +209,6 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void TestDeserializeNullable() {
-            NetJSON.GenerateAssembly = true;
             var data = NetJSON.Deserialize<TestJSON>("{\"b\": {\"val1\":1,\"val2\":null,\"val3\":3}, \"v\": [1,2,null,4,null,6], \"d\":[{\"val\":5},{\"val\":null}]}");
         }
 
@@ -238,6 +242,60 @@ namespace NetJSON.Tests
             }
 
             Task.WaitAll(tasks.ToArray());
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithMillisecondDefaultFormatLocal() {
+            NetJSON.DateFormat = NetJSONDateFormat.Default;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithMillisecondDefaultFormatUtc() {
+            NetJSON.DateFormat = NetJSONDateFormat.Default;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithMillisecondDefaultFormatUnSpecified() {
+            NetJSON.DateFormat = NetJSONDateFormat.Default;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithISOFormatUnSpecified() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithISOFormatLocal() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+        }
+
+        [TestMethod]
+        public void TestSerializeDateWithISOFormatUTC() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
         }
 
         [TestMethod]
@@ -295,7 +353,6 @@ namespace NetJSON.Tests
         [TestMethod]
         public void TestSerializeTuple() {
 
-            NetJSON.GenerateAssembly = true;
 
             var tuple = new Tuple<int, string>(100, "Hello World");
 
@@ -305,8 +362,6 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void TestSerializeComplexTuple() {
-
-            NetJSON.GenerateAssembly = true;
 
             var tuple = new Tuple<int, DateTime, string,
                           Tuple<double, List<string>>>(1, DateTime.Now, "xisbound",

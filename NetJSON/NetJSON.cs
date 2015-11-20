@@ -274,6 +274,12 @@ namespace NetJSON {
         JsonNetISO = 6
     }
 
+    public enum NetJSONTimeZoneFormat {
+        Unspecified = 0,
+        Utc = 2,
+        Local = 4
+    }
+
     public enum NetJSONQuote {
         Default = 0,
         Double = Default,
@@ -903,10 +909,25 @@ namespace NetJSON {
         }
 
         private static NetJSONDateFormat _dateFormat = NetJSONDateFormat.Default;
+        private static NetJSONTimeZoneFormat _timeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
+
+        private static bool _useSharedAssembly = true;
+
+        public static bool ShareAssembly {
+            set {
+                _useSharedAssembly = value;
+            }
+        }
 
         public static NetJSONDateFormat DateFormat {
             set {
                 _dateFormat = value;
+            }
+        }
+
+        public static NetJSONTimeZoneFormat TimeZoneFormat {
+            set {
+                _timeZoneFormat = value;
             }
         }
 
@@ -970,17 +991,34 @@ namespace NetJSON {
         private static StringBuilder _cachedDateStringBuilder;
 
         public static string DateToISOFormat(DateTime date) {
+
+            var minute = date.Minute;
+            var hour = date.Hour;
+            var second = date.Second;
+            var millisecond = date.Millisecond;
+            var day = date.Day;
+            var month = date.Month;
+            var year = date.Year;
+
             var value = (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
-                .Clear().Append(IntToStr(date.Year)).Append('-')
-                .Append(date.Month < 10 ? "0" : string.Empty)
-                .Append(IntToStr(date.Month))
-            .Append('-').Append(date.Day < 10 ? "0" : string.Empty).Append(IntToStr(date.Day)).Append('T').Append(IntToStr(date.Hour)).Append(':')
-            .Append(IntToStr(date.Minute)).Append(':');
+                .Clear().Append(IntToStr(year)).Append('-')
+                .Append(month < 10 ? "0" : string.Empty)
+                .Append(IntToStr(month))
+            .Append('-').Append(day < 10 ? "0" : string.Empty).Append(IntToStr(day)).Append('T').Append(hour < 10 ? "0" : string.Empty).Append(IntToStr(hour)).Append(':')
+            .Append(minute < 10 ? "0" : string.Empty).Append(IntToStr(minute)).Append(':')
+            .Append(second < 10 ? "0" : string.Empty).Append(IntToStr(second)).Append('.')
+            .Append(millisecond < 10 ? "00" : millisecond < 100 ? "0" : string.Empty).Append(IntToStr(millisecond));
 
-            if(_dateFormat == NetJSONDateFormat.ISO)
-                return value.Append(IntToStr(date.Second)).Append('.').Append(IntToStr(date.Millisecond)).Append('Z').ToString();
+            if (_timeZoneFormat == NetJSONTimeZoneFormat.Utc)
+                value.Append('Z');
+            else if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+                var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+                var hours = Math.Abs(offset.Hours);
+                var minutes = Math.Abs(offset.Minutes);
+                value.Append(offset.Ticks >= 0 ? '+' : '-').Append(hours < 10 ? "0" : string.Empty).Append(IntToStr(hours)).Append(minutes < 10 ? "0" : string.Empty).Append(IntToStr(minutes));
+            }
 
-            return value.Append(date.Second < 10 ? "0" : string.Empty).Append(IntToStr(date.Second)).ToString();
+            return value.ToString();
         }
 
         private static DateTime Epoch = new DateTime(1970, 1, 1),
@@ -994,14 +1032,13 @@ namespace NetJSON {
             var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
             var hours = Math.Abs(offset.Hours);
             var minutes = Math.Abs(offset.Minutes);
-            var offsetText = string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
-                hours, minutes < 10 ? "0" : string.Empty, minutes);
+            var offsetText = _timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
+                hours, minutes < 10 ? "0" : string.Empty, minutes)) : string.Empty;
             return String.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
         }
 
         public static string DateToEpochTime(DateTime date) {
-            long epochTime = (date.ToUniversalTime() - UnixEpoch).Ticks;
-            epochTime = (epochTime / TimeSpan.TicksPerSecond);
+            long epochTime = (long)(date.ToUniversalTime() - UnixEpoch).TotalMilliseconds;
             return IntUtility.ltoa(epochTime);
         }
 
@@ -1194,8 +1231,8 @@ namespace NetJSON {
         public static void GenerateTypesInto(string asmName, params Type[] types) {
             if (!types.Any())
                 throw new NetJSONInvalidAssemblyGeneration(asmName);
-            
-            var assembly = GenerateAssemblyBuilder(asmName);
+
+            var assembly = GenerateAssemblyBuilderNoShare(asmName);
             var module = GenerateModuleBuilder(assembly);
 
             foreach (var type in types) {
@@ -1213,9 +1250,9 @@ namespace NetJSON {
 
             var asmName = String.Concat(objType.GetName(), ClassStr);
 
-            var assembly = GenerateAssemblyBuilder(asmName);
+            var assembly = _useSharedAssembly ? GenerateAssemblyBuilder() : GenerateAssemblyBuilderNoShare(asmName);
 
-            var module = GenerateModuleBuilder(assembly);
+            var module = _useSharedAssembly ? GenerateModuleBuilder(assembly) : GenerateModuleBuilderNoShare(assembly);
 
             var type = GenerateTypeBuilder(objType, module);
 
@@ -1339,12 +1376,63 @@ OpCodes.Call,
             return type;
         }
 
-        private static ModuleBuilder GenerateModuleBuilder(AssemblyBuilder assembly) {
+        private static ModuleBuilder GenerateModuleBuilderNoShare(AssemblyBuilder assembly) {
             var module = assembly.DefineDynamicModule(String.Concat(assembly.GetName().Name, _dllStr));
             return module;
         }
 
-        private static AssemblyBuilder GenerateAssemblyBuilder(string asmName) {
+        private static ModuleBuilder GenerateModuleBuilder(AssemblyBuilder assembly) {
+            if (_module == null) {
+                lock (_lockAsmObject) {
+                    if (_module == null)
+                        _module = assembly.DefineDynamicModule(String.Concat(assembly.GetName().Name, _dllStr));
+                }
+            }
+            return _module;
+        }
+
+        private readonly static object _lockAsmObject = new object();
+        private static AssemblyBuilder _assembly = null;
+        private static ModuleBuilder _module = null;
+        private const string NET_JSON_GENERATED_ASSEMBLY_NAME = "NetJSONGeneratedAssembly";
+
+        private static AssemblyBuilder GenerateAssemblyBuilder() {
+            if (_assembly == null) {
+                lock (_lockAsmObject) {
+                    if (_assembly == null) {
+                        _assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(
+                            new AssemblyName(NET_JSON_GENERATED_ASSEMBLY_NAME) {
+                                Version = new Version(1, 0, 0, 0)
+                            },
+                            AssemblyBuilderAccess.RunAndSave);
+
+
+                        //[assembly: CompilationRelaxations(8)]
+                        _assembly.SetCustomAttribute(new CustomAttributeBuilder(typeof(CompilationRelaxationsAttribute).GetConstructor(new[] { _intType }), new object[] { 8 }));
+
+                        //[assembly: RuntimeCompatibility(WrapNonExceptionThrows=true)]
+                        _assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                            typeof(RuntimeCompatibilityAttribute).GetConstructor(Type.EmptyTypes),
+                            new object[] { },
+                            new[] {  typeof(RuntimeCompatibilityAttribute).GetProperty("WrapNonExceptionThrows")
+                },
+                            new object[] { true }));
+
+                        //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
+                        _assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                            typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
+                            new object[] { SecurityAction.RequestMinimum },
+                            new[] {  typeof(SecurityPermissionAttribute).GetProperty("SkipVerification")
+                },
+                            new object[] { true }));
+                        //return _assembly;
+                    }
+                }
+            }
+            return _assembly;
+        }
+
+        private static AssemblyBuilder GenerateAssemblyBuilderNoShare(string asmName) {
             var assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
@@ -3561,6 +3649,7 @@ OpCodes.Call,
             string[] tokens = null;
             bool negative = false;
             string offsetText = null;
+            bool hasZ = false;
 
             if (value == "\\/Date(-62135596800)\\/")
                 return DateTime.MinValue;
@@ -3574,18 +3663,37 @@ OpCodes.Call,
                 dateText = tokens[0];
 
                 var ticks = FastStringToLong(dateText);
-                dt = new DateTime((ticks * 10000) + 621355968000000000, DateTimeKind.Utc);
+
+                dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+                dt = dt.AddMilliseconds(ticks);
+
+                if (_timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || _timeZoneFormat == NetJSONTimeZoneFormat.Utc)
+                    dt = dt.ToLocalTime();
+
+                var kind = _timeZoneFormat == NetJSONTimeZoneFormat.Local ? DateTimeKind.Local :
+                    _timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
+                    DateTimeKind.Unspecified;
+
+                dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, kind);
+
                 offsetText = tokens.Length > 1 ? tokens[1] : offsetText;
             } else {
-                var dateText = value.Substring(0, value.Length - 6);
+                var dateText = _timeZoneFormat != NetJSONTimeZoneFormat.Unspecified ? value.Substring(0, value.Length - 5) : value;
                 var diff = value.Length - dateText.Length;
                 var hasOffset = diff > 0;
-                var utcOffsetText = hasOffset ? value.Substring(value.Length - 6, 6) : string.Empty;
+                var utcOffsetText = hasOffset ? value.Substring(value.Length - 5, value.Length - (value.Length - 5)) : string.Empty;
                 negative = diff > 0 && utcOffsetText[0] == '-';
                 if (hasOffset) {
-                    offsetText = utcOffsetText.Substring(1, 5).Replace(":", string.Empty);
+                    hasZ = utcOffsetText.IndexOf('Z') >= 0;
+                    offsetText = utcOffsetText.Substring(1, utcOffsetText.Length - 1).Replace(":", string.Empty).Replace("Z", string.Empty);
                 }
                 dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
+                if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+                    dt = dt.ToUniversalTime();
+                    dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Local);
+                } else if (_timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
+                    dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Utc);
+                }
             }
 
             var isNullOrWhiteSpace = false;
@@ -3597,15 +3705,13 @@ OpCodes.Call,
 #endif
 
             if (!isNullOrWhiteSpace) {
-                var hours = FastStringToInt(offsetText.Substring(0, 2));
-                var minutes = offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0;
+                var hours = hasZ ? 0 : FastStringToInt(offsetText.Substring(0, 2));
+                var minutes = hasZ ? 0 : (offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0);
+                var millseconds = hasZ ? FastStringToInt(offsetText) : 0d;
                 if (negative)
                     hours *= -1;
-                var offsetHour = TimeSpan.FromHours(hours);
-                var offsetMinute = TimeSpan.FromMinutes(minutes);
-                var offset = offsetHour + offsetMinute;
-                var dateOffset = new DateTimeOffset(dt.Add(offset).Ticks, offset);
-                dt = dateOffset.DateTime;
+
+                dt = dt.AddHours(hours).AddMinutes(minutes).AddMilliseconds(millseconds);
             }
 
             return dt;
@@ -4408,6 +4514,10 @@ OpCodes.Call,
                     il.Emit(OpCodes.Ldloc, quotes);
                     il.Emit(OpCodes.Ldc_I4_0);
                     il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
+
+                    //foundQuote = true
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Stloc, foundQuote);
 
                     //quotes++
                     il.Emit(OpCodes.Ldloc, quotes);
