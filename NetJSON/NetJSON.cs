@@ -381,7 +381,7 @@ namespace NetJSON {
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
             _textReaderType = typeof(TextReader);
 
-        static readonly MethodInfo _stringBuilderToString =
+        static MethodInfo _stringBuilderToString =
             _stringBuilderType.GetMethod("ToString", Type.EmptyTypes),
             _stringBuilderAppend = _stringBuilderType.GetMethod("Append", new[] { _stringType }),
             _stringBuilderAppendObject = _stringBuilderType.GetMethod("Append", new[] { _objectType }),
@@ -466,12 +466,13 @@ namespace NetJSON {
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
             _threadQuoteCharGet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetGetMethod(),
-            _threadQuoteCharSet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetSetMethod(),
             _QuotCharGet = _jsonType.GetProperty("QuotChar", MethodBinding).GetGetMethod(),
             _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
-            _hasOverrideQuoteField = _jsonType.GetField("_hasOverrideQuoteChar", MethodBinding);
+            _hasOverrideQuoteField = _jsonType.GetField("_hasOverrideQuoteChar", MethodBinding),
+            _threadQuoteStringField = _jsonType.GetField("_threadQuoteString", MethodBinding),
+            _threadQuoteCharField = _jsonType.GetField("_threadQuoteChar", MethodBinding);
 
         const int Delimeter = (int)',',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
@@ -523,53 +524,53 @@ namespace NetJSON {
                     };
 
 
-        static readonly ConcurrentDictionary<Type, Type> _types =
+        static ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
-        static readonly ConcurrentDictionary<string, MethodBuilder> _writeMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _writeMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _setValueMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _setValueMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _readMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _readMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _createListMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _createListMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _extractMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _extractMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _readDeserializeMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _readDeserializeMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _writeEnumToStringMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _writeEnumToStringMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<string, MethodBuilder> _readEnumToStringMethodBuilders =
+        static ConcurrentDictionary<string, MethodBuilder> _readEnumToStringMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
 
-        static readonly ConcurrentDictionary<Type, bool> _primitiveTypes =
+        static ConcurrentDictionary<Type, bool> _primitiveTypes =
             new ConcurrentDictionary<Type, bool>();
 
-        static readonly ConcurrentDictionary<Type, Type> _nullableTypes =
+        static ConcurrentDictionary<Type, Type> _nullableTypes =
             new ConcurrentDictionary<Type, Type>();
 
 
-        static readonly ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
+        static ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
 
-        static readonly ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
+        static ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
             new ConcurrentDictionary<Type, Delegate>();
 
-        static readonly ConcurrentDictionary<Type, NetJSONMemberInfo[]> _typeProperties =
+        static ConcurrentDictionary<Type, NetJSONMemberInfo[]> _typeProperties =
             new ConcurrentDictionary<Type, NetJSONMemberInfo[]>();
 
-        static readonly ConcurrentDictionary<string, string> _fixes =
+        static ConcurrentDictionary<string, string> _fixes =
             new ConcurrentDictionary<string, string>();
 
         const int DefaultStringBuilderCapacity = 1024 * 2;
 
-        private readonly static object _lockObject = new object();
+        private static object _lockObject = new object();
 
         public static string FloatToStr(float value) {
             return value.ToString(CultureInfo.InvariantCulture);
@@ -859,7 +860,8 @@ namespace NetJSON {
         }
 
         private static void LoadQuotChar(ILGenerator il) {
-            il.Emit(OpCodes.Call, _QuotCharGet);
+            il.Emit(OpCodes.Ldsfld, _threadQuoteStringField);
+            //il.Emit(OpCodes.Call, _QuotCharGet);
             //il.Emit(OpCodes.Ldstr, QuotChar);
         }
 
@@ -870,10 +872,10 @@ namespace NetJSON {
         }
 
         [ThreadStatic]
-        public static bool _hasOverrideQuoteChar;
+        public static bool _hasOverrideQuoteChar = false;
 
         [ThreadStatic]
-        private static char _threadQuoteChar;
+        public static char _threadQuoteChar = QuotDoubleChar;
         public static char _ThreadQuoteChar {
             get {
                 return _threadQuoteChar == '\0' ? (_threadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar) : _threadQuoteChar;
@@ -885,7 +887,7 @@ namespace NetJSON {
         }
 
         [ThreadStatic]
-        private static string _threadQuoteString;
+        public static string _threadQuoteString = "\"";
         public static string _ThreadQuoteString {
             get {
                 return _threadQuoteString ?? (_threadQuoteString = (_ThreadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString());
@@ -956,7 +958,7 @@ namespace NetJSON {
             }
         }
 
-        private static bool _includeFields = false;
+        private static bool _includeFields = true;
 
         public static bool IncludeFields {
             set {
@@ -972,7 +974,7 @@ namespace NetJSON {
             }
         }
 
-        private static bool _useStringOptimization = true;
+        private static bool _useStringOptimization = false;
 
         public static bool UseStringOptimization {
             set {
@@ -1470,12 +1472,13 @@ OpCodes.Call,
             bool isNonStringType = false;
             int counter = 0;
             bool hasChar = false;
+            var currentQuote = _threadQuoteChar;
 
             while (true) {
                 current = *(ptr + index);
                 if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
                     if (!hasChar) {
-                        isStringType = IsCurrentAQuot(current);
+                        isStringType = current == currentQuote;
                         if (!isStringType)
                             isNonStringType = current != '{' && current != '[';
                         if (isStringType || isNonStringType)
@@ -1506,74 +1509,8 @@ OpCodes.Call,
             }
         }
 
-        public static unsafe void SkipPropertyOld(char* ptr, ref int index) {
-            char current = '\0', schar = '\0', echar = '\0', prev = '\0';
-            int count = 0, charCount = 0;
-            bool isBeginEnd = false, isTag = false, isQuote = false;
-
-            while (true) {
-                current = *(ptr + index);
-                var hasChar = schar != '\0';
-                if (!hasChar) {
-                    if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
-                        echar = IsCurrentAQuot(current) ? _ThreadQuoteChar :
-                                current == '{' ? '}' :
-                                current == '[' ? ']' : '\0';
-                        isQuote = echar == _ThreadQuoteChar;
-                        if (echar == '\0') {
-                            index--;
-                            if (*(ptr + index) == _ThreadQuoteChar) 
-                               GetStringBasedValue(ptr, ref index);
-                            else
-                                GetNonStringValue(ptr, ref index);
-                            return;
-                        }
-                        schar = current;
-                        count = 1;
-                        charCount = 1;
-                    }
-                    ++index;
-                    prev = current;
-                    continue;
-                }
-            endLabel:
-                isBeginEnd = (current == schar || current == echar);
-                isTag = isBeginEnd && charCount == 0;
-                if (isTag) count++;
-                if (count == 2) {
-                    ++index;
-                    break;
-                }
-                if (!isTag) {
-                    if (isQuote) {
-                        if (IsCurrentAQuot(current) && charCount > 0 && prev != '\\') {
-                            //++index;
-                            charCount = 0;
-                            goto endLabel;
-                            //continue;
-                        }
-                    } else {
-                        if (isBeginEnd) {
-                            if (current == schar) charCount++;
-                            else if (current == echar) charCount--;
-                            if (charCount == 0 && prev == echar) index++;
-                        }
-                    }
-                }
-                if (current != echar) {
-                    ++index;
-                } else {
-                    if (isQuote) {
-                        if (prev == '\\') {
-                            ++index;
-                        }
-                    }
-                }
-                prev = current;
-            }
-        }
-
         public static unsafe void EncodedJSONString(StringBuilder sb, string str) {
+            var quote = _threadQuoteChar;
             char c;
             fixed (char* chr = str) {
                 char* ptr = chr;
@@ -1614,10 +1551,10 @@ OpCodes.Call,
                         case '\u001E': sb.Append(@"\u001E"); break;
                         case '\u001F': sb.Append(@"\u001F"); break;
                         default:
-                            if (_ThreadQuoteChar == c) {
-                                if (_ThreadQuoteChar == '"')
+                            if (quote == c) {
+                                if (quote == '"')
                                     sb.Append("\\\"");
-                                else if (_ThreadQuoteChar == '\'')
+                                else if (quote == '\'')
                                     sb.Append("\\\'");
                             }
                             sb.Append(c);
@@ -3061,7 +2998,7 @@ OpCodes.Call,
 
                 //if(current == _ThreadQuoteChar) {
                 //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                il.Emit(OpCodes.Call, _threadQuoteCharGet);
+                il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
 
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
@@ -3501,7 +3438,7 @@ OpCodes.Call,
         public unsafe static string DecodeJSONString(char* ptr, ref int index) {
             char current = '\0', next = '\0';
             bool hasQuote = false;
-            char currentQuote = _ThreadQuoteChar;
+            char currentQuote = _threadQuoteChar;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
 
             while (true) {
@@ -3510,7 +3447,7 @@ OpCodes.Call,
                 if (hasQuote) {
                     //if (current == '\0') break;
 
-                    if (current == _ThreadQuoteChar) {
+                    if (current == currentQuote) {
                         ++index;
                         break;
                     } else {
@@ -3541,8 +3478,8 @@ OpCodes.Call,
                                     index += 4;
                                     break;
                                 default:
-                                    if (_ThreadQuoteChar == next)
-                                        sb.Append(_ThreadQuoteChar);
+                                    if (currentQuote == next)
+                                        sb.Append(currentQuote);
 
                                     break;
                             }
@@ -3550,7 +3487,7 @@ OpCodes.Call,
                         }
                     }
                 } else {
-                    if (IsCurrentAQuot(current)) {
+                    if (current == currentQuote) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
@@ -4230,15 +4167,18 @@ OpCodes.Call,
 
             var value = new String(ptr, index + 1, offset);
 
-            inRange = (*(ptr + index) == _ThreadQuoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
+            inRange = (*(ptr + index) == _threadQuoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
 
             return inRange;
         }
 
         public static bool IsCurrentAQuot(char current) {
-            var isQuote = _hasOverrideQuoteChar ? current == _ThreadQuoteChar : (current == QuotSingleChar || current == QuotDoubleChar);
-            if (!_hasOverrideQuoteChar && isQuote) {
-                if (_ThreadQuoteChar != current)
+            if (_hasOverrideQuoteChar)
+                return current == _threadQuoteChar;
+            var quote = _threadQuoteChar;
+            var isQuote = current == QuotSingleChar || current == QuotDoubleChar;
+            if (isQuote) {
+                if (quote != current)
                     _ThreadQuoteChar = current;
                 _hasOverrideQuoteChar = true;
             }
@@ -4502,13 +4442,45 @@ OpCodes.Call,
                     var currentQuotePrevNotLabel = il.DefineLabel();
                     var keyLocal = il.DeclareLocal(_stringType);
 
-                    //if(current == _ThreadQuoteChar && quotes == 0)
-                    il.Emit(OpCodes.Ldloc, current);
-                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                    //il.Emit(OpCodes.Call, _threadQuoteCharGet);
+                    var isCurrentLocal = il.DeclareLocal(_boolType);
+                    var hasOverrideLabel = il.DefineLabel();
+                    var hasOverrideLabel2 = il.DefineLabel();
+                    var notHasOverrideLabel = il.DefineLabel();
 
-                    //il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+                    il.Emit(OpCodes.Ldsfld, _hasOverrideQuoteField);
+                    il.Emit(OpCodes.Brfalse, hasOverrideLabel);
+
+                    il.Emit(OpCodes.Ldloc, current);
+                    il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
+                    il.Emit(OpCodes.Bne_Un, hasOverrideLabel2);
+
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+                    il.MarkLabel(hasOverrideLabel2);
+
+                    il.MarkLabel(hasOverrideLabel);
+
+                    il.Emit(OpCodes.Ldsfld, _hasOverrideQuoteField);
+                    il.Emit(OpCodes.Brtrue, notHasOverrideLabel);
+
+                    il.Emit(OpCodes.Ldloc, current);
                     il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
+                    il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+                    il.MarkLabel(notHasOverrideLabel);
+
+                    il.Emit(OpCodes.Ldloc, isCurrentLocal);
+
+                    //if(current == _ThreadQuoteChar && quotes == 0)
+                    
+                    //il.Emit(OpCodes.Ldloc, current);
+                    //il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
+                    
+
                     il.Emit(OpCodes.Brfalse, currentQuoteLabel);
 
                     il.Emit(OpCodes.Ldloc, quotes);
@@ -4573,7 +4545,7 @@ OpCodes.Call,
                     //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
                     il.Emit(OpCodes.Ldloc, current);
                     //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                    il.Emit(OpCodes.Call, _threadQuoteCharGet);
+                    il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
 
                     il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
                     il.Emit(OpCodes.Ldloc, quotes);
@@ -4836,14 +4808,14 @@ OpCodes.Call,
             char current = '\0', prev = '\0';
             int count = 0, startIndex = 0;
             string value = string.Empty;
-
+            var currentQuote = _threadQuoteChar;
 
             while (true) {
                 current = ptr[index];
-                if (count == 0 && IsCurrentAQuot(current)) {
+                if (count == 0 && current == currentQuote) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && IsCurrentAQuot(current) && prev != '\\') {
+                } else if (count > 0 && current == currentQuote && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
