@@ -3946,9 +3946,13 @@ OpCodes.Call,
             var addMethod = _genericCollectionType.MakeGenericType(elementType).GetMethod("Add");
 
             var prevLabel = il.DefineLabel();
-            
+            var ctor = obj.LocalType.GetConstructor(Type.EmptyTypes);
 
-            il.Emit(OpCodes.Newobj, obj.LocalType.GetConstructor(Type.EmptyTypes));
+            if (ctor != null)
+            {
+                il.Emit(OpCodes.Newobj, ctor);
+            }
+
             il.Emit(OpCodes.Stloc, obj);
 
             il.Emit(OpCodes.Ldc_I4_0);
