@@ -189,6 +189,7 @@ namespace NetJSON.Tests
             var json2 = "{\"DateTimeValue\":\"2015-11-08T19:18:00+02:00\"}";
 
             NetJSON.DateFormat = NetJSONDateFormat.Default;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
             var obj = NetJSON.Deserialize<TestDateTimeFormatting>(json);
             var sobj = NetJSON.Serialize(obj);
 
@@ -248,45 +249,61 @@ namespace NetJSON.Tests
         public void TestSerializeDateWithMillisecondDefaultFormatLocal() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
-            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var date = DateTime.UtcNow;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
-
+        
         [TestMethod]
-        public void TestSerializeDateWithMillisecondDefaultFormatUtc() {
+        public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
-            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var date = DateTime.UtcNow;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
+        }
+
+
+        [TestMethod]
+        public void TestSerializeDateNowWithMillisecondDefaultFormatUtc() {
+            NetJSON.DateFormat = NetJSONDateFormat.Default;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var date = DateTime.Now;
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
 
         [TestMethod]
         public void TestSerializeDateWithMillisecondDefaultFormatUnSpecified() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
-            var date = new DateTime(2010, 12, 05, 1, 1, 30, 100);
+            var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
 
         [TestMethod]
         public void TestSerializeDateWithISOFormatUnSpecified() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
-            var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
+            var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
 
         [TestMethod]
         public void TestSerializeDateWithISOFormatLocal() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
-            var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
+            var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
 
         [TestMethod]
@@ -296,7 +313,19 @@ namespace NetJSON.Tests
             var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
         }
+
+        [TestMethod]
+        public void TestSerializeDateNowUtcWithISOFormatUTC() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var date = DateTime.UtcNow;
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.IsTrue(date == ddate);
+        }
+
 
         [TestMethod]
         public void SerializeDictionaryWithShortType() {

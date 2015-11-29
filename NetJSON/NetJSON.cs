@@ -404,10 +404,8 @@ namespace NetJSON {
             _generatorFloatToStr = _jsonType.GetMethod("FloatToStr", MethodBinding),
             _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
             _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
-            _generatorDateToString = _jsonType.GetMethod("DateToString", MethodBinding),
+            _generatorDateToString = _jsonType.GetMethod("AllDateToString", MethodBinding),
             _generatorSByteToStr = _jsonType.GetMethod("SByteToStr", MethodBinding),
-            _generatorDateToEpochTime = _jsonType.GetMethod("DateToEpochTime", MethodBinding),
-            _generatorDateToISOFormat = _jsonType.GetMethod("DateToISOFormat", MethodBinding),
             _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
             _byteArrayToStr = _jsonType.GetMethod("ByteArrayToStr", MethodBinding),
             _objectToString = _objectType.GetMethod("ToString", Type.EmptyTypes),
@@ -992,12 +990,13 @@ namespace NetJSON {
         [ThreadStatic]
         private static StringBuilder _cachedDateStringBuilder;
 
-        public static string DateToISOFormat(DateTime date) {
+        private static string DateToISOFormat(DateTime date) {
 
             var minute = date.Minute;
             var hour = date.Hour;
             var second = date.Second;
-            var millisecond = date.Millisecond;
+            var timeOfDay = date.TimeOfDay;
+            int totalSeconds = (int)(date.Ticks - (Math.Floor((decimal)date.Ticks / TimeSpan.TicksPerSecond) * TimeSpan.TicksPerSecond));
             var day = date.Day;
             var month = date.Month;
             var year = date.Year;
@@ -1009,7 +1008,7 @@ namespace NetJSON {
             .Append('-').Append(day < 10 ? "0" : string.Empty).Append(IntToStr(day)).Append('T').Append(hour < 10 ? "0" : string.Empty).Append(IntToStr(hour)).Append(':')
             .Append(minute < 10 ? "0" : string.Empty).Append(IntToStr(minute)).Append(':')
             .Append(second < 10 ? "0" : string.Empty).Append(IntToStr(second)).Append('.')
-            .Append(millisecond < 10 ? "00" : millisecond < 100 ? "0" : string.Empty).Append(IntToStr(millisecond));
+            .Append(IntToStr(totalSeconds));
 
             if (_timeZoneFormat == NetJSONTimeZoneFormat.Utc)
                 value.Append('Z');
@@ -1025,8 +1024,15 @@ namespace NetJSON {
 
         private static DateTime Epoch = new DateTime(1970, 1, 1),
             UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-        
-        public static string DateToString(DateTime date) {
+
+
+        public static string AllDateToString(DateTime date) {
+            return _dateFormat == NetJSONDateFormat.Default ? DateToString(date) :
+                _dateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
+                DateToISOFormat(date);
+        }
+
+        private static string DateToString(DateTime date) {
             if (date == DateTime.MinValue)
                 return "\\/Date(-62135596800)\\/";
             else if (date == DateTime.MaxValue)
@@ -1036,11 +1042,19 @@ namespace NetJSON {
             var minutes = Math.Abs(offset.Minutes);
             var offsetText = _timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
                 hours, minutes < 10 ? "0" : string.Empty, minutes)) : string.Empty;
+
+            if (date.Kind == DateTimeKind.Utc && _timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
+                offset = TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
+                hours = Math.Abs(offset.Hours);
+                minutes = Math.Abs(offset.Minutes);
+                date = date.AddHours(hours).AddMinutes(minutes);
+            }
+
             return String.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
         }
 
-        public static string DateToEpochTime(DateTime date) {
-            long epochTime = (long)(date.ToUniversalTime() - UnixEpoch).TotalMilliseconds;
+        private static string DateToEpochTime(DateTime date) {
+            long epochTime = (long)(date.ToUniversalTime() - UnixEpoch).Ticks;
             return IntUtility.ltoa(epochTime);
         }
 
@@ -1138,7 +1152,7 @@ namespace NetJSON {
 
                 il.MarkLabel(needQuoteStartLabel);
 
-                _defaultSerializerTypes[_dateTimeType] = (_dateFormat == NetJSONDateFormat.Default ? _generatorDateToString : _dateFormat == NetJSONDateFormat.ISO || _dateFormat == NetJSONDateFormat.JsonNetISO ? _generatorDateToISOFormat : _generatorDateToEpochTime);
+                _defaultSerializerTypes[_dateTimeType] = _generatorDateToString;
 
                 var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
                 
@@ -1938,6 +1952,7 @@ OpCodes.Call,
             if (_writeMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(WriteStr, typeName);
+
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
                 _voidType, new[] { type, _stringBuilderType });
             _writeMethodBuilders[key] = method;
@@ -2063,9 +2078,7 @@ OpCodes.Call,
                             il.Emit(OpCodes.Ldarg_0);
                         //il.Emit(OpCodes.Box, _dateTimeType);
                         //il.Emit(OpCodes.Call, _stringFormat);
-                        il.Emit(OpCodes.Call, _dateFormat == NetJSONDateFormat.Default ? _generatorDateToString :
-                            _dateFormat == NetJSONDateFormat.ISO || _dateFormat == NetJSONDateFormat.JsonNetISO ? _generatorDateToISOFormat :
-                            _generatorDateToEpochTime);
+                        il.Emit(OpCodes.Call, _generatorDateToString);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
@@ -3579,14 +3592,15 @@ OpCodes.Call,
             if (_dateFormat == NetJSONDateFormat.EpochTime) {
                 var unixTimeStamp = FastStringToLong(value);
                 var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-                return date.AddSeconds(unixTimeStamp).ToLocalTime();
+                return date.AddTicks(unixTimeStamp).ToLocalTime();
             }
 
             DateTime dt;
             string[] tokens = null;
             bool negative = false;
             string offsetText = null;
-            bool hasZ = false;
+            int tickMilliseconds = 0;
+            bool noOffSetValue = false;
 
             if (value == "\\/Date(-62135596800)\\/")
                 return DateTime.MinValue;
@@ -3602,7 +3616,7 @@ OpCodes.Call,
                 var ticks = FastStringToLong(dateText);
 
                 dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-                dt = dt.AddMilliseconds(ticks);
+                dt = dt.AddTicks(ticks);
 
                 if (_timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || _timeZoneFormat == NetJSONTimeZoneFormat.Utc)
                     dt = dt.ToLocalTime();
@@ -3611,18 +3625,34 @@ OpCodes.Call,
                     _timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
                     DateTimeKind.Unspecified;
 
-                dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, kind);
+                dt = new DateTime(dt.Ticks, kind);
 
                 offsetText = tokens.Length > 1 ? tokens[1] : offsetText;
             } else {
-                var dateText = _timeZoneFormat != NetJSONTimeZoneFormat.Unspecified ? value.Substring(0, value.Length - 5) : value;
+                var dateText = value.Substring(0, 19);
                 var diff = value.Length - dateText.Length;
                 var hasOffset = diff > 0;
-                var utcOffsetText = hasOffset ? value.Substring(value.Length - 5, value.Length - (value.Length - 5)) : string.Empty;
-                negative = diff > 0 && utcOffsetText[0] == '-';
+                var utcOffsetText = hasOffset ? value.Substring(dateText.Length, diff) : string.Empty;
+                var firstChar = utcOffsetText[0];
+                negative = diff > 0 && firstChar == '-'; 
                 if (hasOffset) {
-                    hasZ = utcOffsetText.IndexOf('Z') >= 0;
+                    noOffSetValue = _timeZoneFormat == NetJSONTimeZoneFormat.Utc || _timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
                     offsetText = utcOffsetText.Substring(1, utcOffsetText.Length - 1).Replace(":", string.Empty).Replace("Z", string.Empty);
+                    if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+                        int indexOfSign = offsetText.IndexOf('-');
+                        negative = indexOfSign >= 0;
+                        if(!negative){
+                            indexOfSign = offsetText.IndexOf('+');
+                        }
+                        tickMilliseconds = FastStringToInt(offsetText.Substring(0, indexOfSign));
+                        offsetText = offsetText.Substring(indexOfSign + 1, offsetText.Length - indexOfSign - 1);
+                        if (negative)
+                            offsetText = offsetText.Replace("-", string.Empty);
+                        else
+                            offsetText = offsetText.Replace("+", string.Empty);
+                    } else {
+                        tickMilliseconds = FastStringToInt(offsetText);
+                    }
                 }
                 dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
                 if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
@@ -3642,13 +3672,12 @@ OpCodes.Call,
 #endif
 
             if (!isNullOrWhiteSpace) {
-                var hours = hasZ ? 0 : FastStringToInt(offsetText.Substring(0, 2));
-                var minutes = hasZ ? 0 : (offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0);
-                var millseconds = hasZ ? FastStringToInt(offsetText) : 0d;
+                var hours = noOffSetValue ? 0 : FastStringToInt(offsetText.Substring(0, 2));
+                var minutes = noOffSetValue ? 0 : (offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0);
                 if (negative)
                     hours *= -1;
 
-                dt = dt.AddHours(hours).AddMinutes(minutes).AddMilliseconds(millseconds);
+                dt = dt.AddHours(hours).AddMinutes(minutes).AddTicks(tickMilliseconds);
             }
 
             return dt;
