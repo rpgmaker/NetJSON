@@ -255,6 +255,21 @@ namespace NetJSON.Tests
             Assert.IsTrue(date == ddate);
         }
 
+        public class APIQuote {
+            public string value { get; set; }
+        }
+
+        [TestMethod]
+        public void TestSerializeAlwaysContainsQuotesEvenAfterBeenSerializedInDifferentThreads() {
+            var api = new APIQuote { value = "Test" };
+            var json = NetJSON.Serialize(api);
+            var json2 = string.Empty;
+            Task.Run(() => {
+                json2 = NetJSON.Serialize(api);
+            }).Wait();
+            Assert.IsTrue(json.Equals(json2), json2);
+        }
+
         [TestMethod]
         public void TestSerializeDictionaryWithComplexDictionaryString() {
             NetJSON.IncludeFields = true;

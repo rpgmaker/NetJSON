@@ -2830,6 +2830,10 @@ OpCodes.Call,
         }
 
         internal static NetJSONSerializer<T> GetSerializer<T>() {
+            if (_threadQuoteString == null) {
+                _threadQuoteChar = QuotDoubleChar;
+                _threadQuoteString = "\"";
+            }
             return NetJSONCachedSerializer<T>.Serializer;
         }
 
