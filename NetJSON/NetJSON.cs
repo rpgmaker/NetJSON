@@ -1570,8 +1570,8 @@ OpCodes.Call,
                                     sb.Append("\\\"");
                                 else if (quote == '\'')
                                     sb.Append("\\\'");
-                            }
-                            sb.Append(c);
+                            } else
+                                sb.Append(c);
                             break;
                     }
 

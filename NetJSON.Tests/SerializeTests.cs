@@ -254,6 +254,23 @@ namespace NetJSON.Tests
             var ddate = NetJSON.Deserialize<DateTime>(djson);
             Assert.IsTrue(date == ddate);
         }
+
+        [TestMethod]
+        public void TestSerializeDictionaryWithComplexDictionaryString() {
+            NetJSON.IncludeFields = true;
+            Dictionary<string, string> sub1 = new Dictionary<string, string> { { "k1", "v1\"well" }, { "k2", "v2\"alsogood" } };
+            var sub1Json = NetJSON.Serialize(sub1);
+            Dictionary<string, string> main = new Dictionary<string, string> { 
+            { "MK1", sub1Json },
+            { "MK2", sub1Json } };
+
+            //At this moment we got in dictionary 2 keys with string values. Every string value is complex and actually is the other serialized Dictionary
+            string final = NetJSON.Serialize(main);
+
+            //Trying to get main dictionary back and it fails
+            var l1 = NetJSON.Deserialize<Dictionary<string, string>>(final);
+            Assert.IsTrue(l1.Count == 2);
+        }
         
         [TestMethod]
         public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
