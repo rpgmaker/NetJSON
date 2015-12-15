@@ -36,6 +36,14 @@ namespace NetJSON {
         }
     }
 
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
+    public class NetJSONKnownTypeAttribute : Attribute {
+        public Type Type { private set; get; }
+        public NetJSONKnownTypeAttribute(Type type) {
+            Type = type;
+        }
+    }
+
     public class NetJSONMemberInfo {
         public MemberInfo Member { get; set; }
         public NetJSONPropertyAttribute Attribute { get; set; }
@@ -472,7 +480,7 @@ namespace NetJSON {
             _threadQuoteStringField = _jsonType.GetField("_threadQuoteString", MethodBinding),
             _threadQuoteCharField = _jsonType.GetField("_threadQuoteChar", MethodBinding);
 
-        const int Delimeter = (int)',',
+        const int Delimeter = (int)',', ColonChr = (int)':',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
 
         const string IsoFormat = "{0:yyyy-MM-ddTHH:mm:ss.fffZ}",
@@ -554,6 +562,7 @@ namespace NetJSON {
         static ConcurrentDictionary<Type, Type> _nullableTypes =
             new ConcurrentDictionary<Type, Type>();
 
+        static ConcurrentDictionary<Type, List<Type>> _includedTypeTypes = new ConcurrentDictionary<Type, List<Type>>();
 
         static ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
 
@@ -986,6 +995,13 @@ namespace NetJSON {
         public static bool GenerateAssembly {
             set {
                 _generateAssembly = value;
+            }
+        }
+
+        private static bool _includeTypeInformation = false;
+        public static bool IncludeTypeInformation {
+            set {
+                _includeTypeInformation = value;
             }
         }
 
@@ -2302,10 +2318,57 @@ OpCodes.Call,
 
             if (type.IsNotPublic && type.IsClass) {
                 throw new InvalidOperationException("Non-Public Types is not supported yet");
-            } 
-            else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
-            else WritePropertiesFor(typeBuilder, type, methodIL);
-            
+            } else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
+            else {
+                if (!_includeTypeInformation)
+                    WritePropertiesFor(typeBuilder, type, methodIL);
+                else {
+                    var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
+                        var attrs = type.GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
+                        var types = attrs.Any() ? attrs.Where(x => !x.Type.IsAbstract).Select(x => x.Type).ToList() : null;
+                        //Expense call to auto-magically figure all subclass of current type
+                        if (types == null) {
+                            types = new List<Type>();
+                            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                            foreach (var asm in assemblies) {
+                                try {
+                                    types = asm.GetTypes().Where(x => x.IsSubclassOf(type)).ToList();
+                                } catch (ReflectionTypeLoadException ex) {
+                                    types = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)).ToList() : types;
+                                }
+                            }
+                        }
+
+                        if (!types.Contains(type) && !type.IsAbstract)
+                            types.Insert(0, type);
+
+                        return types;
+                    });
+                    
+                    var typeLocal = methodIL.DeclareLocal(typeof(Type));
+
+                    methodIL.Emit(OpCodes.Ldarg_0);
+                    methodIL.Emit(OpCodes.Callvirt, _objectGetType);
+                    methodIL.Emit(OpCodes.Stloc, typeLocal);
+
+                    foreach (var pType in pTypes) {
+                        var compareLabel = methodIL.DefineLabel();
+
+                        methodIL.Emit(OpCodes.Ldloc, typeLocal);
+
+                        methodIL.Emit(OpCodes.Ldtoken, pType);
+                        methodIL.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+
+                        methodIL.Emit(OpCodes.Call, _cTypeOpEquality);
+
+                        methodIL.Emit(OpCodes.Brfalse, compareLabel);
+
+                        WritePropertiesFor(typeBuilder, pType, methodIL, isPoly: true);
+
+                        methodIL.MarkLabel(compareLabel);
+                    }
+                }
+            }
         }
 
         internal static void WriteCollection(TypeBuilder typeBuilder, Type type, ILGenerator il) {
@@ -2628,7 +2691,7 @@ OpCodes.Call,
         }
 
 
-        internal static void WritePropertiesFor(TypeBuilder typeBuilder, Type type, ILGenerator il) {
+        internal static void WritePropertiesFor(TypeBuilder typeBuilder, Type type, ILGenerator il, bool isPoly = false) {
 
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldc_I4_S, ObjectOpen);
@@ -2644,6 +2707,30 @@ OpCodes.Call,
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasValue);
 
+            if (isPoly) {
+                il.Emit(OpCodes.Ldarg_1);
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Ldstr, "$type");
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Ldc_I4, ColonChr);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
+                il.Emit(OpCodes.Ldstr, string.Format("{0}, {1}", type.FullName, type.Assembly.GetName().Name));
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+
+                LoadQuotChar(il);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+                counter = 1;
+
+                il.Emit(OpCodes.Ldc_I4_1);
+                il.Emit(OpCodes.Stloc, hasValue);
+            }
 
             foreach (var mem in props) {
                 var member = mem.Member;
@@ -2761,8 +2848,8 @@ OpCodes.Call,
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Ldstr, Colon);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Ldc_I4, ColonChr);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
                 il.Emit(OpCodes.Pop);
 
 

@@ -439,6 +439,18 @@ namespace NetJSON.Tests
             var data = NetJSON.Deserialize<JsonRpcResponse<AccountFundsResponse>>(jsonData);
         }
 
+        [TestMethod]
+        public void SerializePolyObjects() {
+            NetJSON.IncludeTypeInformation = true;
+
+            var graph = new Graph { name = "my graph" };
+            graph.nodes = new List<Node>();
+            graph.nodes.Add(new NodeA { number = 10f });
+            graph.nodes.Add(new NodeB { text = "hello" });
+            var json = NetJSON.Serialize(graph);
+            var jgraph = NetJSON.Deserialize<Graph>(json);
+        }
+
         //[TestMethod]
         public void NestedGraphDoesNotThrow()
         {
@@ -471,6 +483,27 @@ namespace NetJSON.Tests
             
             var actual = NetJSON.Serialize(o.GetType(), o);
         }
+    }
+
+
+    public class Graph {
+        public string name;
+        public List<Node> nodes;
+    }
+
+    [NetJSONKnownType(typeof(NodeA)), NetJSONKnownType(typeof(NodeB))]
+    public class Node {
+        //public Vector2 pos;
+        public float posx;
+        public float posy;
+    }
+
+    public class NodeA : Node {
+        public float number;
+    }
+
+    public class NodeB : Node {
+        public string text;
     }
 
     public enum ExceptionType
