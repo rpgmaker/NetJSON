@@ -473,8 +473,6 @@ namespace NetJSON.Tests
         }
     }
 
-
-
     public enum ExceptionType
     {
         None,

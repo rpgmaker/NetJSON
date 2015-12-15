@@ -809,7 +809,9 @@ namespace NetJSON {
 
         internal static NetJSONMemberInfo[] GetTypeProperties(this Type type) {
             return _typeProperties.GetOrAdd(type, key => {
-                var props = key.GetProperties(PropertyBinding).Select(x => new NetJSONMemberInfo{ Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault()});
+                var props = key.GetProperties(PropertyBinding)
+                    .Where(x => x.GetIndexParameters().Length == 0)
+                    .Select(x => new NetJSONMemberInfo{ Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault()});
                 if (_includeFields) {
                     props = props.Union(key.GetFields(PropertyBinding).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() }));
                 }
