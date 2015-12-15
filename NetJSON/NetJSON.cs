@@ -2332,9 +2332,11 @@ OpCodes.Call,
                             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
                             foreach (var asm in assemblies) {
                                 try {
-                                    types = asm.GetTypes().Where(x => x.IsSubclassOf(type)).ToList();
+                                    types.AddRange(asm.GetTypes().Where(x => x.IsSubclassOf(type)));
                                 } catch (ReflectionTypeLoadException ex) {
-                                    types = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)).ToList() : types;
+                                    var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)) : null;
+                                    if (exTypes != null)
+                                        types.AddRange(exTypes);
                                 }
                             }
                         }
@@ -2344,28 +2346,32 @@ OpCodes.Call,
 
                         return types;
                     });
-                    
-                    var typeLocal = methodIL.DeclareLocal(typeof(Type));
 
-                    methodIL.Emit(OpCodes.Ldarg_0);
-                    methodIL.Emit(OpCodes.Callvirt, _objectGetType);
-                    methodIL.Emit(OpCodes.Stloc, typeLocal);
+                    if (pTypes.Count == 1)
+                        WritePropertiesFor(typeBuilder, type, methodIL);
+                    else {
+                        var typeLocal = methodIL.DeclareLocal(typeof(Type));
 
-                    foreach (var pType in pTypes) {
-                        var compareLabel = methodIL.DefineLabel();
+                        methodIL.Emit(OpCodes.Ldarg_0);
+                        methodIL.Emit(OpCodes.Callvirt, _objectGetType);
+                        methodIL.Emit(OpCodes.Stloc, typeLocal);
 
-                        methodIL.Emit(OpCodes.Ldloc, typeLocal);
+                        foreach (var pType in pTypes) {
+                            var compareLabel = methodIL.DefineLabel();
 
-                        methodIL.Emit(OpCodes.Ldtoken, pType);
-                        methodIL.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+                            methodIL.Emit(OpCodes.Ldloc, typeLocal);
 
-                        methodIL.Emit(OpCodes.Call, _cTypeOpEquality);
+                            methodIL.Emit(OpCodes.Ldtoken, pType);
+                            methodIL.Emit(OpCodes.Call, _typeGetTypeFromHandle);
 
-                        methodIL.Emit(OpCodes.Brfalse, compareLabel);
+                            methodIL.Emit(OpCodes.Call, _cTypeOpEquality);
 
-                        WritePropertiesFor(typeBuilder, pType, methodIL, isPoly: true);
+                            methodIL.Emit(OpCodes.Brfalse, compareLabel);
 
-                        methodIL.MarkLabel(compareLabel);
+                            WritePropertiesFor(typeBuilder, pType, methodIL, isPoly: true);
+
+                            methodIL.MarkLabel(compareLabel);
+                        }
                     }
                 }
             }
