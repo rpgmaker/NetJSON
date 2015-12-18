@@ -4994,6 +4994,8 @@ OpCodes.Call,
         }
 
         public static bool IsStringBasedType(this Type type) {
+            var nullableType = type.GetNullableType() ?? type;
+            type = nullableType;
             return type == _stringType || type == _typeType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
         }
     }

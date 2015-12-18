@@ -246,6 +246,13 @@ namespace NetJSON.Tests
         }
 
         [TestMethod]
+        public void SerializeObjectWithQuotes() {
+            var obj = new APIQuote { createDate = DateTime.Now, value = "Hello world" };
+            var json = NetJSON.Serialize(obj);
+            var obj2 = NetJSON.Deserialize<APIQuote>(json);
+        }
+
+        [TestMethod]
         public void TestSerializeDateWithMillisecondDefaultFormatLocal() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
@@ -256,6 +263,7 @@ namespace NetJSON.Tests
         }
 
         public class APIQuote {
+            public DateTime? createDate { get; set; }
             public string value { get; set; }
         }
 
