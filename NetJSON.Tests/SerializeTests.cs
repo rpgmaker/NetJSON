@@ -483,8 +483,58 @@ namespace NetJSON.Tests
             
             var actual = NetJSON.Serialize(o.GetType(), o);
         }
-    }
 
+		[TestMethod]
+		public void CanDeserialiseNullableDateTime()
+		{
+			var itm = new DateTime(2015, 12, 15);
+			var testObj = new NullableTestType<DateTime>(itm);
+			var serialised = NetJSON.Serialize(testObj);
+			var deserialised = NetJSON.Deserialize<NullableTestType<DateTime>>(serialised);
+			
+			Assert.IsNotNull(deserialised);
+			Assert.IsNotNull(deserialised.TestItem);
+			Assert.AreEqual(testObj.TestItem.Value, itm);
+		}
+		
+		[TestMethod]
+		public void CanDeserialiseNullableTimespan()
+		{
+			var itm = new TimeSpan(1500);
+			var testObj = new NullableTestType<TimeSpan>(itm);
+			var serialised = NetJSON.Serialize(testObj);
+			var deserialised = NetJSON.Deserialize<NullableTestType<DateTime>>(serialised);
+			
+			Assert.IsNotNull(deserialised);
+			Assert.IsNotNull(deserialised.TestItem);
+			Assert.AreEqual(testObj.TestItem.Value, itm);
+		}
+		
+		[TestMethod]
+		public void CanDeserialiseNullableGuid()
+		{
+			var itm = new Guid("10b5a72b-815f-4e64-90bf-cb250840e989");
+			var testObj = new NullableTestType<Guid>(itm);
+			var serialised = NetJSON.Serialize(testObj);
+			var deserialised = NetJSON.Deserialize<NullableTestType<Guid>>(serialised);
+			
+			Assert.IsNotNull(deserialised);
+			Assert.IsNotNull(deserialised.TestItem);
+			Assert.AreEqual(testObj.TestItem.Value, itm);
+		}
+    }
+	
+	public class NullableTestType<T> where T : struct
+	{
+		public Nullable<T> TestItem { get; set; }
+
+		public NullableTestType() { }
+
+		public NullableTestType(T item)
+		{
+			TestItem = item;
+		}
+	}
 
     public class Graph {
         public string name;
