@@ -473,7 +473,8 @@ namespace NetJSON {
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
             _threadQuoteCharGet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetGetMethod(),
             _QuotCharGet = _jsonType.GetProperty("QuotChar", MethodBinding).GetGetMethod(),
-            _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding);
+            _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding),
+            _getTypeIdentifierInstanceMethod = _jsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
             _hasOverrideQuoteField = _jsonType.GetField("_hasOverrideQuoteChar", MethodBinding),
@@ -484,6 +485,7 @@ namespace NetJSON {
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
 
         const string IsoFormat = "{0:yyyy-MM-ddTHH:mm:ss.fffZ}",
+             TypeIdentifier = "$type",
              ClassStr = "Class", _dllStr = ".dll",
              NullStr = "null",
               IListStr = "IList`1",
@@ -555,6 +557,8 @@ namespace NetJSON {
 
         static ConcurrentDictionary<string, MethodBuilder> _readEnumToStringMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
+
+        static ConcurrentDictionary<string, Func<object>> _typeIdentifierFuncs = new ConcurrentDictionary<string, Func<object>>();
 
         static ConcurrentDictionary<Type, bool> _primitiveTypes =
             new ConcurrentDictionary<Type, bool>();
@@ -1003,6 +1007,28 @@ namespace NetJSON {
             set {
                 _includeTypeInformation = value;
             }
+        }
+
+        public static object GetTypeIdentifierInstance(string typeName) {
+            return _typeIdentifierFuncs.GetOrAdd(typeName, _ => { 
+                var type = Type.GetType(typeName, throwOnError: false);
+                if(type == null)
+                    throw new InvalidOperationException(string.Format("Unable to resolve {0} with value = {1}", TypeIdentifier, typeName));
+
+                var ctor = type.GetConstructor(Type.EmptyTypes);
+
+                if (ctor == null)
+                    throw new InvalidOperationException(string.Format("{0} with value = {1} must have a default constructor", TypeIdentifier, typeName));
+
+                var meth = new DynamicMethod(Guid.NewGuid().ToString("N"), _objectType, null, restrictedSkipVisibility: true);
+
+                var il = meth.GetILGenerator();
+
+                il.Emit(OpCodes.Newobj, ctor);
+                il.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<object>)) as Func<object>;
+            })();
         }
 
         [ThreadStatic]
@@ -2323,29 +2349,7 @@ OpCodes.Call,
                 if (!_includeTypeInformation)
                     WritePropertiesFor(typeBuilder, type, methodIL);
                 else {
-                    var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
-                        var attrs = type.GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
-                        var types = attrs.Any() ? attrs.Where(x => !x.Type.IsAbstract).Select(x => x.Type).ToList() : null;
-                        //Expense call to auto-magically figure all subclass of current type
-                        if (types == null) {
-                            types = new List<Type>();
-                            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                            foreach (var asm in assemblies) {
-                                try {
-                                    types.AddRange(asm.GetTypes().Where(x => x.IsSubclassOf(type)));
-                                } catch (ReflectionTypeLoadException ex) {
-                                    var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)) : null;
-                                    if (exTypes != null)
-                                        types.AddRange(exTypes);
-                                }
-                            }
-                        }
-
-                        if (!types.Contains(type) && !type.IsAbstract)
-                            types.Insert(0, type);
-
-                        return types;
-                    });
+                    var pTypes = GetIncludedTypeTypes(type);
 
                     if (pTypes.Count == 1)
                         WritePropertiesFor(typeBuilder, type, methodIL);
@@ -2375,6 +2379,33 @@ OpCodes.Call,
                     }
                 }
             }
+        }
+
+        private static List<Type> GetIncludedTypeTypes(Type type) {
+            var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
+                var attrs = type.GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
+                var types = attrs.Any() ? attrs.Where(x => !x.Type.IsAbstract).Select(x => x.Type).ToList() : null;
+                //Expense call to auto-magically figure all subclass of current type
+                if (types == null) {
+                    types = new List<Type>();
+                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                    foreach (var asm in assemblies) {
+                        try {
+                            types.AddRange(asm.GetTypes().Where(x => x.IsSubclassOf(type)));
+                        } catch (ReflectionTypeLoadException ex) {
+                            var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)) : null;
+                            if (exTypes != null)
+                                types.AddRange(exTypes);
+                        }
+                    }
+                }
+
+                if (!types.Contains(type) && !type.IsAbstract)
+                    types.Insert(0, type);
+
+                return types;
+            });
+            return pTypes;
         }
 
         internal static void WriteCollection(TypeBuilder typeBuilder, Type type, ILGenerator il) {
@@ -2717,7 +2748,7 @@ OpCodes.Call,
                 il.Emit(OpCodes.Ldarg_1);
                 LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Ldstr, "$type");
+                il.Emit(OpCodes.Ldstr, TypeIdentifier);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
@@ -3891,9 +3922,49 @@ OpCodes.Call,
 
             const bool Optimized = true;
 
-            var props = type.GetTypeProperties();
             var il = method.GetILGenerator();
 
+            if (!_includeTypeInformation)
+                GenerateTypeSetValueFor(typeBuilder, type, isTypeValueType, Optimized, il);
+            else {
+                var pTypes = GetIncludedTypeTypes(type);
+
+                if (pTypes.Count == 1)
+                    GenerateTypeSetValueFor(typeBuilder, type, isTypeValueType, Optimized, il);
+                else {
+                    var typeLocal = il.DeclareLocal(typeof(Type));
+
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Callvirt, _objectGetType);
+                    il.Emit(OpCodes.Stloc, typeLocal);
+
+                    foreach (var pType in pTypes) {
+                        var compareLabel = il.DefineLabel();
+
+                        il.Emit(OpCodes.Ldloc, typeLocal);
+
+                        il.Emit(OpCodes.Ldtoken, pType);
+                        il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+
+                        il.Emit(OpCodes.Call, _cTypeOpEquality);
+
+                        il.Emit(OpCodes.Brfalse, compareLabel);
+
+                        GenerateTypeSetValueFor(typeBuilder, pType, pType.IsValueType, Optimized, il);
+
+                        il.MarkLabel(compareLabel);
+                    }
+                }
+            }
+
+            il.Emit(OpCodes.Ret);
+
+            return method;
+        }
+
+        private static void GenerateTypeSetValueFor(TypeBuilder typeBuilder, Type type, bool isTypeValueType, bool Optimized, ILGenerator il) {
+
+            var props = type.GetTypeProperties();
             for (var i = 0; i < props.Length; i++) {
                 var mem = props[i];
                 var member = mem.Member;
@@ -4015,10 +4086,6 @@ OpCodes.Call,
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Call, _skipProperty);
-
-            il.Emit(OpCodes.Ret);
-
-            return method;
         }
 
         public unsafe static int MoveToArrayBlock(char* str, ref int index) {
@@ -4720,11 +4787,39 @@ OpCodes.Call,
                     } else {
                         if (!isTuple) {
                             //Set property based on key
-                            il.Emit(OpCodes.Ldarg_0);
-                            il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
-                            il.Emit(OpCodes.Ldloc, keyLocal);
-                            il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+                            if (_includeTypeInformation) {
+                                var typeIdentifierLabel = il.DefineLabel();
+                                var notTypeIdentifierLabel = il.DefineLabel();
+
+                                il.Emit(OpCodes.Ldloc, keyLocal);
+                                il.Emit(OpCodes.Ldstr, TypeIdentifier);
+                                il.Emit(OpCodes.Call, _stringOpEquality);
+                                il.Emit(OpCodes.Brfalse, typeIdentifierLabel);
+
+                                il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(OpCodes.Ldarg_1);
+                                il.Emit(OpCodes.Call, _getStringBasedValue);
+                                il.Emit(OpCodes.Call, _getTypeIdentifierInstanceMethod);
+                                il.Emit(OpCodes.Isinst, type);
+                                il.Emit(OpCodes.Stloc, obj);
+
+                                il.Emit(OpCodes.Br, notTypeIdentifierLabel);
+                                il.MarkLabel(typeIdentifierLabel);
+
+                                il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(OpCodes.Ldarg_1);
+                                il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                                il.Emit(OpCodes.Ldloc, keyLocal);
+                                il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+
+                                il.MarkLabel(notTypeIdentifierLabel);
+                            } else {
+                                il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(OpCodes.Ldarg_1);
+                                il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                                il.Emit(OpCodes.Ldloc, keyLocal);
+                                il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+                            }
                         } else {
 
                             for (var i = 0; i < tupleCount; i++)

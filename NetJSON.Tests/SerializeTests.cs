@@ -457,6 +457,12 @@ namespace NetJSON.Tests
             graph.nodes.Add(new NodeB { text = "hello" });
             var json = NetJSON.Serialize(graph);
             var jgraph = NetJSON.Deserialize<Graph>(json);
+
+            var nodeA = jgraph.nodes[0] as NodeA;
+            var nodeB = jgraph.nodes[1] as NodeB;
+
+            Assert.IsTrue(nodeA != null && nodeA.number == 10);
+            Assert.IsTrue(nodeB != null && nodeB.text == "hello");
         }
 
         //[TestMethod]
