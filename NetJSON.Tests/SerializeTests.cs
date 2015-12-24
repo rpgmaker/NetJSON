@@ -7,17 +7,15 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NetJSON.Tests
-{
+namespace NetJSON.Tests {
     [TestClass]
-    public class SerializeTests
-    {
+    public class SerializeTests {
         public enum MyEnumTest {
-            Test1,Test2
+            Test1, Test2
         }
 
         public void CanSerializeMccUserDataObject() {
-            var obj = new MccUserData() { arr = new int?[]{10, null, 20} };
+            var obj = new MccUserData() { arr = new int?[] { 10, null, 20 } };
 
             NetJSON.IncludeFields = true;
 
@@ -39,7 +37,7 @@ namespace NetJSON.Tests
 
         [TestMethod]
         public void TestAutoDetectQuotes() {
-            
+
             var dict = new Dictionary<string, string>();
             dict["Test"] = "Test2";
             dict["Test2"] = "Test3";
@@ -101,7 +99,10 @@ namespace NetJSON.Tests
                 ExceptionType = typeof(InvalidCastException),
                 HelpLink = "HelloWorld",
                 InnerException = new ExceptionInfoEx { HelpLink = "Inner" },
-             Message = "Nothing here", Source = "Not found", StackTrace = "I am all here"};
+                Message = "Nothing here",
+                Source = "Not found",
+                StackTrace = "I am all here"
+            };
 
             var json = NetJSON.Serialize(exception);
 
@@ -294,7 +295,7 @@ namespace NetJSON.Tests
             var l1 = NetJSON.Deserialize<Dictionary<string, string>>(final);
             Assert.IsTrue(l1.Count == 2);
         }
-        
+
         [TestMethod]
         public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
@@ -400,7 +401,7 @@ namespace NetJSON.Tests
 
             var sjson = NetJSON.Serialize(s);
             var ss = NetJSON.Deserialize<string>(sjson);
-            
+
             var djson = NetJSON.Serialize(d);
             var dd = NetJSON.Deserialize<DateTime>(djson);
 
@@ -466,10 +467,8 @@ namespace NetJSON.Tests
         }
 
         //[TestMethod]
-        public void NestedGraphDoesNotThrow()
-        {
-            var o = new GetTopWinsResponse()
-            {
+        public void NestedGraphDoesNotThrow() {
+            var o = new GetTopWinsResponse() {
                 TopWins = new List<TopWinDto>()
                 {
                     new TopWinDto()
@@ -494,10 +493,58 @@ namespace NetJSON.Tests
                     }
                 }
             };
-            
+
             var actual = NetJSON.Serialize(o.GetType(), o);
         }
+
+        [TestMethod]
+        public void CanDeserialiseNullableDateTime() {
+            var itm = new DateTime(2015, 12, 15);
+            var testObj = new NullableTestType<DateTime>(itm);
+            var serialised = NetJSON.Serialize(testObj);
+            var deserialised = NetJSON.Deserialize<NullableTestType<DateTime>>(serialised);
+
+            Assert.IsNotNull(deserialised);
+            Assert.IsNotNull(deserialised.TestItem);
+            Assert.AreEqual(testObj.TestItem.Value, itm);
+        }
+
+        [TestMethod]
+        public void CanDeserialiseNullableTimespan() {
+            var itm = new TimeSpan(1500);
+            var testObj = new NullableTestType<TimeSpan>(itm);
+            var serialised = NetJSON.Serialize(testObj);
+            var deserialised = NetJSON.Deserialize<NullableTestType<TimeSpan>>(serialised);
+
+            Assert.IsNotNull(deserialised);
+            Assert.IsNotNull(deserialised.TestItem);
+            Assert.AreEqual(testObj.TestItem.Value, itm);
+        }
+
+        [TestMethod]
+        public void CanDeserialiseNullableGuid() {
+            var itm = new Guid("10b5a72b-815f-4e64-90bf-cb250840e989");
+            var testObj = new NullableTestType<Guid>(itm);
+            var serialised = NetJSON.Serialize(testObj);
+            var deserialised = NetJSON.Deserialize<NullableTestType<Guid>>(serialised);
+
+            Assert.IsNotNull(deserialised);
+            Assert.IsNotNull(deserialised.TestItem);
+            Assert.AreEqual(testObj.TestItem.Value, itm);
+        }
     }
+
+    public class NullableTestType<T> where T : struct {
+        public Nullable<T> TestItem { get; set; }
+
+        public NullableTestType() { }
+
+        public NullableTestType(T item) {
+            TestItem = item;
+        }
+    }
+
+
 
 
     public class Graph {
@@ -520,8 +567,7 @@ namespace NetJSON.Tests
         public string text;
     }
 
-    public enum ExceptionType
-    {
+    public enum ExceptionType {
         None,
         Business,
         Security,
@@ -529,8 +575,7 @@ namespace NetJSON.Tests
         Unknown,
     }
 
-    public class ExceptionInfo
-    {
+    public class ExceptionInfo {
         public ExceptionInfo InnerException { get; set; }
 
         public string Message { get; set; }
@@ -541,12 +586,10 @@ namespace NetJSON.Tests
 
         public string FaultCode { get; set; }
 
-        public ExceptionInfo()
-        {
+        public ExceptionInfo() {
         }
 
-        public ExceptionInfo(Exception exception)
-        {
+        public ExceptionInfo(Exception exception) {
             this.Message = exception.Message;
             this.StackTrace = exception.StackTrace;
             this.Type = exception.GetType().ToString();
@@ -586,31 +629,26 @@ namespace NetJSON.Tests
         }
     }
 
-    public class Response
-    {
+    public class Response {
         public ExceptionInfo Exception { get; set; }
 
         public ExceptionType ExceptionType { get; set; }
 
         public bool IsCached { get; set; }
 
-        public Response GetShallowCopy()
-        {
+        public Response GetShallowCopy() {
             return (Response)this.MemberwiseClone();
         }
     }
 
-    public class GetTopWinsResponse : Response
-    {
-        public GetTopWinsResponse()
-        {
+    public class GetTopWinsResponse : Response {
+        public GetTopWinsResponse() {
             //TopWins = new List<TopWinDto>();
         }
 
         public IEnumerable<TopWinDto> TopWins { get; set; }
 
-        public override string ToString()
-        {
+        public override string ToString() {
             var sb = new StringBuilder();
 
             foreach (var win in TopWins)
@@ -626,8 +664,7 @@ namespace NetJSON.Tests
         public string XXXXXXXXXXXXURL { get; set; }
     }
 
-    public class TopWinDto
-    {
+    public class TopWinDto {
         public TopWinType Type { get; set; }
 
         public DateTime Timestamp { get; set; }
@@ -643,13 +680,11 @@ namespace NetJSON.Tests
         public TopWinOnlineSports OnlineSports { get; set; }
     }
 
-    public class TopWinOnlineCasino
-    {
+    public class TopWinOnlineCasino {
         public string GameId { get; set; }
     }
 
-    public class TopWinLandBasedCasino
-    {
+    public class TopWinLandBasedCasino {
         public string Location { get; set; }
 
         public string MachineName { get; set; }
@@ -668,8 +703,7 @@ namespace NetJSON.Tests
         }
     }
 
-    public class TopWinOnlineSports
-    {
+    public class TopWinOnlineSports {
         public DateTime CreationDate { get; set; }
 
         public string HomeTeam { get; set; }
@@ -687,8 +721,7 @@ namespace NetJSON.Tests
         public string LeagueName { get; set; }
     }
 
-    public enum TopWinType
-    {
+    public enum TopWinType {
         OnlineCasinoWin,
         OnlineSportsWin,
         LandBasedCasinoWin
