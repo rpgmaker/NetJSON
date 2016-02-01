@@ -36,6 +36,32 @@ namespace NetJSON {
         }
     }
 
+    public class NetJSONSettings {
+        public NetJSONDateFormat DateFormat { get; set; }
+        public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
+        public bool ShareAssembly { get; set; }
+        public bool UseEnumString { get; set; }
+        public bool IncludeFields { get; set; }
+        public bool SkipDefaultValue { get; set; }
+        public bool CaseSensitive { get; set; }
+        public bool GenerateAssembly { get; set; }
+        public NetJSONQuote QuoteType { get; set; }
+        public bool UseStringOptimization { get; set; }
+
+        public NetJSONSettings() {
+            DateFormat = NetJSONDateFormat.ISO;
+            TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
+            ShareAssembly = true;
+            UseEnumString = false;
+            IncludeFields = true;
+            SkipDefaultValue = true;
+            CaseSensitive = true;
+            GenerateAssembly = false;
+            QuoteType = NetJSONQuote.Double;
+            UseStringOptimization = false;
+        }
+    }
+
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public class NetJSONKnownTypeAttribute : Attribute {
         public Type Type { private set; get; }
@@ -273,6 +299,13 @@ namespace NetJSON {
         public abstract void Serialize(T value, TextWriter writer);
         public abstract T Deserialize(TextReader reader);
 
+        //With Settings
+        /*
+        public abstract string Serialize(T value, NetJSONSettings settings);
+        public abstract T Deserialize(string value, NetJSONSettings settings);
+        public abstract string Serialize(T value, TextWriter writer, NetJSONSettings settings);
+        public abstract T Deserialize(TextReader reader, NetJSONSettings settings);
+        */
     }
 
     public enum NetJSONDateFormat {
