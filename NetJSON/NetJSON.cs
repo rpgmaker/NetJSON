@@ -39,26 +39,66 @@ namespace NetJSON {
     public class NetJSONSettings {
         public NetJSONDateFormat DateFormat { get; set; }
         public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
-        public bool ShareAssembly { get; set; }
         public bool UseEnumString { get; set; }
-        public bool IncludeFields { get; set; }
         public bool SkipDefaultValue { get; set; }
         public bool CaseSensitive { get; set; }
-        public bool GenerateAssembly { get; set; }
-        public NetJSONQuote QuoteType { get; set; }
+
+        private NetJSONQuote _quoteType;
+        public NetJSONQuote QuoteType {
+            get {
+                return _quoteType;
+            }
+            set {
+                _quoteType = value;
+                _quoteChar = _quoteType == NetJSONQuote.Single ? '\'' : '"';
+                _quoteCharString = _quoteType == NetJSONQuote.Single ? "'" : "\"";
+            }
+        }
+
+        public char _quoteChar;
+        public string _quoteCharString;
+
+        public bool HasOverrideQuoteChar {get; internal set;}
+
         public bool UseStringOptimization { get; set; }
+        public bool IncludeTypeInformation { get; set; }
+
+        public StringComparison CaseComparison {
+            get {
+                return CaseSensitive ? StringComparison.CurrentCulture : StringComparison.OrdinalIgnoreCase;
+            }
+        }
 
         public NetJSONSettings() {
-            DateFormat = NetJSONDateFormat.ISO;
-            TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
-            ShareAssembly = true;
-            UseEnumString = false;
-            IncludeFields = true;
-            SkipDefaultValue = true;
-            CaseSensitive = true;
-            GenerateAssembly = false;
-            QuoteType = NetJSONQuote.Double;
-            UseStringOptimization = false;
+            IncludeTypeInformation = NetJSON.IncludeTypeInformation;
+            DateFormat = NetJSON.DateFormat;
+            TimeZoneFormat = NetJSON.TimeZoneFormat;
+            UseEnumString = NetJSON.UseEnumString;
+            SkipDefaultValue = NetJSON.SkipDefaultValue;
+            CaseSensitive = NetJSON.CaseSensitive;
+            QuoteType = NetJSON.QuoteType;
+            UseStringOptimization = NetJSON.UseStringOptimization;
+        }
+
+        public NetJSONSettings Clone() {
+            return new NetJSONSettings {
+                IncludeTypeInformation = IncludeTypeInformation,
+                DateFormat = DateFormat,
+                TimeZoneFormat = TimeZoneFormat,
+                UseEnumString = UseEnumString,
+                SkipDefaultValue = SkipDefaultValue,
+                CaseSensitive = CaseSensitive,
+                QuoteType = QuoteType,
+                UseStringOptimization = UseStringOptimization
+            };
+        }
+
+        [ThreadStatic]
+        private static NetJSONSettings _currentSettings;
+        public static NetJSONSettings CurrentSettings {
+            get {
+                return new NetJSONSettings();
+            }
         }
     }
 
@@ -300,12 +340,10 @@ namespace NetJSON {
         public abstract T Deserialize(TextReader reader);
 
         //With Settings
-        /*
         public abstract string Serialize(T value, NetJSONSettings settings);
         public abstract T Deserialize(string value, NetJSONSettings settings);
-        public abstract string Serialize(T value, TextWriter writer, NetJSONSettings settings);
+        public abstract void Serialize(T value, TextWriter writer, NetJSONSettings settings);
         public abstract T Deserialize(TextReader reader, NetJSONSettings settings);
-        */
     }
 
     public enum NetJSONDateFormat {
@@ -333,11 +371,11 @@ namespace NetJSON {
             public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
         }
         
-        public static string QuotChar {
-            get {
-                return _ThreadQuoteString;
-            }
-        }
+        //public static string QuotChar {
+        //    get {
+        //        return _ThreadQuoteString;
+        //    }
+        //}
 
         
 
@@ -420,7 +458,8 @@ namespace NetJSON {
             _textWriterType = typeof(TextWriter),
             _tupleContainerType = typeof(TupleContainer),
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
-            _textReaderType = typeof(TextReader);
+            _textReaderType = typeof(TextReader),
+            _settingsType = typeof(NetJSONSettings);
 
         static MethodInfo _stringBuilderToString =
             _stringBuilderType.GetMethod("ToString", Type.EmptyTypes),
@@ -504,15 +543,18 @@ namespace NetJSON {
             _objectEquals = _objectType.GetMethod("Equals", new []{ _objectType}),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
-            _threadQuoteCharGet = _jsonType.GetProperty("_ThreadQuoteChar", MethodBinding).GetGetMethod(),
-            _QuotCharGet = _jsonType.GetProperty("QuotChar", MethodBinding).GetGetMethod(),
             _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding),
-            _getTypeIdentifierInstanceMethod = _jsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding);
+            _getTypeIdentifierInstanceMethod = _jsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding),
+            _settingsUseEnumStringProp = _settingsType.GetProperty("UseEnumString", MethodBinding).GetGetMethod(),
+            _settingsUseStringOptimization = _settingsType.GetProperty("UseStringOptimization", MethodBinding).GetGetMethod(),
+            _settingsCaseComparison = _settingsType.GetProperty("CaseComparison", MethodBinding).GetGetMethod(),
+            _settingsHasOverrideQuoteChar = _settingsType.GetProperty("HasOverrideQuoteChar", MethodBinding).GetGetMethod(),
+            _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
+            _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod();
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
-            _hasOverrideQuoteField = _jsonType.GetField("_hasOverrideQuoteChar", MethodBinding),
-            _threadQuoteStringField = _jsonType.GetField("_threadQuoteString", MethodBinding),
-            _threadQuoteCharField = _jsonType.GetField("_threadQuoteChar", MethodBinding);
+            _settingQuoteChar = _settingsType.GetField("_quoteChar", MethodBinding),
+            _settingQuoteCharString = _settingsType.GetField("_quoteCharString", MethodBinding);
 
         const int Delimeter = (int)',', ColonChr = (int)':',
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
@@ -536,13 +578,14 @@ namespace NetJSON {
               ArrayLiteral = "[]",
               Colon = ":",
               ToTupleStr = "ToTuple",
-              SerializeStr = "Serialize", DeserializeStr = "Deserialize";
+              SerializeStr = "Serialize", DeserializeStr = "Deserialize", SettingsFieldName = "_settingsField";
 
         const char QuotDoubleChar = '"',
                    QuotSingleChar = '\'';
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
+        static ConstructorInfo _settingsCtor = _settingsType.GetConstructor(Type.EmptyTypes);
 
         static ConcurrentDictionary<Type, MethodInfo> _registeredSerializerMethods =
             new ConcurrentDictionary<Type, MethodInfo>();
@@ -906,9 +949,9 @@ namespace NetJSON {
         }
 
         private static void LoadQuotChar(ILGenerator il) {
-            il.Emit(OpCodes.Ldsfld, _threadQuoteStringField);
-            //il.Emit(OpCodes.Call, _QuotCharGet);
-            //il.Emit(OpCodes.Ldstr, QuotChar);
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Ldfld, _settingQuoteCharString);
+            //il.Emit(OpCodes.Ldsfld, _threadQuoteStringField);
         }
 
         [ThreadStatic]
@@ -916,34 +959,6 @@ namespace NetJSON {
         public static StringBuilder GetStringBuilder() {
             return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
-
-        [ThreadStatic]
-        public static bool _hasOverrideQuoteChar = false;
-
-        [ThreadStatic]
-        public static char _threadQuoteChar = QuotDoubleChar;
-        public static char _ThreadQuoteChar {
-            get {
-                return _threadQuoteChar == '\0' ? (_threadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar) : _threadQuoteChar;
-            }
-            set{
-                _threadQuoteChar = value;
-                _threadQuoteString = _threadQuoteChar == '\'' ? "'" : "\"";
-            }
-        }
-
-        [ThreadStatic]
-        public static string _threadQuoteString = "\"";
-        public static string _ThreadQuoteString {
-            get {
-                return _threadQuoteString ?? (_threadQuoteString = (_ThreadQuoteChar = _quoteType == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString());
-            }
-            set {
-                _threadQuoteString = value;
-                _threadQuoteChar = _threadQuoteString == "'" ? '\'' : '"';
-            }
-        }
-
 
         private static bool _useTickFormat = true;
 
@@ -971,11 +986,17 @@ namespace NetJSON {
             set {
                 _dateFormat = value;
             }
+            internal get {
+                return _dateFormat;
+            }
         }
 
         public static NetJSONTimeZoneFormat TimeZoneFormat {
             set {
                 _timeZoneFormat = value;
+            }
+            internal get {
+                return _timeZoneFormat;
             }
         }
 
@@ -984,7 +1005,10 @@ namespace NetJSON {
         public static NetJSONQuote QuoteType {
             set {
                 _quoteType = value;
-                _ThreadQuoteString = (_ThreadQuoteChar = value == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString();
+                //_ThreadQuoteString = (_ThreadQuoteChar = value == NetJSONQuote.Single ? QuotSingleChar : QuotDoubleChar).ToString();
+            }
+            internal get {
+                return _quoteType;
             }
         }
 
@@ -994,6 +1018,9 @@ namespace NetJSON {
             set {
                 _caseSensitive = value;
             }
+            internal get {
+                return _caseSensitive;
+            }
         }
 
         private static bool _useEnumString = false;
@@ -1001,6 +1028,9 @@ namespace NetJSON {
         public static bool UseEnumString {
             set {
                 _useEnumString = value;
+            }
+            internal get {
+                return _useEnumString;
             }
         }
 
@@ -1010,6 +1040,9 @@ namespace NetJSON {
             set {
                 _includeFields = value;
             }
+            internal get {
+                return _includeFields;
+            }
         }
 
         private static bool _skipDefaultValue = true;
@@ -1018,6 +1051,9 @@ namespace NetJSON {
             set {
                 _skipDefaultValue = value;
             }
+            internal get {
+                return _skipDefaultValue;
+            }
         }
 
         private static bool _useStringOptimization = false;
@@ -1025,6 +1061,9 @@ namespace NetJSON {
         public static bool UseStringOptimization {
             set {
                 _useStringOptimization = value;
+            }
+            internal get {
+                return _useStringOptimization;
             }
         }
 
@@ -1039,6 +1078,9 @@ namespace NetJSON {
         public static bool IncludeTypeInformation {
             set {
                 _includeTypeInformation = value;
+            }
+            internal get {
+                return _includeTypeInformation;
             }
         }
 
@@ -1067,8 +1109,8 @@ namespace NetJSON {
         [ThreadStatic]
         private static StringBuilder _cachedDateStringBuilder;
 
-        private static string DateToISOFormat(DateTime date) {
-
+        private static string DateToISOFormat(DateTime date, NetJSONSettings settings) {
+            var timeZoneFormat = settings.TimeZoneFormat;
             var minute = date.Minute;
             var hour = date.Hour;
             var second = date.Second;
@@ -1087,9 +1129,9 @@ namespace NetJSON {
             .Append(second < 10 ? "0" : string.Empty).Append(IntToStr(second)).Append('.')
             .Append(IntToStr(totalSeconds));
 
-            if (_timeZoneFormat == NetJSONTimeZoneFormat.Utc)
+            if (timeZoneFormat == NetJSONTimeZoneFormat.Utc)
                 value.Append('Z');
-            else if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+            else if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
                 var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
                 var hours = Math.Abs(offset.Hours);
                 var minutes = Math.Abs(offset.Minutes);
@@ -1103,13 +1145,14 @@ namespace NetJSON {
             UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
 
 
-        public static string AllDateToString(DateTime date) {
-            return _dateFormat == NetJSONDateFormat.Default ? DateToString(date) :
-                _dateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
-                DateToISOFormat(date);
+        public static string AllDateToString(DateTime date, NetJSONSettings settings) {
+            return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings) :
+                settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
+                DateToISOFormat(date, settings);
         }
 
-        private static string DateToString(DateTime date) {
+        private static string DateToString(DateTime date, NetJSONSettings settings) {
+            var timeZoneFormat = settings.TimeZoneFormat;
             if (date == DateTime.MinValue)
                 return "\\/Date(-62135596800)\\/";
             else if (date == DateTime.MaxValue)
@@ -1117,10 +1160,10 @@ namespace NetJSON {
             var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
             var hours = Math.Abs(offset.Hours);
             var minutes = Math.Abs(offset.Minutes);
-            var offsetText = _timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
+            var offsetText = timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
                 hours, minutes < 10 ? "0" : string.Empty, minutes)) : string.Empty;
 
-            if (date.Kind == DateTimeKind.Utc && _timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
+            if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
                 offset = TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
                 hours = Math.Abs(offset.Hours);
                 minutes = Math.Abs(offset.Minutes);
@@ -1142,8 +1185,8 @@ namespace NetJSON {
             return (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
         }
 
-        public static bool NeedQuotes(Type type) {
-            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (_useEnumString && type.IsEnum);
+        public static bool NeedQuotes(Type type, NetJSONSettings settings) {
+            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && settings.DateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (settings.UseEnumString && type.IsEnum);
         }
 
         public static bool CustomTypeEquality(Type type1, Type type2) {
@@ -1154,8 +1197,8 @@ namespace NetJSON {
             return type1 == type2;
         }
 
-        public static string CustomEnumToStr(Enum @enum) {
-            if (_useEnumString)
+        public static string CustomEnumToStr(Enum @enum, NetJSONSettings settings) {
+            if (settings.UseEnumString)
                 return @enum.ToString();
             return IntToStr((int)((object)@enum));
         }
@@ -1169,7 +1212,7 @@ namespace NetJSON {
             return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
 
                 var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
-                    new[] { _objectType, _stringBuilderType });
+                    new[] { _objectType, _stringBuilderType, _settingsType });
 
                 var il = method.GetILGenerator();
 
@@ -1215,6 +1258,7 @@ namespace NetJSON {
 
 
                 il.Emit(OpCodes.Ldloc, typeLocal);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, _needQuote);
                 il.Emit(OpCodes.Stloc, needQuoteLocal);
 
@@ -1264,6 +1308,7 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldarg_1);
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Unbox_Any, objType);
+                        il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, _generatorEnumToStr);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
@@ -1297,6 +1342,8 @@ namespace NetJSON {
                         if (objType.IsValueType)
                             il.Emit(OpCodes.Unbox_Any, objType);
                         else il.Emit(OpCodes.Castclass, objType);
+                        if (objType == _dateTimeType)
+                            il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, kv.Value);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
@@ -1358,6 +1405,10 @@ namespace NetJSON {
             return returnType;
         }
 
+        private static void EmitSettingsGetProperty(ILGenerator il, string name) {
+
+        }
+
         private static TypeBuilder GenerateTypeBuilder(Type objType, ModuleBuilder module) {
 
             var genericType = _serializerType.MakeGenericType(objType);
@@ -1383,6 +1434,18 @@ namespace NetJSON {
                 objType, new[] { _textReaderType });
 
 
+            var serializeMethodWithSettings = type.DefineMethod(SerializeStr, MethodAttribute,
+               _stringType, new[] { objType, _settingsType });
+
+            var serializeWithTextWriterMethodWithSettings = type.DefineMethod(SerializeStr, MethodAttribute,
+                _voidType, new[] { objType, _textWriterType, _settingsType });
+
+            var deserializeMethodWithSettings = type.DefineMethod(DeserializeStr, MethodAttribute,
+                objType, new[] { _stringType, _settingsType });
+
+            var deserializeWithReaderMethodWithSettings = type.DefineMethod(DeserializeStr, MethodAttribute,
+                objType, new[] { _textReaderType, _settingsType });
+
             var il = serializeMethod.GetILGenerator();
 
             var sbLocal = il.DeclareLocal(_stringBuilderType);
@@ -1401,6 +1464,7 @@ OpCodes.Call,
             //il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldloc, sbLocal);
+            il.Emit(OpCodes.Call, _settingsCurrentSettings);
             il.Emit(OpCodes.Call, writeMethod);
 
             il.Emit(OpCodes.Ldloc, sbLocal);
@@ -1423,6 +1487,7 @@ OpCodes.Call,
             //il.Emit(OpCodes.Ldarg_0);
             wil.Emit(OpCodes.Ldarg_1);
             wil.Emit(OpCodes.Ldloc, wsbLocal);
+            wil.Emit(OpCodes.Call, _settingsCurrentSettings);
             wil.Emit(OpCodes.Call, writeMethod);
 
             wil.Emit(OpCodes.Ldarg_2);
@@ -1432,28 +1497,87 @@ OpCodes.Call,
             wil.Emit(OpCodes.Ret);
 
             var dil = deserializeMethod.GetILGenerator();
-            var dilLocal = dil.DeclareLocal(objType);
-
+            
             dil.Emit(OpCodes.Ldarg_1);
+            dil.Emit(OpCodes.Call, _settingsCurrentSettings);
             dil.Emit(OpCodes.Call, readMethod);
-            dil.Emit(OpCodes.Stloc, dilLocal);
-            dil.Emit(OpCodes.Ldc_I4_0);
-            dil.Emit(OpCodes.Stsfld, _hasOverrideQuoteField);
-            dil.Emit(OpCodes.Ldloc, dilLocal);
             dil.Emit(OpCodes.Ret);
 
             var rdil = deserializeWithReaderMethod.GetILGenerator();
-            var rdilLocal = rdil.DeclareLocal(objType);
-
 
             rdil.Emit(OpCodes.Ldarg_1);
             rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+            rdil.Emit(OpCodes.Call, _settingsCurrentSettings);
             rdil.Emit(OpCodes.Call, readMethod);
-            rdil.Emit(OpCodes.Stloc, rdilLocal);
-            rdil.Emit(OpCodes.Ldc_I4_0);
-            rdil.Emit(OpCodes.Stsfld, _hasOverrideQuoteField);
-            rdil.Emit(OpCodes.Ldloc, rdilLocal);           
             rdil.Emit(OpCodes.Ret);
+
+            //With Settings
+            var ilWithSettings = serializeMethodWithSettings.GetILGenerator();
+
+            var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
+            ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+
+            ilWithSettings.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+
+            ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
+
+            //il.Emit(OpCodes.Ldarg_0);
+            ilWithSettings.Emit(OpCodes.Ldarg_1);
+            ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+            ilWithSettings.Emit(OpCodes.Ldarg_2);
+            ilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+            ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+            ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+            ilWithSettings.Emit(OpCodes.Ret);
+
+            var wilWithSettings = serializeWithTextWriterMethodWithSettings.GetILGenerator();
+
+            var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
+            wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+            wilWithSettings.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+            wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
+
+            //il.Emit(OpCodes.Ldarg_0);
+            wilWithSettings.Emit(OpCodes.Ldarg_1);
+            wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+            wilWithSettings.Emit(OpCodes.Ldarg_3);
+            wilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+            wilWithSettings.Emit(OpCodes.Ldarg_2);
+            wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+            wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+            wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
+            wilWithSettings.Emit(OpCodes.Ret);
+
+            var dilWithSettings = deserializeMethodWithSettings.GetILGenerator();
+
+            dilWithSettings.Emit(OpCodes.Ldarg_1);
+            dilWithSettings.Emit(OpCodes.Ldarg_2);
+            dilWithSettings.Emit(OpCodes.Call, readMethod);
+            dilWithSettings.Emit(OpCodes.Ret);
+
+            var rdilWithSettings = deserializeWithReaderMethodWithSettings.GetILGenerator();
+
+            rdilWithSettings.Emit(OpCodes.Ldarg_1);
+            rdilWithSettings.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+            rdilWithSettings.Emit(OpCodes.Ldarg_2);
+            rdilWithSettings.Emit(OpCodes.Call, readMethod);
+            rdilWithSettings.Emit(OpCodes.Ret);
+
+            //With Settings End
 
             type.DefineMethodOverride(serializeMethod,
                 genericType.GetMethod(SerializeStr, new[] { objType }));
@@ -1466,6 +1590,20 @@ OpCodes.Call,
 
             type.DefineMethodOverride(deserializeWithReaderMethod,
                 genericType.GetMethod(DeserializeStr, new[] { _textReaderType }));
+
+            //With Settings
+            type.DefineMethodOverride(serializeMethodWithSettings,
+               genericType.GetMethod(SerializeStr, new Type[] { objType, _settingsType }));
+
+            type.DefineMethodOverride(serializeWithTextWriterMethodWithSettings,
+                genericType.GetMethod(SerializeStr, new Type[] { objType, _textWriterType, _settingsType }));
+
+            type.DefineMethodOverride(deserializeMethodWithSettings,
+                genericType.GetMethod(DeserializeStr, new Type[] { _stringType, _settingsType }));
+
+            type.DefineMethodOverride(deserializeWithReaderMethodWithSettings,
+                genericType.GetMethod(DeserializeStr, new[] { _textReaderType, _settingsType }));
+            //With Settings End
             return type;
         }
 
@@ -1554,7 +1692,7 @@ OpCodes.Call,
             return assembly;
         }
 
-        public static unsafe void SkipProperty(char* ptr, ref int index) {
+        public static unsafe void SkipProperty(char* ptr, ref int index, NetJSONSettings settings) {
             var currentIndex = index;
             char current = '\0';
             char bchar = '\0';
@@ -1563,7 +1701,7 @@ OpCodes.Call,
             bool isNonStringType = false;
             int counter = 0;
             bool hasChar = false;
-            var currentQuote = _threadQuoteChar;
+            var currentQuote = settings._quoteChar;
 
             while (true) {
                 current = *(ptr + index);
@@ -1594,14 +1732,14 @@ OpCodes.Call,
             if (isStringType || isNonStringType) {
                 index = currentIndex;
                 if (isStringType)
-                    GetStringBasedValue(ptr, ref index);
+                    GetStringBasedValue(ptr, ref index, settings);
                 else if (isNonStringType)
                     GetNonStringValue(ptr, ref index);
             }
         }
 
-        public static unsafe void EncodedJSONString(StringBuilder sb, string str) {
-            var quote = _threadQuoteChar;
+        public static unsafe void EncodedJSONString(StringBuilder sb, string str, NetJSONSettings settings) {
+            var quote = settings._quoteChar;
             char c;
             fixed (char* chr = str) {
                 char* ptr = chr;
@@ -1796,116 +1934,127 @@ OpCodes.Call,
                 return method;
             var methodName = String.Concat(WriteStr, typeName);
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                _stringType, new[] { type });
+                _stringType, new[] { type, _settingsType });
             _writeEnumToStringMethodBuilders[key] = method;
 
             var eType = type.GetEnumUnderlyingType();
 
             var il = method.GetILGenerator();
+            var useEnumLabel = il.DefineLabel();
 
-            if (_useEnumString) {
-                var values = Enum.GetValues(type).Cast<object>().ToArray();
-                var names = Enum.GetNames(type);
 
-                var count = values.Length;
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Brfalse, useEnumLabel);
 
-                for (var i = 0; i < count; i++) {
+            WriteEnumToStringForWithString(type, eType, il);
 
-                    var value = values[i];
-                    
-                    var label = il.DefineLabel();
+            il.MarkLabel(useEnumLabel);
 
-                    il.Emit(OpCodes.Ldarg_0);
-
-                    if (eType == _intType)
-                        il.Emit(OpCodes.Ldc_I4, (int)value);
-                    else if (eType == _longType)
-                        il.Emit(OpCodes.Ldc_I8, (long)value);
-                    else if (eType == typeof(ulong))
-                        il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
-                    else if (eType == typeof(uint))
-                        il.Emit(OpCodes.Ldc_I4, (uint)value);
-                    else if (eType == typeof(byte)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
-                        il.Emit(OpCodes.Conv_U1);
-                    } else if (eType == typeof(ushort)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
-                        il.Emit(OpCodes.Conv_U2);
-                    } else if (eType == typeof(short)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((short)value));
-                        il.Emit(OpCodes.Conv_I2);
-                    }
-                    
-                    il.Emit(OpCodes.Bne_Un, label);
-
-                    il.Emit(OpCodes.Ldstr, names[i]);
-                    il.Emit(OpCodes.Ret);
-
-                    il.MarkLabel(label);
-                }
-
-            } else {
-                var values = Enum.GetValues(type).Cast<object>().ToArray();
-
-                var count = values.Length;
-
-                for (var i = 0; i < count; i++) {
-
-                    var value = values[i];
-                    
-                    var label = il.DefineLabel();
-
-                    il.Emit(OpCodes.Ldarg_0);
-
-                    if (eType == _intType)
-                        il.Emit(OpCodes.Ldc_I4, (int)value);
-                    else if (eType == _longType)
-                        il.Emit(OpCodes.Ldc_I8, (long)value);
-                    else if (eType == typeof(ulong))
-                        il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
-                    else if (eType == typeof(uint))
-                        il.Emit(OpCodes.Ldc_I4, (uint)value);
-                    else if (eType == typeof(byte)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
-                        il.Emit(OpCodes.Conv_U1);
-                    } else if (eType == typeof(ushort)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
-                        il.Emit(OpCodes.Conv_U2);
-                    } else if (eType == typeof(short)) {
-                        il.Emit(OpCodes.Ldc_I4, (int)((short)value));
-                        il.Emit(OpCodes.Conv_I2);
-                    }
-
-                    il.Emit(OpCodes.Bne_Un, label);
-
-                    if (eType == _intType)
-                        il.Emit(OpCodes.Ldstr, IntToStr((int)value));
-                    else if (eType == _longType)
-                        il.Emit(OpCodes.Ldstr, LongToStr((long)value));
-                    else if (eType == typeof(ulong))
-                        il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
-                    else if (eType == typeof(uint))
-                        il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
-                    else if (eType == typeof(byte))
-                        il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
-                    else if (eType == typeof(ushort))
-                        il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
-                    else if (eType == typeof(short))
-                        il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
-                    
-                 
-                    il.Emit(OpCodes.Ret);
-
-                    il.MarkLabel(label);
-                }
-
-            }
+            WriteEnumToStringForWithInt(type, eType, il);
 
             il.Emit(OpCodes.Ldstr, "0");
 
             il.Emit(OpCodes.Ret);
 
             return method;
+        }
+
+        private static void WriteEnumToStringForWithInt(Type type, Type eType, ILGenerator il) {
+            var values = Enum.GetValues(type).Cast<object>().ToArray();
+
+            var count = values.Length;
+
+            for (var i = 0; i < count; i++) {
+
+                var value = values[i];
+
+                var label = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldarg_0);
+
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldc_I8, (long)value);
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldc_I4, (uint)value);
+                else if (eType == typeof(byte)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                    il.Emit(OpCodes.Conv_U1);
+                } else if (eType == typeof(ushort)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                    il.Emit(OpCodes.Conv_U2);
+                } else if (eType == typeof(short)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                    il.Emit(OpCodes.Conv_I2);
+                }
+
+                il.Emit(OpCodes.Bne_Un, label);
+
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)value));
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldstr, LongToStr((long)value));
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
+                else if (eType == typeof(byte))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
+                else if (eType == typeof(ushort))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
+                else if (eType == typeof(short))
+                    il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
+
+
+                il.Emit(OpCodes.Ret);
+
+                il.MarkLabel(label);
+            }
+        }
+
+        private static void WriteEnumToStringForWithString(Type type, Type eType, ILGenerator il) {
+            var values = Enum.GetValues(type).Cast<object>().ToArray();
+            var names = Enum.GetNames(type);
+
+            var count = values.Length;
+
+            for (var i = 0; i < count; i++) {
+
+                var value = values[i];
+
+                var label = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldarg_0);
+
+                if (eType == _intType)
+                    il.Emit(OpCodes.Ldc_I4, (int)value);
+                else if (eType == _longType)
+                    il.Emit(OpCodes.Ldc_I8, (long)value);
+                else if (eType == typeof(ulong))
+                    il.Emit(OpCodes.Ldc_I8, (long)((ulong)value));
+                else if (eType == typeof(uint))
+                    il.Emit(OpCodes.Ldc_I4, (uint)value);
+                else if (eType == typeof(byte)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((byte)value));
+                    il.Emit(OpCodes.Conv_U1);
+                } else if (eType == typeof(ushort)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((ushort)value));
+                    il.Emit(OpCodes.Conv_U2);
+                } else if (eType == typeof(short)) {
+                    il.Emit(OpCodes.Ldc_I4, (int)((short)value));
+                    il.Emit(OpCodes.Conv_I2);
+                }
+
+                il.Emit(OpCodes.Bne_Un, label);
+
+                il.Emit(OpCodes.Ldstr, names[i]);
+                il.Emit(OpCodes.Ret);
+
+                il.MarkLabel(label);
+            }
         }
 
         internal static MethodInfo WriteDeserializeMethodFor(TypeBuilder typeBuilder, Type type) {
@@ -1916,7 +2065,7 @@ OpCodes.Call,
                 return method;
             var methodName = String.Concat(ReadStr, typeName);
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _stringType });
+                type, new[] { _stringType, _settingsType });
             _readDeserializeMethodBuilders[key] = method;
             var il = method.GetILGenerator();
 
@@ -1970,6 +2119,7 @@ OpCodes.Call,
                 //IsPrimitive
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
+                il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, type));
                 il.Emit(OpCodes.Ret);
 
@@ -1982,6 +2132,7 @@ OpCodes.Call,
                 //IsArray
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
+                il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, typeof(List<object>)));
                 il.Emit(OpCodes.Ret);
 
@@ -1995,6 +2146,7 @@ OpCodes.Call,
                 //IsDictionary
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
+                il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, 
                     typeof(Dictionary<string, object>)));
                 il.Emit(OpCodes.Ret);
@@ -2007,6 +2159,7 @@ OpCodes.Call,
 
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
+                il.Emit(OpCodes.Ldarg_1);
                 if (isArray)
                     il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, type));
                 else {
@@ -2031,7 +2184,7 @@ OpCodes.Call,
             var methodName = String.Concat(WriteStr, typeName);
 
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                _voidType, new[] { type, _stringBuilderType });
+                _voidType, new[] { type, _stringBuilderType, _settingsType });
             _writeMethodBuilders[key] = method;
             var il = method.GetILGenerator();
             var isTypeObject = type == _objectType;
@@ -2076,7 +2229,7 @@ OpCodes.Call,
                     il.Emit(OpCodes.Stloc, valueLocal);
                 }
 
-                needQuote = needQuote && (type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType);
+                needQuote = needQuote && (type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || type == _byteArrayType);
 
                 if (type == _stringType || isTypeObject) {
 
@@ -2115,6 +2268,7 @@ OpCodes.Call,
                         else
                             il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, GenerateFastObjectToString(typeBuilder));
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Pop);
@@ -2124,6 +2278,7 @@ OpCodes.Call,
                         else
                             il.Emit(OpCodes.Ldarg_0);
                         //il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, _encodedJSONString);
                         il.Emit(OpCodes.Ldarg_1);
                     }
@@ -2138,14 +2293,41 @@ OpCodes.Call,
 
                     if (type == _dateTimeType) {
 
-                        var needDateQuote = _dateFormat != NetJSONDateFormat.EpochTime;
+                        var needDateQuoteLocal = il.DeclareLocal(_boolType);
+                        var needDateCheck = il.DefineLabel();
+                        var needDateQuoteLabel1 = il.DefineLabel();
+                        var needDateQuoteLabel2 = il.DefineLabel();
 
-                        if (needDateQuote) {
-                            il.Emit(OpCodes.Ldarg_1);
-                            LoadQuotChar(il);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        }
+                        il.Emit(OpCodes.Ldc_I4_0);
+                        il.Emit(OpCodes.Stloc, needDateQuoteLocal);
+
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Callvirt, _settingsDateFormat);
+                        il.Emit(OpCodes.Ldc_I4, (int)NetJSONDateFormat.EpochTime);
+                        il.Emit(OpCodes.Ceq);
+                        il.Emit(OpCodes.Brfalse, needDateCheck);
+
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        il.Emit(OpCodes.Stloc, needDateQuoteLocal);
+
+                        il.MarkLabel(needDateCheck);
+
+                        il.Emit(OpCodes.Ldloc, needDateQuoteLocal);
+                        il.Emit(OpCodes.Brtrue, needDateQuoteLabel1);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        LoadQuotChar(il);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
+                        il.MarkLabel(needDateQuoteLabel1);
+
+                        //if (needDateQuote) {
+                        //    il.Emit(OpCodes.Ldarg_1);
+                        //    LoadQuotChar(il);
+                        //    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        //    il.Emit(OpCodes.Pop);
+                        //}
 
                         il.Emit(OpCodes.Ldarg_1);
                         //il.Emit(OpCodes.Ldstr, IsoFormat);
@@ -2155,16 +2337,27 @@ OpCodes.Call,
                             il.Emit(OpCodes.Ldarg_0);
                         //il.Emit(OpCodes.Box, _dateTimeType);
                         //il.Emit(OpCodes.Call, _stringFormat);
+                        il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, _generatorDateToString);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
-                        if (needDateQuote) {
-                            il.Emit(OpCodes.Ldarg_1);
-                            LoadQuotChar(il);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        }
+                        //if (needDateQuote) {
+                        //    il.Emit(OpCodes.Ldarg_1);
+                        //    LoadQuotChar(il);
+                        //    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        //    il.Emit(OpCodes.Pop);
+                        //}
+
+                        il.Emit(OpCodes.Ldloc, needDateQuoteLocal);
+                        il.Emit(OpCodes.Brtrue, needDateQuoteLabel2);
+
+                        il.Emit(OpCodes.Ldarg_1);
+                        LoadQuotChar(il);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+
+                        il.MarkLabel(needDateQuoteLabel2);
 
                     } else if (type == _byteArrayType) {
 
@@ -2220,29 +2413,40 @@ OpCodes.Call,
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
                     } else if (type.IsEnum) {
+                        var useEnumStringLocal = il.DeclareLocal(_boolType);
+                        var useEnumLabel1 = il.DefineLabel();
+                        var useEnumLabel2 = il.DefineLabel();
 
-                        if (_useEnumString) {
-                            il.Emit(OpCodes.Ldarg_1);
-                            LoadQuotChar(il);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        }
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
+                        il.Emit(OpCodes.Stloc, useEnumStringLocal);
+
+                        il.Emit(OpCodes.Ldloc, useEnumStringLocal);
+                        il.Emit(OpCodes.Brfalse, useEnumLabel1);
+                        il.Emit(OpCodes.Ldarg_1);
+                        LoadQuotChar(il);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                        
+                        il.MarkLabel(useEnumLabel1);
 
                         il.Emit(OpCodes.Ldarg_1);
                         if (isNullable)
                             il.Emit(OpCodes.Ldloc, valueLocal);
                         else
                             il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, WriteEnumToStringFor(typeBuilder, type));
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
-                        if (_useEnumString) {
-                            il.Emit(OpCodes.Ldarg_1);
-                            LoadQuotChar(il);
-                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                            il.Emit(OpCodes.Pop);
-                        }
+                        il.Emit(OpCodes.Ldloc, useEnumStringLocal);
+                        il.Emit(OpCodes.Brfalse, useEnumLabel2);
+                        il.Emit(OpCodes.Ldarg_1);
+                        LoadQuotChar(il);
+                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                        il.Emit(OpCodes.Pop);
+                        il.MarkLabel(useEnumLabel2);
 
                     } else if (type == _floatType) {
                         il.Emit(OpCodes.Ldarg_1);
@@ -2375,7 +2579,7 @@ OpCodes.Call,
             methodIL.Emit(OpCodes.Ret);
             methodIL.MarkLabel(conditionLabel);
 
-            if (type.IsNotPublic && type.IsClass) {
+            if (type.IsNotPublic) {
                 throw new InvalidOperationException("Non-Public Types is not supported yet");
             } else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
             else {
@@ -2383,12 +2587,10 @@ OpCodes.Call,
                     WritePropertiesFor(typeBuilder, type, methodIL);
                 else {
                     var pTypes = GetIncludedTypeTypes(type);
-
-                    if (pTypes.Count == 1)
+                    if (pTypes.Count == 1) {
                         WritePropertiesFor(typeBuilder, type, methodIL);
-                    else {
+                    } else {
                         var typeLocal = methodIL.DeclareLocal(typeof(Type));
-
                         methodIL.Emit(OpCodes.Ldarg_0);
                         methodIL.Emit(OpCodes.Callvirt, _objectGetType);
                         methodIL.Emit(OpCodes.Stloc, typeLocal);
@@ -2569,7 +2771,7 @@ OpCodes.Call,
                 il.Emit(OpCodes.Call, keyValuePairType.GetProperty("Value").GetGetMethod());
 
                 il.Emit(OpCodes.Ldarg_1);
-
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, valueType));
             }
 
@@ -2604,7 +2806,6 @@ OpCodes.Call,
             var endEnumeratorLabel = il.DefineLabel();
             var hasItem = il.DeclareLocal(_boolType);
             var hasItemLabel = il.DefineLabel();
-            var needQuote = (itemType == _stringType || itemType == _charType || itemType == _guidType || itemType == _timeSpanType || (itemType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || itemType == _byteArrayType || (_useEnumString && itemType.IsEnum));
 
 
             il.Emit(OpCodes.Ldc_I4_0);
@@ -2644,6 +2845,7 @@ OpCodes.Call,
             } else {
                 il.Emit(OpCodes.Ldloc, entryLocal);
                 il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, itemType));
             }
 
@@ -2733,6 +2935,7 @@ OpCodes.Call,
             } else {
                 il.Emit(OpCodes.Ldloc, itemLocal);
                 il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, itemType));
             }
 
@@ -2911,7 +3114,6 @@ OpCodes.Call,
                 }
 
                 il.Emit(OpCodes.Ldarg_1);
-                //il.Emit(OpCodes.Ldstr, String.Concat(QuotChar, name, QuotChar, Colon));
                 LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Ldstr, name);
@@ -2934,6 +3136,7 @@ OpCodes.Call,
                     il.Emit(OpCodes.Ldloc, propValue);
 
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
                 }
 
@@ -2989,10 +3192,6 @@ OpCodes.Call,
         }
 
         internal static NetJSONSerializer<T> GetSerializer<T>() {
-            if (_threadQuoteString == null) {
-                _threadQuoteChar = QuotDoubleChar;
-                _threadQuoteString = "\"";
-            }
             return NetJSONCachedSerializer<T>.Serializer;
         }
 
@@ -3104,6 +3303,22 @@ OpCodes.Call,
             return GetSerializer<T>().Deserialize(reader);
         }
 
+        public static string Serialize<T>(T value, NetJSONSettings settings) {
+            return GetSerializer<T>().Serialize(value, settings);
+        }
+
+        public static void Serialize<T>(T value, TextWriter writer, NetJSONSettings settings) {
+            GetSerializer<T>().Serialize(value, writer, settings);
+        }
+
+        public static T Deserialize<T>(string json, NetJSONSettings settings) {
+            return GetSerializer<T>().Deserialize(json, settings);
+        }
+
+        public static T Deserialize<T>(TextReader reader, NetJSONSettings settings) {
+            return GetSerializer<T>().Deserialize(reader, settings);
+        }
+
         public static object DeserializeObject(string json) {
             return GetSerializer<object>().Deserialize(json);
         }
@@ -3128,7 +3343,7 @@ OpCodes.Call,
                 return method;
 
             method = type.DefineMethod("ExtractObjectValue", StaticMethodAttribute, _objectType,
-                    new[] { _charPtrType, _intType.MakeByRefType() });
+                    new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
 
 
             _readMethodBuilders[key] = method;
@@ -3174,7 +3389,8 @@ OpCodes.Call,
 
                 //if(current == _ThreadQuoteChar) {
                 //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Ldfld, _settingQuoteChar);
 
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
@@ -3182,6 +3398,7 @@ OpCodes.Call,
                 //value = GetStringBasedValue(json, ref index)
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, _getStringBasedValue);
                 il.Emit(OpCodes.Stloc, valueLocal);
 
@@ -3216,6 +3433,7 @@ OpCodes.Call,
                 //CreateList(json, typeof(List<object>), ref index)
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, GenerateCreateListFor(type, typeof(List<object>)));
 
                 il.Emit(OpCodes.Stloc, obj);
@@ -3233,6 +3451,7 @@ OpCodes.Call,
                 //GetClassOrDict(json, typeof(Dictionary<string, object>), ref index)
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(type, typeof(Dictionary<string, object>)));
 
                 il.Emit(OpCodes.Stloc, obj);
@@ -3611,10 +3830,10 @@ OpCodes.Call,
         [ThreadStatic]
         static StringBuilder _decodeJSONStringBuilder;
 
-        public unsafe static string DecodeJSONString(char* ptr, ref int index) {
+        public unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
             char current = '\0', next = '\0';
             bool hasQuote = false;
-            char currentQuote = _threadQuoteChar;
+            //char currentQuote = settings._quoteChar;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
 
             while (true) {
@@ -3623,7 +3842,7 @@ OpCodes.Call,
                 if (hasQuote) {
                     //if (current == '\0') break;
 
-                    if (current == currentQuote) {
+                    if (IsCurrentAQuot(current, settings)) {
                         ++index;
                         break;
                     } else {
@@ -3654,8 +3873,8 @@ OpCodes.Call,
                                     index += 4;
                                     break;
                                 default:
-                                    if (currentQuote == next)
-                                        sb.Append(currentQuote);
+                                    if (IsCurrentAQuot(next, settings))
+                                        sb.Append(next);
 
                                     break;
                             }
@@ -3663,7 +3882,7 @@ OpCodes.Call,
                         }
                     }
                 } else {
-                    if (current == currentQuote) {
+                    if (IsCurrentAQuot(current, settings)) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
@@ -3686,45 +3905,97 @@ OpCodes.Call,
             var methodName = String.Concat(ExtractStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _charPtrType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _extractMethodBuilders[key] = method;
 
             var il = method.GetILGenerator();
             var value = il.DeclareLocal(_stringType);
+
+            var settings = il.DeclareLocal(_settingsType);
+           
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Stloc, settings);
+
+            var isStringBasedLocal = il.DeclareLocal(_boolType);
+
+            il.Emit(OpCodes.Ldc_I4, type.IsStringBasedType() ? 1 : 0);
+            il.Emit(OpCodes.Stloc, isStringBasedLocal);
+
+            if (type.IsEnum) {
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+            }
+
+            if ((type.GetNullableType() ?? type) == _dateTimeType) {
+                var dateCheckLabel = il.DefineLabel();
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsDateFormat);
+                il.Emit(OpCodes.Ldc_I4, (int)NetJSONDateFormat.EpochTime);
+                il.Emit(OpCodes.Ceq);
+                il.Emit(OpCodes.Brtrue, dateCheckLabel);
+                il.Emit(OpCodes.Ldc_I4_1);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+                il.MarkLabel(dateCheckLabel);
+            }
             
             if (type.IsPrimitiveType()) {
-                
+
+                var isStringBasedLabel1 = il.DefineLabel();
+                var isStringBasedLabel2 = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
+
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
-                if (type.IsStringBasedType()) {
-                    if (type == _stringType) {
-                        il.Emit(OpCodes.Call, _decodeJSONString);
-                    } else {
-                        il.Emit(OpCodes.Call, _getStringBasedValue);
-                    }
-                } else
-                    il.Emit(OpCodes.Call, _getNonStringValue);
+                il.Emit(OpCodes.Ldarg_2);
+                if (type == _stringType) {
+                    il.Emit(OpCodes.Call, _decodeJSONString);
+                } else {
+                    il.Emit(OpCodes.Call, _getStringBasedValue);
+                }
+
                 il.Emit(OpCodes.Stloc, value);
 
-                GenerateChangeTypeFor(typeBuilder, type, il, value);
+                il.MarkLabel(isStringBasedLabel1);
+
+
+                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+
+                il.Emit(OpCodes.Call, _getNonStringValue);
+
+                il.Emit(OpCodes.Stloc, value);
+
+                il.MarkLabel(isStringBasedLabel2);
+
+                GenerateChangeTypeFor(typeBuilder, type, il, value, settings);
+                il.Emit(OpCodes.Ret);
             } else {
                 if (isObjectType) {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Call, GenerateExtractObject(typeBuilder));
                 } else if (!(type.IsListType() || type.IsArray)) {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, type));
                 }
                 else {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, type));
                 }
-            }
-
-            il.Emit(OpCodes.Ret);
+                il.Emit(OpCodes.Ret);
+            } 
 
             return method;
         }
@@ -3751,8 +4022,8 @@ OpCodes.Call,
 
         private static char[] _dateNegChars = new[] { '-' },
             _datePosChars = new[] { '+' };
-        public static DateTime FastStringToDate(string value) {
-            if (_dateFormat == NetJSONDateFormat.EpochTime) {
+        public static DateTime FastStringToDate(string value, NetJSONSettings settings) {
+            if (settings.DateFormat == NetJSONDateFormat.EpochTime) {
                 var unixTimeStamp = FastStringToLong(value);
                 var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
                 return date.AddTicks(unixTimeStamp).ToLocalTime();
@@ -3764,6 +4035,7 @@ OpCodes.Call,
             string offsetText = null;
             int tickMilliseconds = 0;
             bool noOffSetValue = false;
+            var timeZoneFormat = settings.TimeZoneFormat;
 
             if (value == "\\/Date(-62135596800)\\/")
                 return DateTime.MinValue;
@@ -3781,11 +4053,11 @@ OpCodes.Call,
                 dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
                 dt = dt.AddTicks(ticks);
 
-                if (_timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || _timeZoneFormat == NetJSONTimeZoneFormat.Utc)
+                if (timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || timeZoneFormat == NetJSONTimeZoneFormat.Utc)
                     dt = dt.ToLocalTime();
 
-                var kind = _timeZoneFormat == NetJSONTimeZoneFormat.Local ? DateTimeKind.Local :
-                    _timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
+                var kind = timeZoneFormat == NetJSONTimeZoneFormat.Local ? DateTimeKind.Local :
+                    timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
                     DateTimeKind.Unspecified;
 
                 dt = new DateTime(dt.Ticks, kind);
@@ -3799,9 +4071,9 @@ OpCodes.Call,
                 var firstChar = utcOffsetText[0];
                 negative = diff > 0 && firstChar == '-'; 
                 if (hasOffset) {
-                    noOffSetValue = _timeZoneFormat == NetJSONTimeZoneFormat.Utc || _timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
+                    noOffSetValue = timeZoneFormat == NetJSONTimeZoneFormat.Utc || timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
                     offsetText = utcOffsetText.Substring(1, utcOffsetText.Length - 1).Replace(":", string.Empty).Replace("Z", string.Empty);
-                    if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+                    if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
                         int indexOfSign = offsetText.IndexOf('-');
                         negative = indexOfSign >= 0;
                         if(!negative){
@@ -3818,10 +4090,10 @@ OpCodes.Call,
                     }
                 }
                 dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
-                if (_timeZoneFormat == NetJSONTimeZoneFormat.Local) {
+                if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
                     dt = dt.ToUniversalTime();
                     dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Local);
-                } else if (_timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
+                } else if (timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
                     dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Utc);
                 }
             }
@@ -3855,7 +4127,7 @@ OpCodes.Call,
             return Type.GetType(value, false);
         }
 
-        private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value, Type originalType = null) {
+        private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value, LocalBuilder settings, Type originalType = null) {
 
             var nullableType = type;
             type = nullableType.GetNullableType();
@@ -3911,9 +4183,10 @@ OpCodes.Call,
                 il.Emit(OpCodes.Call, _fastStringToDouble);
             else if (type == typeof(float))
                 il.Emit(OpCodes.Call, _fastStringToFloat);
-            else if (type == _dateTimeType)
+            else if (type == _dateTimeType) {
+                il.Emit(OpCodes.Ldloc, settings);
                 il.Emit(OpCodes.Call, _fastStringToDate);
-            else if (type == _charType)
+            } else if (type == _charType)
                 il.Emit(OpCodes.Call, _fastStringToChar);
             else if (type == _timeSpanType)
                 il.Emit(OpCodes.Call, _timeSpanParse);
@@ -3950,7 +4223,7 @@ OpCodes.Call,
             var methodName = String.Concat(SetStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                _voidType, new[] { _charPtrType, _intType.MakeByRefType(), isTypeValueType ? type.MakeByRefType() : type, _stringType });
+                _voidType, new[] { _charPtrType, _intType.MakeByRefType(), isTypeValueType ? type.MakeByRefType() : type, _stringType, _settingsType });
             _setValueMethodBuilders[key] = method;
 
             const bool Optimized = true;
@@ -4020,19 +4293,18 @@ OpCodes.Call,
 
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, attr != null ? (attr.Name ?? propName) : propName);
-                if (_caseSensitive)
-                    il.Emit(OpCodes.Call, _stringOpEquality);
-                else {
-                    il.Emit(OpCodes.Ldc_I4, (int)StringComparison.OrdinalIgnoreCase);
-                    il.Emit(OpCodes.Call, _stringEqualCompare);
-                }
+
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsCaseComparison);
+                il.Emit(OpCodes.Call, _stringEqualCompare);
+
                 il.Emit(OpCodes.Brfalse, conditionLabel);
 
 
                 if (!Optimized) {
-                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg, 4);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
                     if (isProp) {
                         if (prop.CanWrite)
@@ -4051,6 +4323,7 @@ OpCodes.Call,
 
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg, 4);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, originPropType));
 
                     il.Emit(OpCodes.Stloc, propValue);
@@ -4118,6 +4391,7 @@ OpCodes.Call,
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldarg, 4);
             il.Emit(OpCodes.Call, _skipProperty);
         }
 
@@ -4148,7 +4422,7 @@ OpCodes.Call,
             var methodName = String.Concat(CreateListStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _charPtrType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _createListMethodBuilders[key] = method;
 
             var il = method.GetILGenerator();
@@ -4161,10 +4435,12 @@ OpCodes.Call,
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || (nullableType == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || nullableType == _timeSpanType || isByteArray || (_useEnumString && nullableType.IsEnum);
+            var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
 
-
+            var isStringBasedLocal = il.DeclareLocal(_boolType);
+            
+            var settings = il.DeclareLocal(_settingsType);
             var obj = isCollectionType ? il.DeclareLocal(type) : il.DeclareLocal(typeof(List<>).MakeGenericType(elementType));
             var objArray = isArray ? il.DeclareLocal(elementType.MakeArrayType()) : null;
             var count = il.DeclareLocal(_intType);
@@ -4174,7 +4450,30 @@ OpCodes.Call,
             var addMethod = _genericCollectionType.MakeGenericType(elementType).GetMethod("Add");
 
             var prevLabel = il.DefineLabel();
-            
+
+            il.Emit(OpCodes.Ldc_I4, isStringBased ? 1 : 0);
+            il.Emit(OpCodes.Stloc, isStringBasedLocal);
+
+            if (nullableType.IsEnum) {
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+            }
+
+            if (nullableType == _dateTimeType) {
+                var dateCheckLabel = il.DefineLabel();
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsDateFormat);
+                il.Emit(OpCodes.Ldc_I4, (int)NetJSONDateFormat.EpochTime);
+                il.Emit(OpCodes.Ceq);
+                il.Emit(OpCodes.Brtrue, dateCheckLabel);
+                il.Emit(OpCodes.Ldc_I4_1);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+                il.MarkLabel(dateCheckLabel);
+            }
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Stloc, settings);
 
             il.Emit(OpCodes.Newobj, obj.LocalType.GetConstructor(Type.EmptyTypes));
             il.Emit(OpCodes.Stloc, obj);
@@ -4206,106 +4505,18 @@ OpCodes.Call,
                 il.MarkLabel(prevLabel);
 
                 if (isPrimitive) {
-                    if (isStringBased) {
-                        var text = il.DeclareLocal(_stringType);
+                    var isStringBasedLabel1 = il.DefineLabel();
+                    var isStringBasedLabel2 = il.DefineLabel();
 
+                    il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                    il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
+                    GenerateCreateListForStringBased(typeBuilder, il, elementType, isStringType, settings, obj, addMethod, current, ptr, bLabel);
+                    il.MarkLabel(isStringBasedLabel1);
 
-                        var blankNewLineLabel = il.DefineLabel();
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)' ');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)',');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)']');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\t');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldarg_1);
-                        if (isStringType) {
-                            il.Emit(OpCodes.Call, _decodeJSONString);
-                        } else {
-                            il.Emit(OpCodes.Call, _getStringBasedValue);
-                        }
-                        il.Emit(OpCodes.Stloc, text);
-
-                        il.Emit(OpCodes.Ldloc, obj);
-
-                        if (!isStringType)
-                            GenerateChangeTypeFor(typeBuilder, elementType, il, text);
-                        else
-                            il.Emit(OpCodes.Ldloc, text);
-
-                        il.Emit(OpCodes.Callvirt, addMethod);
-
-                        GenerateUpdateCurrent(il, current, ptr);
-
-                        var currentLabel = il.DefineLabel();
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)']');
-                        il.Emit(OpCodes.Bne_Un, currentLabel);
-                        //break
-                        il.Emit(OpCodes.Br, bLabel);
-                        il.MarkLabel(currentLabel);
-
-                        il.MarkLabel(blankNewLineLabel);
-                    } else {
-                        var text = il.DeclareLocal(_stringType);
-                        
-                        var blankNewLineLabel = il.DefineLabel();
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)' ');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)',');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)']');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\n');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\r');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldloc, current);
-                        il.Emit(OpCodes.Ldc_I4, (int)'\t');
-                        il.Emit(OpCodes.Beq, blankNewLineLabel);
-
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Call, _getNonStringValue);
-
-                        il.Emit(OpCodes.Stloc, text);
-
-                        il.Emit(OpCodes.Ldloc, obj);
-                        GenerateChangeTypeFor(typeBuilder, elementType, il, text);
-                        il.Emit(OpCodes.Callvirt, addMethod);
-
-                        il.MarkLabel(blankNewLineLabel);
-                    }
+                    il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                    il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
+                    GenerateCreateListForNonStringBased(typeBuilder, il, elementType, settings, obj, addMethod, current);
+                    il.MarkLabel(isStringBasedLabel2);
                 } else {
                     var currentBlank = il.DefineLabel();
                     var currentBlockEnd = il.DefineLabel();
@@ -4338,6 +4549,7 @@ OpCodes.Call,
                     il.Emit(OpCodes.Ldloc, obj);
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, elementType));
                     il.Emit(OpCodes.Callvirt, addMethod);
 
@@ -4384,31 +4596,134 @@ OpCodes.Call,
             return method;
         }
 
+        private static void GenerateCreateListForNonStringBased(TypeBuilder typeBuilder, ILGenerator il, Type elementType, LocalBuilder settings, LocalBuilder obj, MethodInfo addMethod, LocalBuilder current) {
+            var text = il.DeclareLocal(_stringType);
+
+            var blankNewLineLabel = il.DefineLabel();
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)' ');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)',');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)']');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\n');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\r');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\t');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Call, _getNonStringValue);
+
+            il.Emit(OpCodes.Stloc, text);
+
+            il.Emit(OpCodes.Ldloc, obj);
+            GenerateChangeTypeFor(typeBuilder, elementType, il, text, settings);
+            il.Emit(OpCodes.Callvirt, addMethod);
+
+            il.MarkLabel(blankNewLineLabel);
+        }
+
+        private static void GenerateCreateListForStringBased(TypeBuilder typeBuilder, ILGenerator il, Type elementType, bool isStringType, LocalBuilder settings, LocalBuilder obj, MethodInfo addMethod, LocalBuilder current, LocalBuilder ptr, Label bLabel) {
+            var text = il.DeclareLocal(_stringType);
+
+            var blankNewLineLabel = il.DefineLabel();
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)' ');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)',');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)']');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\n');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\r');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\t');
+            il.Emit(OpCodes.Beq, blankNewLineLabel);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldarg_2);
+            if (isStringType) {
+                il.Emit(OpCodes.Call, _decodeJSONString);
+            } else {
+                il.Emit(OpCodes.Call, _getStringBasedValue);
+            }
+            il.Emit(OpCodes.Stloc, text);
+
+            il.Emit(OpCodes.Ldloc, obj);
+
+            if (!isStringType)
+                GenerateChangeTypeFor(typeBuilder, elementType, il, text, settings);
+            else
+                il.Emit(OpCodes.Ldloc, text);
+
+            il.Emit(OpCodes.Callvirt, addMethod);
+
+            GenerateUpdateCurrent(il, current, ptr);
+
+            var currentLabel = il.DefineLabel();
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)']');
+            il.Emit(OpCodes.Bne_Un, currentLabel);
+            //break
+            il.Emit(OpCodes.Br, bLabel);
+            il.MarkLabel(currentLabel);
+
+            il.MarkLabel(blankNewLineLabel);
+        }
+
         public unsafe static string CreateString(string str, int startIndex, int length) {
             fixed (char* ptr = str)
                 return new string(ptr, startIndex, length);
         }
 
-        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key) {
+        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
             var inRange = false;
             var inRangeChr = *(ptr + index + offset + 2);
 
             var value = new String(ptr, index + 1, offset);
 
-            inRange = (*(ptr + index) == _threadQuoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
+            inRange = (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
 
             return inRange;
         }
 
-        public static bool IsCurrentAQuot(char current) {
-            if (_hasOverrideQuoteChar)
-                return current == _threadQuoteChar;
-            var quote = _threadQuoteChar;
+        public static bool IsCurrentAQuot(char current, NetJSONSettings settings) {
+            if (settings.HasOverrideQuoteChar)
+                return current == settings._quoteChar;
+            var quote = settings._quoteChar;
             var isQuote = current == QuotSingleChar || current == QuotDoubleChar;
             if (isQuote) {
                 if (quote != current)
-                    _ThreadQuoteChar = current;
-                _hasOverrideQuoteChar = true;
+                    settings._quoteCharString = (settings._quoteChar = current).ToString();
+                settings.HasOverrideQuoteChar = true;
             }
             return isQuote;
         }
@@ -4422,12 +4737,13 @@ OpCodes.Call,
             var methodName = String.Concat(CreateClassOrDictStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
-                type, new[] { _charPtrType, _intType.MakeByRefType() });
+                type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _readMethodBuilders[key] = method;
 
             
             var il = method.GetILGenerator();
 
+            var settings = il.DeclareLocal(_settingsType);
             var foundQuote = il.DeclareLocal(_boolType);
             var dict = il.DeclareLocal(_dictType);
             var prev = il.DeclareLocal(_charType);
@@ -4482,9 +4798,10 @@ OpCodes.Call,
             }
 
             var obj = il.DeclareLocal(type);
-            var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType || (_useEnumString && keyType.IsEnum);
+            var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType;
             var isTypeValueType = type.IsValueType;
             var tupleCountLocal = isTuple ? il.DeclareLocal(_intType) : null;
+            var isStringTypeLocal = il.DeclareLocal(_boolType);
 
             MethodInfo addMethod = null;
 
@@ -4504,6 +4821,16 @@ OpCodes.Call,
                 if (type.Name == IDictStr) {
                     type = _genericDictType.MakeGenericType(keyType, valueType);
                 }
+            }
+
+            il.Emit(OpCodes.Ldc_I4, isStringType ? 1 : 0);
+            il.Emit(OpCodes.Stloc, isStringTypeLocal);
+
+
+            if (keyType.IsEnum) {
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
+                il.Emit(OpCodes.Stloc, isStringTypeLocal);
             }
 
             if (tupleCountLocal != null) {
@@ -4531,6 +4858,9 @@ OpCodes.Call,
                 il.Emit(OpCodes.Isinst, _dictType);
                 il.Emit(OpCodes.Stloc, dict);
             }
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Stloc, settings);
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, count);
@@ -4664,320 +4994,19 @@ OpCodes.Call,
                 il.Emit(OpCodes.Ldloc, isTag);
                 il.Emit(OpCodes.Brtrue, isNotTagLabel);
 
-                if (isStringType) {
-
-                    var currentQuoteLabel = il.DefineLabel();
-                    var currentQuotePrevNotLabel = il.DefineLabel();
-                    var keyLocal = il.DeclareLocal(_stringType);
-
-                    var isCurrentLocal = il.DeclareLocal(_boolType);
-                    var hasOverrideLabel = il.DefineLabel();
-                    var hasOverrideLabel2 = il.DefineLabel();
-                    var notHasOverrideLabel = il.DefineLabel();
-
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Stloc, isCurrentLocal);
-
-                    il.Emit(OpCodes.Ldsfld, _hasOverrideQuoteField);
-                    il.Emit(OpCodes.Brfalse, hasOverrideLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
-                    il.Emit(OpCodes.Bne_Un, hasOverrideLabel2);
-
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Stloc, isCurrentLocal);
-
-                    il.MarkLabel(hasOverrideLabel2);
-
-                    il.MarkLabel(hasOverrideLabel);
-
-                    il.Emit(OpCodes.Ldsfld, _hasOverrideQuoteField);
-                    il.Emit(OpCodes.Brtrue, notHasOverrideLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
-                    il.Emit(OpCodes.Stloc, isCurrentLocal);
-
-                    il.MarkLabel(notHasOverrideLabel);
-
-                    il.Emit(OpCodes.Ldloc, isCurrentLocal);
-
-                    //if(current == _ThreadQuoteChar && quotes == 0)
-                    
-                    //il.Emit(OpCodes.Ldloc, current);
-                    //il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
-                    
-
-                    il.Emit(OpCodes.Brfalse, currentQuoteLabel);
-
-                    il.Emit(OpCodes.Ldloc, quotes);
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
-
-                    //foundQuote = true
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Stloc, foundQuote);
-
-                    //quotes++
-                    il.Emit(OpCodes.Ldloc, quotes);
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Add);
-                    il.Emit(OpCodes.Stloc, quotes);
-
-                    //startIndex = index + 1;
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldind_I4);
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Add);
-                    il.Emit(OpCodes.Stloc, startIndex);
-
-
-                    #region String Skipping Optimization
-                    if (!isDict && _useStringOptimization) {
-                        var typeProps = type.GetTypeProperties();
-
-                        var nextLabel = il.DefineLabel();
-
-                        foreach (var prop in typeProps) {
-                            var propName = prop.Member.Name;
-                            var attr = prop.Attribute;
-                            if (attr != null)
-                                propName = attr.Name ?? propName;
-                            var set = propName.Length;
-                            var checkCharByIndexLabel = il.DefineLabel();
-
-                            il.Emit(OpCodes.Ldloc, ptr);
-                            il.Emit(OpCodes.Ldarg_1);
-                            il.Emit(OpCodes.Ldc_I4, set);
-                            il.Emit(OpCodes.Ldstr, propName);
-                            il.Emit(OpCodes.Call, _isInRange);
-                            il.Emit(OpCodes.Brfalse, checkCharByIndexLabel);
-
-                            IncrementIndexRef(il, count: set - 1);
-                            il.Emit(OpCodes.Ldc_I4_1);
-                            il.Emit(OpCodes.Stloc, foundQuote);
-
-                            il.Emit(OpCodes.Br, nextLabel);
-
-                            il.MarkLabel(checkCharByIndexLabel);
-
-                        }
-
-                        il.MarkLabel(nextLabel);
-                    }
-                    #endregion String Skipping Optimization
-                    
-                    il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
-                    il.MarkLabel(currentQuoteLabel);
-                    //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
-                    il.Emit(OpCodes.Ldloc, current);
-                    //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
-                    il.Emit(OpCodes.Ldsfld, _threadQuoteCharField);
-
-                    il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
-                    il.Emit(OpCodes.Ldloc, quotes);
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Ble, currentQuotePrevNotLabel);
-                    il.Emit(OpCodes.Ldloc, prev);
-                    il.Emit(OpCodes.Ldc_I4, (int)'\\');
-                    il.Emit(OpCodes.Beq, currentQuotePrevNotLabel);
-
-                    //var key = new string(ptr, startIndex, index - startIndex)
-                    il.Emit(OpCodes.Ldloc, ptr);
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldind_I4);
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Sub);
-                    il.Emit(OpCodes.Newobj, _strCtorWithPtr);
-                    //il.Emit(OpCodes.Call, _createString);
-                    il.Emit(OpCodes.Stloc, keyLocal);
-
-                    //il.EmitWriteLine(String.Format("{0}", type));
-                    //il.EmitWriteLine(keyLocal);
-
-                    //index++
-                    IncrementIndexRef(il);
-
-                    if (isDict) {
-                        il.Emit(OpCodes.Ldloc, obj);
-                        if (isExpandoObject)
-                            il.Emit(OpCodes.Isinst, _idictStringObject);
-
-                        if (!keyType.IsStringBasedType())
-                            GenerateChangeTypeFor(typeBuilder, keyType, il, keyLocal);
-                        else
-                            il.Emit(OpCodes.Ldloc, keyLocal);
-                        
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-                        if (isKeyValuePair && !isExpandoObject) {
-                            il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
-                        } 
-                        il.Emit(OpCodes.Callvirt, dictSetItem);
-                    } else {
-                        if (!isTuple) {
-                            //Set property based on key
-                            if (_includeTypeInformation) {
-                                var typeIdentifierLabel = il.DefineLabel();
-                                var notTypeIdentifierLabel = il.DefineLabel();
-
-                                il.Emit(OpCodes.Ldloc, keyLocal);
-                                il.Emit(OpCodes.Ldstr, TypeIdentifier);
-                                il.Emit(OpCodes.Call, _stringOpEquality);
-                                il.Emit(OpCodes.Brfalse, typeIdentifierLabel);
-
-                                il.Emit(OpCodes.Ldarg_0);
-                                il.Emit(OpCodes.Ldarg_1);
-                                il.Emit(OpCodes.Call, _getStringBasedValue);
-                                il.Emit(OpCodes.Call, _getTypeIdentifierInstanceMethod);
-                                il.Emit(OpCodes.Isinst, type);
-                                il.Emit(OpCodes.Stloc, obj);
-
-                                il.Emit(OpCodes.Br, notTypeIdentifierLabel);
-                                il.MarkLabel(typeIdentifierLabel);
-
-                                il.Emit(OpCodes.Ldarg_0);
-                                il.Emit(OpCodes.Ldarg_1);
-                                il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
-                                il.Emit(OpCodes.Ldloc, keyLocal);
-                                il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
-
-                                il.MarkLabel(notTypeIdentifierLabel);
-                            } else {
-                                il.Emit(OpCodes.Ldarg_0);
-                                il.Emit(OpCodes.Ldarg_1);
-                                il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
-                                il.Emit(OpCodes.Ldloc, keyLocal);
-                                il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
-                            }
-                        } else {
-
-                            for (var i = 0; i < tupleCount; i++)
-                                GenerateTupleConvert(typeBuilder, i, il, tupleArguments, obj, tupleCountLocal);
-
-                            il.Emit(OpCodes.Ldloc, tupleCountLocal);
-                            il.Emit(OpCodes.Ldc_I4_1);
-                            il.Emit(OpCodes.Add);
-                            il.Emit(OpCodes.Stloc, tupleCountLocal);
-                        }
-                    }
-
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Stloc, quotes);
-
-                    il.Emit(OpCodes.Br, startLoop);
-
-                    il.MarkLabel(currentQuotePrevNotLabel);
-
-                } else {
-
-                    var isEndOfChar = il.DeclareLocal(_boolType);
-                    var text = il.DeclareLocal(_stringType);
-                    var keyLocal = il.DeclareLocal(keyType);
-                    var startIndexIsEndCharLabel = il.DefineLabel();
-                    var startIndexGreaterIsEndOfCharLabel = il.DefineLabel();
-
-
-                    var currentEndCharLabel = il.DefineLabel();
-                    var currentEndCharLabel2 = il.DefineLabel();
-
-                    //current == ':' || current == '{' || current == ' ';
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)':');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)',');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'\n');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'\r');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'\t');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)'{');
-                    il.Emit(OpCodes.Beq, currentEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, current);
-                    il.Emit(OpCodes.Ldc_I4, (int)' ');
-                    il.Emit(OpCodes.Ceq);
-                    il.Emit(OpCodes.Br, currentEndCharLabel2);
-
-                    il.MarkLabel(currentEndCharLabel);
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.MarkLabel(currentEndCharLabel2);
-
-                    il.Emit(OpCodes.Stloc, isEndOfChar);
-
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Bne_Un, startIndexIsEndCharLabel);
-                    il.Emit(OpCodes.Ldloc, isEndOfChar);
-                    il.Emit(OpCodes.Brtrue, startIndexIsEndCharLabel);
-
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldind_I4);
-                    il.Emit(OpCodes.Stloc, startIndex);
-
-                    il.MarkLabel(startIndexIsEndCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Ble, startIndexGreaterIsEndOfCharLabel);
-                    il.Emit(OpCodes.Ldloc, isEndOfChar);
-                    il.Emit(OpCodes.Brfalse, startIndexGreaterIsEndOfCharLabel);
-
-                    il.Emit(OpCodes.Ldloc, ptr);
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldind_I4);
-                    il.Emit(OpCodes.Ldloc, startIndex);
-                    il.Emit(OpCodes.Sub);
-                    il.Emit(OpCodes.Newobj, _strCtorWithPtr);
-                    
-                    
-                    il.Emit(OpCodes.Stloc, text);
-
-                    GenerateChangeTypeFor(typeBuilder, keyType, il, text);
-                    
-                    il.Emit(OpCodes.Stloc, keyLocal);
-
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Stloc, startIndex);
-
-                    IncrementIndexRef(il);
-
-                    il.Emit(OpCodes.Ldloc, obj);
-                    if (isExpandoObject)
-                        il.Emit(OpCodes.Isinst, _idictStringObject);
-                    il.Emit(OpCodes.Ldloc, keyLocal);
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-
-                    if (isKeyValuePair && !isExpandoObject) {
-                        il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new []{keyType, valueType}));
-                        il.Emit(OpCodes.Callvirt, dictSetItem);
-                    } else {
-                        il.Emit(OpCodes.Callvirt, dictSetItem);
-                    }
-                    
-                    GenerateUpdateCurrent(il, current, ptr);
-
-                    
-                    il.MarkLabel(startIndexGreaterIsEndOfCharLabel);
+                var isStringTypeLabel1 = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, isStringTypeLocal);
+                il.Emit(OpCodes.Brfalse, isStringTypeLabel1);
+                GenerateGetClassOrDictStringType(typeBuilder, type, il, settings, foundQuote, prev, startIndex, quotes, isDict, keyType, valueType, isKeyValuePair, isExpandoObject, isTuple, tupleArguments, tupleCount, obj, isTypeValueType, tupleCountLocal, dictSetItem, current, ptr, startLoop);
+                il.MarkLabel(isStringTypeLabel1);
+
+                if (dictSetItem != null) {
+                    var isStringTypeLabel2 = il.DefineLabel();
+                    il.Emit(OpCodes.Ldloc, isStringTypeLocal);
+                    il.Emit(OpCodes.Brtrue, isStringTypeLabel2);
+                    GenerateGetClassOrDictNonStringType(typeBuilder, il, settings, startIndex, keyType, valueType, isKeyValuePair, isExpandoObject, obj, dictSetItem, current, ptr);
+                    il.MarkLabel(isStringTypeLabel2);
                 }
 
                 il.MarkLabel(isNotTagLabel);
@@ -5011,7 +5040,397 @@ OpCodes.Call,
             return method;
         }
 
-        private static void GenerateTupleConvert(TypeBuilder typeBuilder, int tupleIndex, ILGenerator il, Type[] tupleArguments, LocalBuilder obj, LocalBuilder tupleCountLocal) {
+        private static void GenerateGetClassOrDictNonStringType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder settings, LocalBuilder startIndex, Type keyType, Type valueType, bool isKeyValuePair, bool isExpandoObject, LocalBuilder obj, MethodInfo dictSetItem, LocalBuilder current, LocalBuilder ptr) {
+            var isEndOfChar = il.DeclareLocal(_boolType);
+            var text = il.DeclareLocal(_stringType);
+            var keyLocal = il.DeclareLocal(keyType);
+            var startIndexIsEndCharLabel = il.DefineLabel();
+            var startIndexGreaterIsEndOfCharLabel = il.DefineLabel();
+
+
+            var currentEndCharLabel = il.DefineLabel();
+            var currentEndCharLabel2 = il.DefineLabel();
+
+            //current == ':' || current == '{' || current == ' ';
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)':');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)',');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\n');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\r');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'\t');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)'{');
+            il.Emit(OpCodes.Beq, currentEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldc_I4, (int)' ');
+            il.Emit(OpCodes.Ceq);
+            il.Emit(OpCodes.Br, currentEndCharLabel2);
+
+            il.MarkLabel(currentEndCharLabel);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.MarkLabel(currentEndCharLabel2);
+
+            il.Emit(OpCodes.Stloc, isEndOfChar);
+
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Bne_Un, startIndexIsEndCharLabel);
+            il.Emit(OpCodes.Ldloc, isEndOfChar);
+            il.Emit(OpCodes.Brtrue, startIndexIsEndCharLabel);
+
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldind_I4);
+            il.Emit(OpCodes.Stloc, startIndex);
+
+            il.MarkLabel(startIndexIsEndCharLabel);
+
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ble, startIndexGreaterIsEndOfCharLabel);
+            il.Emit(OpCodes.Ldloc, isEndOfChar);
+            il.Emit(OpCodes.Brfalse, startIndexGreaterIsEndOfCharLabel);
+
+            il.Emit(OpCodes.Ldloc, ptr);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldind_I4);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Sub);
+            il.Emit(OpCodes.Newobj, _strCtorWithPtr);
+
+
+            il.Emit(OpCodes.Stloc, text);
+
+            GenerateChangeTypeFor(typeBuilder, keyType, il, text, settings);
+
+            il.Emit(OpCodes.Stloc, keyLocal);
+
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Stloc, startIndex);
+
+            IncrementIndexRef(il);
+
+            il.Emit(OpCodes.Ldloc, obj);
+            if (isExpandoObject)
+                il.Emit(OpCodes.Isinst, _idictStringObject);
+            il.Emit(OpCodes.Ldloc, keyLocal);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
+
+            if (isKeyValuePair && !isExpandoObject) {
+                il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
+                il.Emit(OpCodes.Callvirt, dictSetItem);
+            } else {
+                il.Emit(OpCodes.Callvirt, dictSetItem);
+            }
+
+            GenerateUpdateCurrent(il, current, ptr);
+
+
+            il.MarkLabel(startIndexGreaterIsEndOfCharLabel);
+        }
+
+        private static void GenerateGetClassOrDictStringType(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder settings, LocalBuilder foundQuote, LocalBuilder prev, LocalBuilder startIndex, LocalBuilder quotes, bool isDict, Type keyType, Type valueType, bool isKeyValuePair, bool isExpandoObject, bool isTuple, Type[] tupleArguments, int tupleCount, LocalBuilder obj, bool isTypeValueType, LocalBuilder tupleCountLocal, MethodInfo dictSetItem, LocalBuilder current, LocalBuilder ptr, Label startLoop) {
+            var currentQuoteLabel = il.DefineLabel();
+            var currentQuotePrevNotLabel = il.DefineLabel();
+            var keyLocal = il.DeclareLocal(_stringType);
+
+            var isCurrentLocal = il.DeclareLocal(_boolType);
+            var hasOverrideLabel = il.DefineLabel();
+            var hasOverrideLabel2 = il.DefineLabel();
+            var notHasOverrideLabel = il.DefineLabel();
+
+            var isStringBasedLocal = il.DeclareLocal(_boolType);
+
+            il.Emit(OpCodes.Ldc_I4, keyType.IsStringBasedType() ? 1 : 0);
+            il.Emit(OpCodes.Stloc, isStringBasedLocal);
+
+            if (keyType.IsEnum) {
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+            }
+
+            if (keyType == _dateTimeType) {
+                var dateCheckLabel = il.DefineLabel();
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Callvirt, _settingsDateFormat);
+                il.Emit(OpCodes.Ldc_I4, (int)NetJSONDateFormat.EpochTime);
+                il.Emit(OpCodes.Ceq);
+                il.Emit(OpCodes.Brtrue, dateCheckLabel);
+                il.Emit(OpCodes.Ldc_I4_1);
+                il.Emit(OpCodes.Stloc, isStringBasedLocal);
+                il.MarkLabel(dateCheckLabel);
+            }
+
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Callvirt, _settingsHasOverrideQuoteChar);
+            il.Emit(OpCodes.Brfalse, hasOverrideLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Ldfld, _settingQuoteChar);
+            il.Emit(OpCodes.Bne_Un, hasOverrideLabel2);
+
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+            il.MarkLabel(hasOverrideLabel2);
+
+            il.MarkLabel(hasOverrideLabel);
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Callvirt, _settingsHasOverrideQuoteChar);
+            il.Emit(OpCodes.Brtrue, notHasOverrideLabel);
+
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
+            il.Emit(OpCodes.Stloc, isCurrentLocal);
+
+            il.MarkLabel(notHasOverrideLabel);
+
+            il.Emit(OpCodes.Ldloc, isCurrentLocal);
+
+            //if(current == _ThreadQuoteChar && quotes == 0)
+
+            //il.Emit(OpCodes.Ldloc, current);
+            //il.Emit(OpCodes.Call, _IsCurrentAQuotMethod);
+
+
+            il.Emit(OpCodes.Brfalse, currentQuoteLabel);
+
+            il.Emit(OpCodes.Ldloc, quotes);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
+
+            //foundQuote = true
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Stloc, foundQuote);
+
+            //quotes++
+            il.Emit(OpCodes.Ldloc, quotes);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Add);
+            il.Emit(OpCodes.Stloc, quotes);
+
+            //startIndex = index + 1;
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldind_I4);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Add);
+            il.Emit(OpCodes.Stloc, startIndex);
+
+
+            #region String Skipping Optimization
+            var skipOptimizeLabel = il.DefineLabel();
+            var skipOptimizeLocal = il.DeclareLocal(_boolType);
+
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Callvirt, _settingsUseStringOptimization);
+            il.Emit(OpCodes.Brfalse, skipOptimizeLabel);
+
+            if (!isDict) {
+                var typeProps = type.GetTypeProperties();
+
+                var nextLabel = il.DefineLabel();
+
+                foreach (var prop in typeProps) {
+                    var propName = prop.Member.Name;
+                    var attr = prop.Attribute;
+                    if (attr != null)
+                        propName = attr.Name ?? propName;
+                    var set = propName.Length;
+                    var checkCharByIndexLabel = il.DefineLabel();
+
+                    il.Emit(OpCodes.Ldloc, ptr);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldc_I4, set);
+                    il.Emit(OpCodes.Ldstr, propName);
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Call, _isInRange);
+                    il.Emit(OpCodes.Brfalse, checkCharByIndexLabel);
+
+                    IncrementIndexRef(il, count: set - 1);
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Stloc, foundQuote);
+
+                    il.Emit(OpCodes.Br, nextLabel);
+
+                    il.MarkLabel(checkCharByIndexLabel);
+
+                }
+
+                il.MarkLabel(nextLabel);
+            }
+
+            il.MarkLabel(skipOptimizeLabel);
+            #endregion String Skipping Optimization
+
+            il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
+            il.MarkLabel(currentQuoteLabel);
+            //else if(current == _ThreadQuoteChar && quotes > 0 && prev != '\\')
+            il.Emit(OpCodes.Ldloc, current);
+            //il.Emit(OpCodes.Ldc_I4, (int)_ThreadQuoteChar);
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Ldfld, _settingQuoteChar);
+
+            il.Emit(OpCodes.Bne_Un, currentQuotePrevNotLabel);
+            il.Emit(OpCodes.Ldloc, quotes);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ble, currentQuotePrevNotLabel);
+            il.Emit(OpCodes.Ldloc, prev);
+            il.Emit(OpCodes.Ldc_I4, (int)'\\');
+            il.Emit(OpCodes.Beq, currentQuotePrevNotLabel);
+
+            //var key = new string(ptr, startIndex, index - startIndex)
+            il.Emit(OpCodes.Ldloc, ptr);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldind_I4);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Sub);
+            il.Emit(OpCodes.Newobj, _strCtorWithPtr);
+            //il.Emit(OpCodes.Call, _createString);
+            il.Emit(OpCodes.Stloc, keyLocal);
+
+            //il.EmitWriteLine(String.Format("{0}", type));
+            //il.EmitWriteLine(keyLocal);
+
+            //index++
+            IncrementIndexRef(il);
+
+            if (isDict) {
+
+
+                var isStringBasedLabel1 = il.DefineLabel();
+                var isStringBasedLabel2 = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
+
+                #region true
+                il.Emit(OpCodes.Ldloc, obj);
+                if (isExpandoObject)
+                    il.Emit(OpCodes.Isinst, _idictStringObject);
+
+                GenerateChangeTypeFor(typeBuilder, keyType, il, keyLocal, settings);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
+                if (isKeyValuePair && !isExpandoObject) {
+                    il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
+                }
+                il.Emit(OpCodes.Callvirt, dictSetItem);
+                #endregion
+
+                il.MarkLabel(isStringBasedLabel1);
+
+
+                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
+                il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
+
+                #region false
+                il.Emit(OpCodes.Ldloc, obj);
+                if (isExpandoObject)
+                    il.Emit(OpCodes.Isinst, _idictStringObject);
+
+                il.Emit(OpCodes.Ldloc, keyLocal);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
+                if (isKeyValuePair && !isExpandoObject) {
+                    il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
+                }
+                il.Emit(OpCodes.Callvirt, dictSetItem);
+                #endregion
+
+                il.MarkLabel(isStringBasedLabel2);
+            } else {
+                if (!isTuple) {
+                    //Set property based on key
+                    if (_includeTypeInformation) {
+                        var typeIdentifierLabel = il.DefineLabel();
+                        var notTypeIdentifierLabel = il.DefineLabel();
+
+                        il.Emit(OpCodes.Ldloc, keyLocal);
+                        il.Emit(OpCodes.Ldstr, TypeIdentifier);
+                        il.Emit(OpCodes.Call, _stringOpEquality);
+                        il.Emit(OpCodes.Brfalse, typeIdentifierLabel);
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Call, _getStringBasedValue);
+                        il.Emit(OpCodes.Call, _getTypeIdentifierInstanceMethod);
+                        il.Emit(OpCodes.Isinst, type);
+                        il.Emit(OpCodes.Stloc, obj);
+
+                        il.Emit(OpCodes.Br, notTypeIdentifierLabel);
+                        il.MarkLabel(typeIdentifierLabel);
+
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                        il.Emit(OpCodes.Ldloc, keyLocal);
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+
+                        il.MarkLabel(notTypeIdentifierLabel);
+                    } else {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                        il.Emit(OpCodes.Ldloc, keyLocal);
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Call, GenerateSetValueFor(typeBuilder, type));
+                    }
+                } else {
+
+                    for (var i = 0; i < tupleCount; i++)
+                        GenerateTupleConvert(typeBuilder, i, il, tupleArguments, obj, tupleCountLocal, settings);
+
+                    il.Emit(OpCodes.Ldloc, tupleCountLocal);
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Add);
+                    il.Emit(OpCodes.Stloc, tupleCountLocal);
+                }
+            }
+
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Stloc, quotes);
+
+            il.Emit(OpCodes.Br, startLoop);
+
+            il.MarkLabel(currentQuotePrevNotLabel);
+        }
+
+        private static void GenerateTupleConvert(TypeBuilder typeBuilder, int tupleIndex, ILGenerator il, Type[] tupleArguments, LocalBuilder obj, LocalBuilder tupleCountLocal, LocalBuilder settings) {
             var compareTupleIndexLabel = il.DefineLabel();
             var tupleItemType = tupleArguments[tupleIndex];
             
@@ -5023,6 +5442,7 @@ OpCodes.Call,
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldloc, settings);
             il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, tupleItemType));
             if (tupleItemType.IsValueType)
                 il.Emit(OpCodes.Box, tupleItemType);
@@ -5060,18 +5480,18 @@ OpCodes.Call,
         }
 
 
-        public unsafe static string GetStringBasedValue(char* ptr, ref int index) {
+        public unsafe static string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
             char current = '\0', prev = '\0';
             int count = 0, startIndex = 0;
             string value = string.Empty;
-            var currentQuote = _threadQuoteChar;
+            var currentQuote = settings._quoteChar;
 
             while (true) {
                 current = ptr[index];
-                if (count == 0 && current == currentQuote) {
+                if (count == 0 && IsCurrentAQuot(current, settings)) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && current == currentQuote && prev != '\\') {
+                } else if (count > 0 && IsCurrentAQuot(current, settings) && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
@@ -5124,7 +5544,7 @@ OpCodes.Call,
         public static bool IsStringBasedType(this Type type) {
             var nullableType = type.GetNullableType() ?? type;
             type = nullableType;
-            return type == _stringType || type == _typeType || (type == _dateTimeType && _dateFormat != NetJSONDateFormat.EpochTime) || type == _timeSpanType || type == _byteArrayType || type == _guidType || (_useEnumString && type.IsEnum);
+            return type == _stringType || type == _typeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
         }
     }
 }

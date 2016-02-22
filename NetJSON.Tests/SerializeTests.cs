@@ -37,7 +37,6 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestAutoDetectQuotes() {
-
             var dict = new Dictionary<string, string>();
             dict["Test"] = "Test2";
             dict["Test2"] = "Test3";
@@ -50,6 +49,7 @@ namespace NetJSON.Tests {
             var str = "Test";
 
             NetJSON.QuoteType = NetJSONQuote.Single;
+
             var json = NetJSON.Serialize(dict);
             var jsonList = NetJSON.Serialize(list);
             var jsonStr = NetJSON.Serialize(str);
@@ -390,8 +390,36 @@ namespace NetJSON.Tests {
             var obj = NetJSON.Deserialize<object>(value);
         }
 
+        public struct StructWithFields {
+            public int x;
+            public int y;
+        }
+
+        public struct StructWithProperties {
+            public int x { get; set; }
+            public int y { get; set; }
+        }
+
         [TestMethod]
-        public void TestSerializePrimitveTypes() {
+        public void TestStructWithProperties() {
+            var data = new StructWithProperties { x = 10, y = 2 };
+            var json = NetJSON.Serialize(data);
+            var data2 = NetJSON.Deserialize<StructWithProperties>(json);
+            Assert.AreEqual(data.x, data.x);
+            Assert.AreEqual(data.y, data.y);
+        }
+
+        [TestMethod]
+        public void TestStructWithFields() {
+            var data = new StructWithFields { x = 10, y = 2 };
+            var json = NetJSON.Serialize(data);
+            var data2 = NetJSON.Deserialize<StructWithFields>(json);
+            Assert.AreEqual(data.x, data.x);
+            Assert.AreEqual(data.y, data.y);
+        }
+
+        [TestMethod]
+        public void TestSerializePrimitiveTypes() {
             var x = 10;
             var s = "Hello World";
             var d = DateTime.Now;
@@ -462,8 +490,8 @@ namespace NetJSON.Tests {
             var nodeA = jgraph.nodes[0] as NodeA;
             var nodeB = jgraph.nodes[1] as NodeB;
 
-            Assert.IsTrue(nodeA != null && nodeA.number == 10);
-            Assert.IsTrue(nodeB != null && nodeB.text == "hello");
+            Assert.IsTrue(nodeA != null && nodeA.number == 10, json);
+            Assert.IsTrue(nodeB != null && nodeB.text == "hello", json);
         }
 
         //[TestMethod]
@@ -564,7 +592,7 @@ namespace NetJSON.Tests {
     }
 
     public class NodeB : Node {
-        public string text;
+        public string text { get; set; }
     }
 
     public enum ExceptionType {
