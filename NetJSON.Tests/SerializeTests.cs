@@ -477,6 +477,17 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void SerializeDateTimeOffSet() {
+            var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
+            var dateTimeOffset = DateTimeOffset.FromFileTime(DateTime.Now.ToFileTime());
+            var json = NetJSON.Serialize(dateTimeOffset, settings);
+
+            var dateTimeOffset2 = NetJSON.Deserialize<DateTimeOffset>(json, settings);
+
+            Assert.AreEqual(dateTimeOffset, dateTimeOffset2);
+        }
+
+        [TestMethod]
         public void SerializePolyObjects() {
             NetJSON.IncludeTypeInformation = true;
 
@@ -484,7 +495,7 @@ namespace NetJSON.Tests {
             graph.nodes = new List<Node>();
             graph.nodes.Add(new NodeA { number = 10f });
             graph.nodes.Add(new NodeB { text = "hello" });
-            var json = NetJSON.Serialize(graph);
+            var json = NetJSON.Serialize(graph, new NetJSONSettings { IncludeTypeInformation = true });
             var jgraph = NetJSON.Deserialize<Graph>(json);
 
             var nodeA = jgraph.nodes[0] as NodeA;

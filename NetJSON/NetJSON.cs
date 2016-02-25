@@ -406,6 +406,7 @@ namespace NetJSON {
 
 
         static readonly Type _dateTimeType = typeof(DateTime),
+            _dateTimeOffsetType = typeof(DateTimeOffset),
             _enumType = typeof(Enum),
             _stringType = typeof(String),
             _byteArrayType = typeof(byte[]),
@@ -485,6 +486,7 @@ namespace NetJSON {
             _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
             _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
             _generatorDateToString = _jsonType.GetMethod("AllDateToString", MethodBinding),
+            _generatorDateOffsetToString = _jsonType.GetMethod("AllDateOffsetToString", MethodBinding),
             _generatorSByteToStr = _jsonType.GetMethod("SByteToStr", MethodBinding),
             _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
             _byteArrayToStr = _jsonType.GetMethod("ByteArrayToStr", MethodBinding),
@@ -507,6 +509,7 @@ namespace NetJSON {
             _fastStringToDecimal = _jsonType.GetMethod("FastStringToDecimal", MethodBinding),
             _fastStringToFloat = _jsonType.GetMethod("FastStringToFloat", MethodBinding),
             _fastStringToDate = _jsonType.GetMethod("FastStringToDate", MethodBinding),
+            _fastStringToDateTimeoffset = _jsonType.GetMethod("FastStringToDateTimeoffset", MethodBinding),
             _fastStringToChar = _jsonType.GetMethod("FastStringToChar", MethodBinding),
             _fastStringToDouble = _jsonType.GetMethod("FastStringToDouble", MethodBinding),
             _fastStringToBool = _jsonType.GetMethod("FastStringToBool", MethodBinding),
@@ -883,6 +886,7 @@ namespace NetJSON {
 
                 return key == _stringType ||
                     key.IsPrimitive || key == _dateTimeType ||
+                    key == _dateTimeOffsetType ||
                     key == _decimalType || key == _timeSpanType ||
                     key == _guidType || key == _charType ||
                     key == _typeType ||
@@ -1151,6 +1155,10 @@ namespace NetJSON {
                 DateToISOFormat(date, settings);
         }
 
+        public static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
+            return AllDateToString(offset.DateTime, settings);
+        }
+
         private static string DateToString(DateTime date, NetJSONSettings settings) {
             var timeZoneFormat = settings.TimeZoneFormat;
             if (date == DateTime.MinValue)
@@ -1186,7 +1194,7 @@ namespace NetJSON {
         }
 
         public static bool NeedQuotes(Type type, NetJSONSettings settings) {
-            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || (type == _dateTimeType && settings.DateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (settings.UseEnumString && type.IsEnum);
+            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || ((type == _dateTimeType || type == _dateTimeOffsetType) && settings.DateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (settings.UseEnumString && type.IsEnum);
         }
 
         public static bool CustomTypeEquality(Type type1, Type type2) {
@@ -1274,6 +1282,7 @@ namespace NetJSON {
                 il.MarkLabel(needQuoteStartLabel);
 
                 _defaultSerializerTypes[_dateTimeType] = _generatorDateToString;
+                _defaultSerializerTypes[_dateTimeOffsetType] = _generatorDateOffsetToString;
 
                 var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
                 
@@ -1342,7 +1351,7 @@ namespace NetJSON {
                         if (objType.IsValueType)
                             il.Emit(OpCodes.Unbox_Any, objType);
                         else il.Emit(OpCodes.Castclass, objType);
-                        if (objType == _dateTimeType)
+                        if (objType == _dateTimeType || objType == _dateTimeOffsetType)
                             il.Emit(OpCodes.Ldarg_2);
                         il.Emit(OpCodes.Call, kv.Value);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
@@ -2291,7 +2300,7 @@ OpCodes.Callvirt,
                     } else il.Emit(OpCodes.Pop);
                 } else {
 
-                    if (type == _dateTimeType) {
+                    if (type == _dateTimeType || type == _dateTimeOffsetType) {
 
                         var needDateQuoteLocal = il.DeclareLocal(_boolType);
                         var needDateCheck = il.DefineLabel();
@@ -2338,7 +2347,7 @@ OpCodes.Callvirt,
                         //il.Emit(OpCodes.Box, _dateTimeType);
                         //il.Emit(OpCodes.Call, _stringFormat);
                         il.Emit(OpCodes.Ldarg_2);
-                        il.Emit(OpCodes.Call, _generatorDateToString);
+                        il.Emit(OpCodes.Call, type == _dateTimeType ? _generatorDateToString : _generatorDateOffsetToString);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
 
@@ -3178,6 +3187,8 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldc_R4, 0f);
             else if (type == _dateTimeType)
                 il.Emit(OpCodes.Ldsfld, _dateTimeType.GetField("MinValue"));
+            else if (type == _dateTimeOffsetType)
+                il.Emit(OpCodes.Ldsfld, _dateTimeOffsetType.GetField("MinValue"));
             else if (type == _timeSpanType)
                 il.Emit(OpCodes.Ldsfld, _timeSpanType.GetField("MinValue"));
             else if (type == _boolType)
@@ -3912,7 +3923,7 @@ OpCodes.Callvirt,
             var value = il.DeclareLocal(_stringType);
 
             var settings = il.DeclareLocal(_settingsType);
-           
+            var nullableType = type.GetNullableType() ?? type;
 
             il.Emit(OpCodes.Ldarg_2);
             il.Emit(OpCodes.Stloc, settings);
@@ -3928,7 +3939,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
             }
 
-            if ((type.GetNullableType() ?? type) == _dateTimeType) {
+            if (nullableType == _dateTimeType || nullableType == _dateTimeOffsetType) {
                 var dateCheckLabel = il.DefineLabel();
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsDateFormat);
@@ -4018,6 +4029,10 @@ OpCodes.Callvirt,
 
         public static char FastStringToChar(string value) {
             return value[0];
+        }
+
+        public static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
+            return DateTimeOffset.FromFileTime(FastStringToDate(value, settings).ToFileTime());
         }
 
         private static char[] _dateNegChars = new[] { '-' },
@@ -4186,7 +4201,11 @@ OpCodes.Callvirt,
             else if (type == _dateTimeType) {
                 il.Emit(OpCodes.Ldloc, settings);
                 il.Emit(OpCodes.Call, _fastStringToDate);
-            } else if (type == _charType)
+            } else if (type == _dateTimeOffsetType) {
+                il.Emit(OpCodes.Ldloc, settings);
+                il.Emit(OpCodes.Call, _fastStringToDateTimeoffset);
+            } 
+            else if (type == _charType)
                 il.Emit(OpCodes.Call, _fastStringToChar);
             else if (type == _timeSpanType)
                 il.Emit(OpCodes.Call, _timeSpanParse);
@@ -4460,7 +4479,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
             }
 
-            if (nullableType == _dateTimeType) {
+            if (nullableType == _dateTimeType || nullableType == _dateTimeOffsetType) {
                 var dateCheckLabel = il.DefineLabel();
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsDateFormat);
@@ -5169,7 +5188,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
             }
 
-            if (keyType == _dateTimeType) {
+            if (keyType == _dateTimeType || keyType == _dateTimeOffsetType) {
                 var dateCheckLabel = il.DefineLabel();
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsDateFormat);
