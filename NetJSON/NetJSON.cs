@@ -1113,7 +1113,7 @@ namespace NetJSON {
         [ThreadStatic]
         private static StringBuilder _cachedDateStringBuilder;
 
-        private static string DateToISOFormat(DateTime date, NetJSONSettings settings) {
+        private static string DateToISOFormat(DateTime date, NetJSONSettings settings, TimeSpan offset) {
             var timeZoneFormat = settings.TimeZoneFormat;
             var minute = date.Minute;
             var hour = date.Hour;
@@ -1136,7 +1136,7 @@ namespace NetJSON {
             if (timeZoneFormat == NetJSONTimeZoneFormat.Utc)
                 value.Append('Z');
             else if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
-                var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+                //var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
                 var hours = Math.Abs(offset.Hours);
                 var minutes = Math.Abs(offset.Minutes);
                 value.Append(offset.Ticks >= 0 ? '+' : '-').Append(hours < 10 ? "0" : string.Empty).Append(IntToStr(hours)).Append(minutes < 10 ? "0" : string.Empty).Append(IntToStr(minutes));
@@ -1150,22 +1150,27 @@ namespace NetJSON {
 
 
         public static string AllDateToString(DateTime date, NetJSONSettings settings) {
-            return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings) :
+            var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+            return DateToStringWithOffset(date, settings, offset);
+        }
+
+        private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
+            return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
                 settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
-                DateToISOFormat(date, settings);
+                DateToISOFormat(date, settings, offset);
         }
 
         public static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
-            return AllDateToString(offset.DateTime, settings);
+            return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
         }
 
-        private static string DateToString(DateTime date, NetJSONSettings settings) {
+        private static string DateToString(DateTime date, NetJSONSettings settings, TimeSpan offset) {
             var timeZoneFormat = settings.TimeZoneFormat;
             if (date == DateTime.MinValue)
                 return "\\/Date(-62135596800)\\/";
             else if (date == DateTime.MaxValue)
                 return "\\/Date(253402300800)\\/";
-            var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+            //var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
             var hours = Math.Abs(offset.Hours);
             var minutes = Math.Abs(offset.Minutes);
             var offsetText = timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
@@ -4032,7 +4037,8 @@ OpCodes.Callvirt,
         }
 
         public static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
-            return DateTimeOffset.FromFileTime(FastStringToDate(value, settings).ToFileTime());
+            var date = FastStringToDate(value, settings);
+            return new DateTimeOffset(date);
         }
 
         private static char[] _dateNegChars = new[] { '-' },

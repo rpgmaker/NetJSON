@@ -479,7 +479,21 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void SerializeDateTimeOffSet() {
             var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
-            var dateTimeOffset = DateTimeOffset.FromFileTime(DateTime.Now.ToFileTime());
+            var dateTimeOffset = new DateTimeOffset(DateTime.Now);
+            var json = NetJSON.Serialize(dateTimeOffset, settings);
+
+            var dateTimeOffset2 = NetJSON.Deserialize<DateTimeOffset>(json, settings);
+
+            Assert.AreEqual(dateTimeOffset, dateTimeOffset2);
+        }
+
+        [TestMethod]
+        public void SerializeDateTimeOffSetWithDifferentOffset() {
+            var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
+
+            var tst = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
+            var dateTimeOffset = TimeZoneInfo.ConvertTime(DateTime.Now, tst);
+
             var json = NetJSON.Serialize(dateTimeOffset, settings);
 
             var dateTimeOffset2 = NetJSON.Deserialize<DateTimeOffset>(json, settings);
