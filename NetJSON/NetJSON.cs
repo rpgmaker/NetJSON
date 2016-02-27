@@ -4037,13 +4037,20 @@ OpCodes.Callvirt,
         }
 
         public static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
-            var date = FastStringToDate(value, settings);
-            return new DateTimeOffset(date);
+            TimeSpan offset;
+            var date = StringToDate(value, settings, out offset, isDateTimeOffset: true);
+            return new DateTimeOffset(date.Ticks, offset);
         }
 
         private static char[] _dateNegChars = new[] { '-' },
             _datePosChars = new[] { '+' };
         public static DateTime FastStringToDate(string value, NetJSONSettings settings) {
+            TimeSpan offset;
+            return StringToDate(value, settings, out offset, isDateTimeOffset: false);
+        }
+
+        private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
+            offset = TimeSpan.Zero;
             if (settings.DateFormat == NetJSONDateFormat.EpochTime) {
                 var unixTimeStamp = FastStringToLong(value);
                 var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
@@ -4090,14 +4097,14 @@ OpCodes.Callvirt,
                 var hasOffset = diff > 0;
                 var utcOffsetText = hasOffset ? value.Substring(dateText.Length, diff) : string.Empty;
                 var firstChar = utcOffsetText[0];
-                negative = diff > 0 && firstChar == '-'; 
+                negative = diff > 0 && firstChar == '-';
                 if (hasOffset) {
                     noOffSetValue = timeZoneFormat == NetJSONTimeZoneFormat.Utc || timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
                     offsetText = utcOffsetText.Substring(1, utcOffsetText.Length - 1).Replace(":", string.Empty).Replace("Z", string.Empty);
                     if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
                         int indexOfSign = offsetText.IndexOf('-');
                         negative = indexOfSign >= 0;
-                        if(!negative){
+                        if (!negative) {
                             indexOfSign = offsetText.IndexOf('+');
                         }
                         tickMilliseconds = FastStringToInt(offsetText.Substring(0, indexOfSign));
@@ -4112,7 +4119,8 @@ OpCodes.Callvirt,
                 }
                 dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
                 if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
-                    dt = dt.ToUniversalTime();
+                    if (!isDateTimeOffset)
+                        dt = dt.ToUniversalTime();
                     dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Local);
                 } else if (timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
                     dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Utc);
@@ -4132,8 +4140,10 @@ OpCodes.Callvirt,
                 var minutes = noOffSetValue ? 0 : (offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0);
                 if (negative)
                     hours *= -1;
-
-                dt = dt.AddHours(hours).AddMinutes(minutes).AddTicks(tickMilliseconds);
+                offset = new TimeSpan(hours, minutes, 0);
+                if (!isDateTimeOffset)
+                    dt = dt.AddHours(hours).AddMinutes(minutes);
+                dt = dt.AddTicks(tickMilliseconds);
             }
 
             return dt;

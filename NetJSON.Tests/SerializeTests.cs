@@ -491,8 +491,9 @@ namespace NetJSON.Tests {
         public void SerializeDateTimeOffSetWithDifferentOffset() {
             var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
 
-            var tst = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
-            var dateTimeOffset = TimeZoneInfo.ConvertTime(DateTime.Now, tst);
+            var now = DateTime.Now;
+            var dateTimeOffset = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, new TimeSpan(2, 0, 0));
+            
 
             var json = NetJSON.Serialize(dateTimeOffset, settings);
 
