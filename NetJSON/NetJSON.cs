@@ -157,6 +157,13 @@ namespace NetJSON {
             }
             return value;
         }
+        public V GetOrAdd(K key, V val) {
+            V value = default(V);
+            if (!this.TryGetValue(key, out value)) {
+                value = this[key] = val;
+            }
+            return value;
+        }
     }
 
     public static class String35Extension {
@@ -590,6 +597,7 @@ namespace NetJSON {
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
         static ConstructorInfo _settingsCtor = _settingsType.GetConstructor(Type.EmptyTypes);
 
+        private static ConcurrentDictionary<string, object> _dictLockObjects = new ConcurrentDictionary<string, object>();
         static ConcurrentDictionary<Type, MethodInfo> _registeredSerializerMethods =
             new ConcurrentDictionary<Type, MethodInfo>();
 
@@ -880,45 +888,50 @@ namespace NetJSON {
 
         private static bool IsPrimitiveType(this Type type) {
             return _primitiveTypes.GetOrAdd(type, key => {
-                if (key.IsGenericType &&
-                    key.GetGenericTypeDefinition() == _nullableType)
-                    key = key.GetGenericArguments()[0];
+                lock (GetDictLockObject("IsPrimitiveType")) {
+                    if (key.IsGenericType &&
+                        key.GetGenericTypeDefinition() == _nullableType)
+                        key = key.GetGenericArguments()[0];
 
-                return key == _stringType ||
-                    key.IsPrimitive || key == _dateTimeType ||
-                    key == _dateTimeOffsetType ||
-                    key == _decimalType || key == _timeSpanType ||
-                    key == _guidType || key == _charType ||
-                    key == _typeType ||
-                    key.IsEnum || key == _byteArrayType;
+                    return key == _stringType ||
+                        key.IsPrimitive || key == _dateTimeType ||
+                        key == _dateTimeOffsetType ||
+                        key == _decimalType || key == _timeSpanType ||
+                        key == _guidType || key == _charType ||
+                        key == _typeType ||
+                        key.IsEnum || key == _byteArrayType;
+                }
             });
         }
 
         private static Type GetNullableType(this Type type) {
             return _nullableTypes.GetOrAdd(type, key => {
-                return key.Name.StartsWith("Nullable`") ? key.GetGenericArguments()[0] : null;
+                lock (GetDictLockObject("GetNullableType"))
+                    return key.Name.StartsWith("Nullable`") ? key.GetGenericArguments()[0] : null;
             });
         }
 
         internal static NetJSONMemberInfo[] GetTypeProperties(this Type type) {
             return _typeProperties.GetOrAdd(type, key => {
-                var props = key.GetProperties(PropertyBinding)
-                    .Where(x => x.GetIndexParameters().Length == 0)
-                    .Select(x => new NetJSONMemberInfo{ Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault()});
-                if (_includeFields) {
-                    props = props.Union(key.GetFields(PropertyBinding).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() }));
-                }
-                var result = props.ToArray();
+                lock (GetDictLockObject("GetTypeProperties")) {
+                    var props = key.GetProperties(PropertyBinding)
+                        .Where(x => x.GetIndexParameters().Length == 0)
+                        .Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() });
+                    if (_includeFields) {
+                        props = props.Union(key.GetFields(PropertyBinding).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() }));
+                    }
+                    var result = props.ToArray();
 
 #if NET_35
                 if (result.Where(x => x.Attribute != null).Any(x => x.Attribute.Name.IsNullOrWhiteSpace() || x.Attribute.Name.Contains(" ")))
                     throw new NetJSONInvalidJSONPropertyException();
 #else
-                if (result.Where(x => x.Attribute != null).Any(x => string.IsNullOrWhiteSpace(x.Attribute.Name) || x.Attribute.Name.Contains(" ")))
-                    throw new NetJSONInvalidJSONPropertyException();
+                    if (result.Where(x => x.Attribute != null).Any(x => string.IsNullOrWhiteSpace(x.Attribute.Name) || x.Attribute.Name.Contains(" ")))
+                        throw new NetJSONInvalidJSONPropertyException();
 #endif
 
-                return result;
+                    return result;
+                }
             });
         }
 
@@ -1089,24 +1102,26 @@ namespace NetJSON {
         }
 
         public static object GetTypeIdentifierInstance(string typeName) {
-            return _typeIdentifierFuncs.GetOrAdd(typeName, _ => { 
-                var type = Type.GetType(typeName, throwOnError: false);
-                if(type == null)
-                    throw new InvalidOperationException(string.Format("Unable to resolve {0} with value = {1}", TypeIdentifier, typeName));
+            return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
+                lock (GetDictLockObject("GetTypeIdentifier")) {
+                    var type = Type.GetType(typeName, throwOnError: false);
+                    if (type == null)
+                        throw new InvalidOperationException(string.Format("Unable to resolve {0} with value = {1}", TypeIdentifier, typeName));
 
-                var ctor = type.GetConstructor(Type.EmptyTypes);
+                    var ctor = type.GetConstructor(Type.EmptyTypes);
 
-                if (ctor == null)
-                    throw new InvalidOperationException(string.Format("{0} with value = {1} must have a default constructor", TypeIdentifier, typeName));
+                    if (ctor == null)
+                        throw new InvalidOperationException(string.Format("{0} with value = {1} must have a default constructor", TypeIdentifier, typeName));
 
-                var meth = new DynamicMethod(Guid.NewGuid().ToString("N"), _objectType, null, restrictedSkipVisibility: true);
+                    var meth = new DynamicMethod(Guid.NewGuid().ToString("N"), _objectType, null, restrictedSkipVisibility: true);
 
-                var il = meth.GetILGenerator();
+                    var il = meth.GetILGenerator();
 
-                il.Emit(OpCodes.Newobj, ctor);
-                il.Emit(OpCodes.Ret);
+                    il.Emit(OpCodes.Newobj, ctor);
+                    il.Emit(OpCodes.Ret);
 
-                return meth.CreateDelegate(typeof(Func<object>)) as Func<object>;
+                    return meth.CreateDelegate(typeof(Func<object>)) as Func<object>;
+                }
             })();
         }
 
@@ -1221,164 +1236,162 @@ namespace NetJSON {
         }
 
         private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
-
             return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
+                lock (GetDictLockObject("GenerateFastObjectToString")) {
+                    var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
+                        new[] { _objectType, _stringBuilderType, _settingsType });
 
-                var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
-                    new[] { _objectType, _stringBuilderType, _settingsType });
+                    var il = method.GetILGenerator();
 
-                var il = method.GetILGenerator();
+                    var typeLocal = il.DeclareLocal(_typeType);
+                    var needQuoteLocal = il.DeclareLocal(_boolType);
+                    var needQuoteStartLabel = il.DefineLabel();
+                    var needQuoteEndLabel = il.DefineLabel();
 
-                var typeLocal = il.DeclareLocal(_typeType);
-                var needQuoteLocal = il.DeclareLocal(_boolType);
-                var needQuoteStartLabel = il.DefineLabel();
-                var needQuoteEndLabel = il.DefineLabel();
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Callvirt, _objectGetType);
+                    il.Emit(OpCodes.Stloc, typeLocal);
 
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Callvirt, _objectGetType);
-                il.Emit(OpCodes.Stloc, typeLocal);
-
-                var isListTypeLabel = il.DefineLabel();
-
-                il.Emit(OpCodes.Ldloc, typeLocal);
-                il.Emit(OpCodes.Call, _isListType);
-                il.Emit(OpCodes.Brfalse, isListTypeLabel);
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Castclass, _listType);
-                il.Emit(OpCodes.Call, _listToListObject);
-                il.Emit(OpCodes.Starg, 0);
-
-                WriteCollection(type, typeof(List<object>), il);
-                il.Emit(OpCodes.Ret);
-
-                il.MarkLabel(isListTypeLabel);
-
-                var isDictTypeLabel = il.DefineLabel();
-
-                il.Emit(OpCodes.Ldloc, typeLocal);
-                il.Emit(OpCodes.Call, _isDictType);
-                il.Emit(OpCodes.Brfalse, isDictTypeLabel);
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Castclass, _dictStringObject);
-                il.Emit(OpCodes.Starg, 0);
-
-                WriteCollection(type, _dictStringObject, il);
-                il.Emit(OpCodes.Ret);
-
-                il.MarkLabel(isDictTypeLabel);
-
-
-                il.Emit(OpCodes.Ldloc, typeLocal);
-                il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, _needQuote);
-                il.Emit(OpCodes.Stloc, needQuoteLocal);
-
-
-                il.Emit(OpCodes.Ldloc, needQuoteLocal);
-                il.Emit(OpCodes.Brfalse, needQuoteStartLabel);
-
-                il.Emit(OpCodes.Ldarg_1);
-                LoadQuotChar(il);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Pop);
-
-                il.MarkLabel(needQuoteStartLabel);
-
-                _defaultSerializerTypes[_dateTimeType] = _generatorDateToString;
-                _defaultSerializerTypes[_dateTimeOffsetType] = _generatorDateOffsetToString;
-
-                var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
-                
-                foreach (var kv in _defaultSerializerTypes) {
-                    serializerTypeMethods[kv.Key] = kv.Value;
-                }
-
-                foreach (var kv in _registeredSerializerMethods) {
-                    serializerTypeMethods[kv.Key] = kv.Value;
-                }
-
-                foreach (var kv in serializerTypeMethods) {
-                    var objType = kv.Key;
-                    var compareLabel = il.DefineLabel();
+                    var isListTypeLabel = il.DefineLabel();
 
                     il.Emit(OpCodes.Ldloc, typeLocal);
-            
-                    il.Emit(OpCodes.Ldtoken, objType);
-                    il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+                    il.Emit(OpCodes.Call, _isListType);
+                    il.Emit(OpCodes.Brfalse, isListTypeLabel);
 
-                    il.Emit(OpCodes.Call, _cTypeOpEquality);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Castclass, _listType);
+                    il.Emit(OpCodes.Call, _listToListObject);
+                    il.Emit(OpCodes.Starg, 0);
 
-                    il.Emit(OpCodes.Brfalse, compareLabel);
+                    WriteCollection(type, typeof(List<object>), il);
+                    il.Emit(OpCodes.Ret);
 
-                    if (objType == _stringType) {
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Castclass, _stringType);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        il.Emit(OpCodes.Pop);
-                    } else if (objType == _enumType) {
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Unbox_Any, objType);
-                        il.Emit(OpCodes.Ldarg_2);
-                        il.Emit(OpCodes.Call, _generatorEnumToStr);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        il.Emit(OpCodes.Pop);
+                    il.MarkLabel(isListTypeLabel);
+
+                    var isDictTypeLabel = il.DefineLabel();
+
+                    il.Emit(OpCodes.Ldloc, typeLocal);
+                    il.Emit(OpCodes.Call, _isDictType);
+                    il.Emit(OpCodes.Brfalse, isDictTypeLabel);
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Castclass, _dictStringObject);
+                    il.Emit(OpCodes.Starg, 0);
+
+                    WriteCollection(type, _dictStringObject, il);
+                    il.Emit(OpCodes.Ret);
+
+                    il.MarkLabel(isDictTypeLabel);
+
+
+                    il.Emit(OpCodes.Ldloc, typeLocal);
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Call, _needQuote);
+                    il.Emit(OpCodes.Stloc, needQuoteLocal);
+
+
+                    il.Emit(OpCodes.Ldloc, needQuoteLocal);
+                    il.Emit(OpCodes.Brfalse, needQuoteStartLabel);
+
+                    il.Emit(OpCodes.Ldarg_1);
+                    LoadQuotChar(il);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                    il.Emit(OpCodes.Pop);
+
+                    il.MarkLabel(needQuoteStartLabel);
+
+                    _defaultSerializerTypes[_dateTimeType] = _generatorDateToString;
+                    _defaultSerializerTypes[_dateTimeOffsetType] = _generatorDateOffsetToString;
+
+                    var serializerTypeMethods = new Dictionary<Type, MethodInfo>();
+
+                    foreach (var kv in _defaultSerializerTypes) {
+                        serializerTypeMethods[kv.Key] = kv.Value;
                     }
-                    else if (objType == _boolType) {
-                        var boolLocal = il.DeclareLocal(_stringType);
-                        var boolLabel = il.DefineLabel();
-                        il.Emit(OpCodes.Ldstr, "true");
-                        il.Emit(OpCodes.Stloc, boolLocal);
 
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Unbox_Any, _boolType);
-                        il.Emit(OpCodes.Brtrue, boolLabel);
-                        il.Emit(OpCodes.Ldstr, "false");
-                        il.Emit(OpCodes.Stloc, boolLocal);
-                        il.MarkLabel(boolLabel);
+                    foreach (var kv in _registeredSerializerMethods) {
+                        serializerTypeMethods[kv.Key] = kv.Value;
+                    }
 
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldloc, boolLocal);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        il.Emit(OpCodes.Pop);
-                    } else if (objType == _objectType) {
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
-                        il.Emit(OpCodes.Pop);
-                    } 
-                    else {
-                        il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldarg_0);
-                        if (objType.IsValueType)
+                    foreach (var kv in serializerTypeMethods) {
+                        var objType = kv.Key;
+                        var compareLabel = il.DefineLabel();
+
+                        il.Emit(OpCodes.Ldloc, typeLocal);
+
+                        il.Emit(OpCodes.Ldtoken, objType);
+                        il.Emit(OpCodes.Call, _typeGetTypeFromHandle);
+
+                        il.Emit(OpCodes.Call, _cTypeOpEquality);
+
+                        il.Emit(OpCodes.Brfalse, compareLabel);
+
+                        if (objType == _stringType) {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Castclass, _stringType);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        } else if (objType == _enumType) {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldarg_0);
                             il.Emit(OpCodes.Unbox_Any, objType);
-                        else il.Emit(OpCodes.Castclass, objType);
-                        if (objType == _dateTimeType || objType == _dateTimeOffsetType)
                             il.Emit(OpCodes.Ldarg_2);
-                        il.Emit(OpCodes.Call, kv.Value);
-                        il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                        il.Emit(OpCodes.Pop);
+                            il.Emit(OpCodes.Call, _generatorEnumToStr);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        } else if (objType == _boolType) {
+                            var boolLocal = il.DeclareLocal(_stringType);
+                            var boolLabel = il.DefineLabel();
+                            il.Emit(OpCodes.Ldstr, "true");
+                            il.Emit(OpCodes.Stloc, boolLocal);
+
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Unbox_Any, _boolType);
+                            il.Emit(OpCodes.Brtrue, boolLabel);
+                            il.Emit(OpCodes.Ldstr, "false");
+                            il.Emit(OpCodes.Stloc, boolLocal);
+                            il.MarkLabel(boolLabel);
+
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldloc, boolLocal);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        } else if (objType == _objectType) {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
+                            il.Emit(OpCodes.Pop);
+                        } else {
+                            il.Emit(OpCodes.Ldarg_1);
+                            il.Emit(OpCodes.Ldarg_0);
+                            if (objType.IsValueType)
+                                il.Emit(OpCodes.Unbox_Any, objType);
+                            else il.Emit(OpCodes.Castclass, objType);
+                            if (objType == _dateTimeType || objType == _dateTimeOffsetType)
+                                il.Emit(OpCodes.Ldarg_2);
+                            il.Emit(OpCodes.Call, kv.Value);
+                            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                            il.Emit(OpCodes.Pop);
+                        }
+
+                        il.MarkLabel(compareLabel);
                     }
 
-                    il.MarkLabel(compareLabel);
+                    il.Emit(OpCodes.Ldloc, needQuoteLocal);
+                    il.Emit(OpCodes.Brfalse, needQuoteEndLabel);
+
+                    il.Emit(OpCodes.Ldarg_1);
+                    LoadQuotChar(il);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                    il.Emit(OpCodes.Pop);
+
+                    il.MarkLabel(needQuoteEndLabel);
+
+                    il.Emit(OpCodes.Ret);
+
+                    return method;
                 }
-               
-                il.Emit(OpCodes.Ldloc, needQuoteLocal);
-                il.Emit(OpCodes.Brfalse, needQuoteEndLabel);
-
-                il.Emit(OpCodes.Ldarg_1);
-                LoadQuotChar(il);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Pop);
-
-                il.MarkLabel(needQuoteEndLabel);
-
-                il.Emit(OpCodes.Ret);
-
-                return method;
             });
         }
 
@@ -1825,12 +1838,14 @@ OpCodes.Callvirt,
 
         public static string Fix(this string name) {
             return _fixes.GetOrAdd(name, key => {
-                var index = key.IndexOf(CarrotQuoteChar, StringComparison.OrdinalIgnoreCase);
-                var quoteText = index > -1 ? key.Substring(index, 2) : CarrotQuoteChar;
-                var value = key.Replace(quoteText, string.Empty).Replace(ArrayLiteral, ArrayStr).Replace(AnonymousBracketStr, string.Empty);
-                if (value.Contains(CarrotQuoteChar))
-                    value = Fix(value);
-                return value;
+                lock (GetDictLockObject("FixName")) {
+                    var index = key.IndexOf(CarrotQuoteChar, StringComparison.OrdinalIgnoreCase);
+                    var quoteText = index > -1 ? key.Substring(index, 2) : CarrotQuoteChar;
+                    var value = key.Replace(quoteText, string.Empty).Replace(ArrayLiteral, ArrayStr).Replace(AnonymousBracketStr, string.Empty);
+                    if (value.Contains(CarrotQuoteChar))
+                        value = Fix(value);
+                    return value;
+                }
             });
         }
 
@@ -2597,9 +2612,9 @@ OpCodes.Callvirt,
                 throw new InvalidOperationException("Non-Public Types is not supported yet");
             } else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
             else {
-                if (!_includeTypeInformation)
+                if (!_includeTypeInformation) {
                     WritePropertiesFor(typeBuilder, type, methodIL);
-                else {
+                } else {
                     var pTypes = GetIncludedTypeTypes(type);
                     if (pTypes.Count == 1) {
                         WritePropertiesFor(typeBuilder, type, methodIL);
@@ -2630,29 +2645,36 @@ OpCodes.Callvirt,
             }
         }
 
+        private static object GetDictLockObject(params string[] keys) {
+            return _dictLockObjects.GetOrAdd(String.Concat(keys), new object());
+        }
+
         private static List<Type> GetIncludedTypeTypes(Type type) {
             var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
-                var attrs = type.GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
-                var types = attrs.Any() ? attrs.Where(x => !x.Type.IsAbstract).Select(x => x.Type).ToList() : null;
-                //Expense call to auto-magically figure all subclass of current type
-                if (types == null) {
-                    types = new List<Type>();
-                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                    foreach (var asm in assemblies) {
-                        try {
-                            types.AddRange(asm.GetTypes().Where(x => x.IsSubclassOf(type)));
-                        } catch (ReflectionTypeLoadException ex) {
-                            var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)) : null;
-                            if (exTypes != null)
-                                types.AddRange(exTypes);
+                lock (GetDictLockObject("GetIncludeTypeTypes")) {
+                    var attrs = type.GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
+                    var types = attrs.Any() ? attrs.Where(x => !x.Type.IsAbstract).Select(x => x.Type).ToList() : null;
+                    
+                    //Expense call to auto-magically figure all subclass of current type
+                    if (types == null) {
+                        types = new List<Type>();
+                        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                        foreach (var asm in assemblies) {
+                            try {
+                                types.AddRange(asm.GetTypes().Where(x => x.IsSubclassOf(type)));
+                            } catch (ReflectionTypeLoadException ex) {
+                                var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.IsSubclassOf(type)) : null;
+                                if (exTypes != null)
+                                    types.AddRange(exTypes);
+                            }
                         }
                     }
+
+                    if (!types.Contains(type) && !type.IsAbstract)
+                        types.Insert(0, type);
+
+                    return types;
                 }
-
-                if (!types.Contains(type) && !type.IsAbstract)
-                    types.Insert(0, type);
-
-                return types;
             });
             return pTypes;
         }
@@ -3225,27 +3247,29 @@ OpCodes.Callvirt,
 
         public static string Serialize(Type type, object value) {
             return _serializeWithTypes.GetOrAdd(type, _ => {
-                var name = String.Concat(SerializeStr, type.FullName);
-                var method = new DynamicMethod(name, _stringType, new[] { _objectType }, restrictedSkipVisibility: true);
+                lock (GetDictLockObject("SerializeType", type.Name)) {
+                    var name = String.Concat(SerializeStr, type.FullName);
+                    var method = new DynamicMethod(name, _stringType, new[] { _objectType }, restrictedSkipVisibility: true);
 
-                var il = method.GetILGenerator();
-                var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
-                var genericType = _netJSONSerializerType.MakeGenericType(type);
+                    var il = method.GetILGenerator();
+                    var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                    var genericType = _netJSONSerializerType.MakeGenericType(type);
 
-                var genericSerialize = genericType.GetMethod(SerializeStr, new[] { type });
+                    var genericSerialize = genericType.GetMethod(SerializeStr, new[] { type });
 
-                il.Emit(OpCodes.Call, genericMethod);
+                    il.Emit(OpCodes.Call, genericMethod);
 
-                il.Emit(OpCodes.Ldarg_0);
-                if (type.IsClass) 
-                    il.Emit(OpCodes.Isinst, type);
-                else il.Emit(OpCodes.Unbox_Any, type);
-                
-                il.Emit(OpCodes.Callvirt, genericSerialize);
+                    il.Emit(OpCodes.Ldarg_0);
+                    if (type.IsClass)
+                        il.Emit(OpCodes.Isinst, type);
+                    else il.Emit(OpCodes.Unbox_Any, type);
 
-                il.Emit(OpCodes.Ret);
+                    il.Emit(OpCodes.Callvirt, genericSerialize);
 
-                return method.CreateDelegate(typeof(SerializeWithTypeDelegate)) as SerializeWithTypeDelegate;
+                    il.Emit(OpCodes.Ret);
+
+                    return method.CreateDelegate(typeof(SerializeWithTypeDelegate)) as SerializeWithTypeDelegate;
+                }
             })(value);
         }
 
@@ -3254,32 +3278,32 @@ OpCodes.Callvirt,
         }
 
         public static object Deserialize(Type type, string value) {
-
             return _deserializeWithTypes.GetOrAdd(type.FullName, _ => {
-                var name = String.Concat(DeserializeStr, type.FullName);
-                var method = new DynamicMethod(name, _objectType, new[] { _stringType }, restrictedSkipVisibility: true);
+                lock (GetDictLockObject("DeserializeType", type.Name)) {
+                    var name = String.Concat(DeserializeStr, type.FullName);
+                    var method = new DynamicMethod(name, _objectType, new[] { _stringType }, restrictedSkipVisibility: true);
 
-                var il = method.GetILGenerator();
-                var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
-                var genericType = _netJSONSerializerType.MakeGenericType(type);
+                    var il = method.GetILGenerator();
+                    var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                    var genericType = _netJSONSerializerType.MakeGenericType(type);
 
-                var genericDeserialize = genericType.GetMethod(DeserializeStr, new[] { _stringType });
+                    var genericDeserialize = genericType.GetMethod(DeserializeStr, new[] { _stringType });
 
-                il.Emit(OpCodes.Call, genericMethod);
+                    il.Emit(OpCodes.Call, genericMethod);
 
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Callvirt, genericDeserialize);
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Callvirt, genericDeserialize);
 
-                if (type.IsClass)
-                    il.Emit(OpCodes.Isinst, type);
-                else {
-                    il.Emit(OpCodes.Box, type);
+                    if (type.IsClass)
+                        il.Emit(OpCodes.Isinst, type);
+                    else {
+                        il.Emit(OpCodes.Box, type);
+                    }
+
+                    il.Emit(OpCodes.Ret);
+
+                    return method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
                 }
-
-                il.Emit(OpCodes.Ret);
-
-                return method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
-            
             })(value);
         }
 

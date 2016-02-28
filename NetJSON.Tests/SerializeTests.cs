@@ -504,12 +504,14 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void SerializePolyObjects() {
-            NetJSON.IncludeTypeInformation = true;
-
+            
             var graph = new Graph { name = "my graph" };
             graph.nodes = new List<Node>();
             graph.nodes.Add(new NodeA { number = 10f });
             graph.nodes.Add(new NodeB { text = "hello" });
+
+            NetJSON.IncludeTypeInformation = true;
+
             var json = NetJSON.Serialize(graph, new NetJSONSettings { IncludeTypeInformation = true });
             var jgraph = NetJSON.Deserialize<Graph>(json);
 
