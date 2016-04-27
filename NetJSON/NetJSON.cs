@@ -4353,7 +4353,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, attr != null ? (attr.Name ?? propName) : propName);
 
-                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Ldarg, 4);
                 il.Emit(OpCodes.Callvirt, _settingsCaseComparison);
                 il.Emit(OpCodes.Call, _stringEqualCompare);
 

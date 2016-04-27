@@ -588,6 +588,34 @@ namespace NetJSON.Tests {
             Assert.IsNotNull(deserialised.TestItem);
             Assert.AreEqual(testObj.TestItem.Value, itm);
         }
+
+        [TestMethod]
+        public void CaseSensitiveGlossary() {
+            var json = @"{
+    ""glossary"": {
+        ""title"": ""example glossary"",
+        ""GlossDiv"": {
+            ""title"": ""S"",
+            ""GlossList"": {
+                ""GlossEntry"": {
+                    ""ID"": ""SGML"",
+                    ""SortAs"": ""SGML"",
+                    ""GlossTerm"": ""Standard Generalized Markup Language"",
+                    ""Acronym"": ""SGML"",
+                    ""Abbrev"": ""ISO 8879:1986"",
+                    ""GlossDef"": {
+                        ""para"": ""A meta-markup language, used to create markup languages such as DocBook."",
+                        ""GlossSeeAlso"": [""GML"", ""XML""]
+                    },
+                    ""GlossSee"": ""markup""
+                }
+            }
+        }
+    }
+}";
+            var obj = NetJSON.Deserialize<GlossaryContainer>(json, new NetJSONSettings { CaseSensitive = false });
+            Assert.IsNotNull(obj.glossary.glossdiv);
+        }
     }
 
     public class NullableTestType<T> where T : struct {
@@ -652,6 +680,40 @@ namespace NetJSON.Tests {
             if (exception.InnerException == null)
                 return;
             this.InnerException = new ExceptionInfo(exception.InnerException);
+        }
+    }
+
+    public class GlossaryContainer {
+        public Glossary glossary { get; set; }
+
+        public class Glossary {
+            public string title { get; set; }
+            public GlossaryDiv glossdiv { get; set; }
+        }
+
+        public class GlossaryDiv {
+            public string title { get; set; }
+            public GlossaryList glosslist { get; set; }
+        }
+
+        public class GlossaryList {
+            public GlossaryEntry glossentry { get; set; }
+        }
+
+        public class GlossaryEntry {
+            public string id { get; set; }
+            public string sortas { get; set; }
+            public string glossterm { get; set; }
+            public string acronym { get; set; }
+            public string abbrev { get; set; }
+            public string glosssee { get; set; }
+
+            public GlossaryDef glossdef { get; set; }
+        }
+
+        public class GlossaryDef {
+            public string para { get; set; }
+            public string[] glossseealso { get; set; }
         }
     }
 
