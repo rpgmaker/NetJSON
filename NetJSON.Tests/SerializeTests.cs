@@ -503,6 +503,16 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void PrettifyString() {
+
+            var data = new StructWithProperties { x = 10, y = 2 };
+            var json = NetJSON.Serialize(data, new NetJSONSettings { Format = NetJSONFormat.Prettify });
+            var count = json.Split('\n').Length;
+
+            Assert.IsTrue(count > 1);
+        }
+
+        [TestMethod]
         public void SerializePolyObjects() {
             
             var graph = new Graph { name = "my graph" };

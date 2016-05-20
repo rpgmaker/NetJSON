@@ -39,6 +39,7 @@ namespace NetJSON {
     public class NetJSONSettings {
         public NetJSONDateFormat DateFormat { get; set; }
         public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
+        public NetJSONFormat Format { get; set; }
         public bool UseEnumString { get; set; }
         public bool SkipDefaultValue { get; set; }
         public bool CaseSensitive { get; set; }
@@ -78,6 +79,7 @@ namespace NetJSON {
             CaseSensitive = NetJSON.CaseSensitive;
             QuoteType = NetJSON.QuoteType;
             UseStringOptimization = NetJSON.UseStringOptimization;
+            Format = NetJSONFormat.Default;
         }
 
         public NetJSONSettings Clone() {
@@ -89,7 +91,8 @@ namespace NetJSON {
                 SkipDefaultValue = SkipDefaultValue,
                 CaseSensitive = CaseSensitive,
                 QuoteType = QuoteType,
-                UseStringOptimization = UseStringOptimization
+                UseStringOptimization = UseStringOptimization,
+                Format = Format
             };
         }
 
@@ -372,6 +375,11 @@ namespace NetJSON {
         Single = 2
     }
 
+    public enum NetJSONFormat {
+        Default = 0,
+        Prettify = 2
+    }
+
     public static class NetJSON {
 
         private static class NetJSONCachedSerializer<T> {
@@ -535,6 +543,7 @@ namespace NetJSON {
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
             _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
             _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
+            _prettifyJSONIfNeeded = _jsonType.GetMethod("PrettifyJSONIfNeeded", MethodBinding),
             _isRawPrimitive = _jsonType.GetMethod("IsRawPrimitive", MethodBinding),
             _isInRange = _jsonType.GetMethod("IsInRange", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
@@ -1539,6 +1548,7 @@ OpCodes.Call,
             rdil.Emit(OpCodes.Ret);
 
             //With Settings
+            var isValueType = objType.IsValueType;
             var ilWithSettings = serializeMethodWithSettings.GetILGenerator();
 
             var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
@@ -1562,6 +1572,14 @@ OpCodes.Callvirt,
 
             ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
             ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+            if (isValueType)
+                ilWithSettings.Emit(OpCodes.Ldarga, 2);
+            else 
+                ilWithSettings.Emit(OpCodes.Ldarg_2);
+            
+            ilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
+
             ilWithSettings.Emit(OpCodes.Ret);
 
             var wilWithSettings = serializeWithTextWriterMethodWithSettings.GetILGenerator();
@@ -1586,6 +1604,12 @@ OpCodes.Callvirt,
             wilWithSettings.Emit(OpCodes.Ldarg_2);
             wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
             wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+            if (isValueType)
+                wilWithSettings.Emit(OpCodes.Ldarga, 3);
+            else
+                wilWithSettings.Emit(OpCodes.Ldarg_3);
+
             wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
             wilWithSettings.Emit(OpCodes.Ret);
 
@@ -1763,6 +1787,67 @@ OpCodes.Callvirt,
                 else if (isNonStringType)
                     GetNonStringValue(ptr, ref index);
             }
+        }
+
+        public static string PrettifyJSONIfNeeded(string str, NetJSONSettings settings) {
+            if (settings.Format == NetJSONFormat.Prettify)
+                return PrettifyJSON(str);
+            return str;
+        }
+
+        public static unsafe string PrettifyJSON(string str) {
+            var sb = new StringBuilder();
+            
+            var horizontal = 0;
+            var horizontals = new int[10000];
+            var hrIndex = -1;
+            bool @return = false;
+            char c;
+
+            fixed (char* chr = str) {
+                char* ptr = chr;
+                while ((c = *(ptr++)) != '\0') {
+                    switch (c) {
+                        case '{':
+                        case '[':
+                            sb.Append(c);
+                            hrIndex++;
+                            horizontals[hrIndex] = horizontal;
+                            @return = true;
+                            break;
+                        case '}':
+                        case ']':
+                            @return = false;
+                            sb.Append('\n');
+                            horizontal = horizontals[hrIndex];
+                            hrIndex--;
+                            for (var i = 0; i < horizontal; i++) {
+                                sb.Append(' ');
+                            }
+                            sb.Append(c);
+                            break;
+                        case ',':
+                            sb.Append(c);
+                            @return = true;
+                            break;
+                        default:
+                            if (@return) {
+                                @return = false;
+                                sb.Append('\n');
+                                horizontal = horizontals[hrIndex] + 1;
+                                for (var i = 0; i < horizontal; i++) {
+                                    sb.Append(' ');
+                                }
+                            }
+                            sb.Append(c);
+                            break;
+                    }
+
+                    horizontal++;
+                }
+            }
+
+            return sb.ToString();
         }
 
         public static unsafe void EncodedJSONString(StringBuilder sb, string str, NetJSONSettings settings) {
