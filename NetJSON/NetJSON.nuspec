@@ -4,9 +4,15 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.1.0.2</version> 
+    <version>1.1.0.3</version> 
     <authors>TJ Bakre</authors>
-    <description>Faster than Any Binary?</description> 
+    <description>Faster than Any Binary?</description>
+    <releaseNotes>
+      Fixed performance issues caused by string comparison for casesentive flag
+      Minor performance improvement
+      Add support for deserialization of class/struct with non-default constructor
+      Improved string skipping optimization
+    </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
     <projectUrl>https://github.com/rpgmaker/NetJSON</projectUrl>

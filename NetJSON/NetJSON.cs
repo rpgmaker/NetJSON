@@ -25,6 +25,7 @@ using System.Security.Permissions;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Runtime.Serialization;
 
 namespace NetJSON {
 
@@ -42,7 +43,17 @@ namespace NetJSON {
         public NetJSONFormat Format { get; set; }
         public bool UseEnumString { get; set; }
         public bool SkipDefaultValue { get; set; }
-        public bool CaseSensitive { get; set; }
+        public StringComparison _caseComparison = StringComparison.Ordinal;
+        private bool _caseSensitive;
+        public bool CaseSensitive {
+            get {
+                return _caseSensitive;
+            }
+            set {
+                _caseSensitive = value;
+                _caseComparison = _caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            }
+        }
 
         private NetJSONQuote _quoteType;
         public NetJSONQuote QuoteType {
@@ -64,9 +75,9 @@ namespace NetJSON {
         public bool UseStringOptimization { get; set; }
         public bool IncludeTypeInformation { get; set; }
 
-        public StringComparison CaseComparison {
+        private StringComparison CaseComparison {
             get {
-                return CaseSensitive ? StringComparison.CurrentCulture : StringComparison.OrdinalIgnoreCase;
+                return CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
             }
         }
 
@@ -100,7 +111,7 @@ namespace NetJSON {
         private static NetJSONSettings _currentSettings;
         public static NetJSONSettings CurrentSettings {
             get {
-                return new NetJSONSettings();
+                return _currentSettings ?? (_currentSettings = new NetJSONSettings());
             }
         }
     }
@@ -475,6 +486,7 @@ namespace NetJSON {
             _tupleContainerType = typeof(TupleContainer),
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
             _textReaderType = typeof(TextReader),
+            _stringComparison = typeof(StringComparison),
             _settingsType = typeof(NetJSONSettings);
 
         static MethodInfo _stringBuilderToString =
@@ -566,13 +578,14 @@ namespace NetJSON {
             _getTypeIdentifierInstanceMethod = _jsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding),
             _settingsUseEnumStringProp = _settingsType.GetProperty("UseEnumString", MethodBinding).GetGetMethod(),
             _settingsUseStringOptimization = _settingsType.GetProperty("UseStringOptimization", MethodBinding).GetGetMethod(),
-            _settingsCaseComparison = _settingsType.GetProperty("CaseComparison", MethodBinding).GetGetMethod(),
             _settingsHasOverrideQuoteChar = _settingsType.GetProperty("HasOverrideQuoteChar", MethodBinding).GetGetMethod(),
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
+            _getUninitializedInstance = _jsonType.GetMethod("GetUninitializedInstance", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod();
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
             _settingQuoteChar = _settingsType.GetField("_quoteChar", MethodBinding),
+            _settingsCaseComparison = _settingsType.GetField("_caseComparison", MethodBinding),
             _settingQuoteCharString = _settingsType.GetField("_quoteCharString", MethodBinding);
 
         const int Delimeter = (int)',', ColonChr = (int)':',
@@ -1082,7 +1095,7 @@ namespace NetJSON {
             }
         }
 
-        private static bool _useStringOptimization = false;
+        private static bool _useStringOptimization = true;
 
         public static bool UseStringOptimization {
             set {
@@ -1110,6 +1123,10 @@ namespace NetJSON {
             }
         }
 
+        public static T GetUninitializedInstance<T>() {
+            return (T)FormatterServices.GetUninitializedObject(typeof(T));
+        }
+
         public static object GetTypeIdentifierInstance(string typeName) {
             return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
                 lock (GetDictLockObject("GetTypeIdentifier")) {
@@ -1126,7 +1143,10 @@ namespace NetJSON {
 
                     var il = meth.GetILGenerator();
 
-                    il.Emit(OpCodes.Newobj, ctor);
+                    if (ctor == null)
+                        il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                    else
+                        il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
                     il.Emit(OpCodes.Ret);
 
                     return meth.CreateDelegate(typeof(Func<object>)) as Func<object>;
@@ -1573,10 +1593,7 @@ OpCodes.Callvirt,
             ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
             ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
 
-            if (isValueType)
-                ilWithSettings.Emit(OpCodes.Ldarga, 2);
-            else 
-                ilWithSettings.Emit(OpCodes.Ldarg_2);
+            ilWithSettings.Emit(OpCodes.Ldarg_2);
             
             ilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
 
@@ -1605,10 +1622,9 @@ OpCodes.Callvirt,
             wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
             wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
 
-            if (isValueType)
-                wilWithSettings.Emit(OpCodes.Ldarga, 3);
-            else
-                wilWithSettings.Emit(OpCodes.Ldarg_3);
+            wilWithSettings.Emit(OpCodes.Ldarg_3);
+
+            wilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
 
             wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
             wilWithSettings.Emit(OpCodes.Ret);
@@ -3967,7 +3983,7 @@ OpCodes.Callvirt,
                 if (hasQuote) {
                     //if (current == '\0') break;
 
-                    if (IsCurrentAQuot(current, settings)) {
+                    if (current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
                         ++index;
                         break;
                     } else {
@@ -3998,7 +4014,7 @@ OpCodes.Callvirt,
                                     index += 4;
                                     break;
                                 default:
-                                    if (IsCurrentAQuot(next, settings))
+                                    if (next == settings._quoteChar/*IsCurrentAQuot(next, settings)*/)
                                         sb.Append(next);
 
                                     break;
@@ -4007,7 +4023,7 @@ OpCodes.Callvirt,
                         }
                     }
                 } else {
-                    if (IsCurrentAQuot(current, settings)) {
+                    if (current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
@@ -4125,8 +4141,8 @@ OpCodes.Callvirt,
             return method;
         }
 
-        public static bool FastStringToBool(string value) {
-            return value == "1" || String.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+        public unsafe static bool FastStringToBool(string value) {
+            return value[0] == 't';
         }
 
         public static byte[] FastStringToByteArray(string value) {
@@ -4415,6 +4431,12 @@ OpCodes.Callvirt,
         private static void GenerateTypeSetValueFor(TypeBuilder typeBuilder, Type type, bool isTypeValueType, bool Optimized, ILGenerator il) {
 
             var props = type.GetTypeProperties();
+            var caseLocal = il.DeclareLocal(_stringComparison);
+
+            il.Emit(OpCodes.Ldarg, 4);
+            il.Emit(OpCodes.Ldfld, _settingsCaseComparison);
+            il.Emit(OpCodes.Stloc, caseLocal);
+
             for (var i = 0; i < props.Length; i++) {
                 var mem = props[i];
                 var member = mem.Member;
@@ -4438,8 +4460,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, attr != null ? (attr.Name ?? propName) : propName);
 
-                il.Emit(OpCodes.Ldarg, 4);
-                il.Emit(OpCodes.Callvirt, _settingsCaseComparison);
+                il.Emit(OpCodes.Ldloc, caseLocal);
                 il.Emit(OpCodes.Call, _stringEqualCompare);
 
                 il.Emit(OpCodes.Brfalse, conditionLabel);
@@ -4849,14 +4870,8 @@ OpCodes.Callvirt,
         }
 
         public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
-            var inRange = false;
             var inRangeChr = *(ptr + index + offset + 2);
-
-            var value = new String(ptr, index + 1, offset);
-
-            inRange = (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) && value == key;
-
-            return inRange;
+            return (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r'));
         }
 
         public static bool IsCurrentAQuot(char current, NetJSONSettings settings) {
@@ -4992,7 +5007,11 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Newobj, type.GetConstructor(new []{ _intType}));
                     il.Emit(OpCodes.Stloc, obj);
                 } else {
-                    il.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes));
+                    var ctor = type.GetConstructor(Type.EmptyTypes);
+                    if (ctor == null)
+                        il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                    else
+                        il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
                     il.Emit(OpCodes.Stloc, obj);
                 }
             }
@@ -5632,10 +5651,10 @@ OpCodes.Callvirt,
 
             while (true) {
                 current = ptr[index];
-                if (count == 0 && IsCurrentAQuot(current, settings)) {
+                if (count == 0 && current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && IsCurrentAQuot(current, settings) && prev != '\\') {
+                } else if (count > 0 && current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/ && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
@@ -5676,6 +5695,15 @@ OpCodes.Callvirt,
                         value = new string(ptr, startIndex, index - startIndex - indexDiff);
                         --index;
                         break;
+                    } else if (current == 't') {
+                        index += 4;
+                        return "true";
+                    } else if (current == 'f') {
+                        index += 5;
+                        return "false";
+                    } else if (current == 'n') {
+                        index += 4;
+                        return null;
                     }
                 }
                 ++index;

@@ -255,11 +255,12 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestSerializeDateWithMillisecondDefaultFormatLocal() {
-            NetJSON.DateFormat = NetJSONDateFormat.Default;
-            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
+            var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.Default, 
+                TimeZoneFormat = NetJSONTimeZoneFormat.Local };
+            
             var date = DateTime.UtcNow;
-            var djson = NetJSON.Serialize(date);
-            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            var djson = NetJSON.Serialize(date, settings);
+            var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
             Assert.IsTrue(date == ddate);
         }
 
@@ -298,11 +299,10 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
-            NetJSON.DateFormat = NetJSONDateFormat.Default;
-            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.Default, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
             var date = DateTime.UtcNow;
-            var djson = NetJSON.Serialize(date);
-            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            var djson = NetJSON.Serialize(date, settings);
+            var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
             Assert.IsTrue(date == ddate);
         }
 
@@ -359,11 +359,11 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestSerializeDateNowUtcWithISOFormatUTC() {
-            NetJSON.DateFormat = NetJSONDateFormat.ISO;
-            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
+            
             var date = DateTime.UtcNow;
-            var djson = NetJSON.Serialize(date);
-            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            var djson = NetJSON.Serialize(date, settings);
+            var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
             Assert.IsTrue(date == ddate);
         }
 
@@ -513,6 +513,13 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void TestRootObjectWithInfiniteLoop() {
+            NetJSON.GenerateAssembly = true;
+            var json = File.ReadAllText("netjson_test.txt");
+            var root = NetJSON.Deserialize<Root2>(json);
+        }
+
+        [TestMethod]
         public void SerializePolyObjects() {
             
             var graph = new Graph { name = "my graph" };
@@ -521,9 +528,10 @@ namespace NetJSON.Tests {
             graph.nodes.Add(new NodeB { text = "hello" });
 
             NetJSON.IncludeTypeInformation = true;
+            var settings = new NetJSONSettings { IncludeTypeInformation = true };
 
-            var json = NetJSON.Serialize(graph, new NetJSONSettings { IncludeTypeInformation = true });
-            var jgraph = NetJSON.Deserialize<Graph>(json);
+            var json = NetJSON.Serialize(graph, settings);
+            var jgraph = NetJSON.Deserialize<Graph>(json, settings);
 
             var nodeA = jgraph.nodes[0] as NodeA;
             var nodeB = jgraph.nodes[1] as NodeB;
@@ -695,6 +703,8 @@ namespace NetJSON.Tests {
 
     public class GlossaryContainer {
         public Glossary glossary { get; set; }
+
+        public GlossaryContainer(string a) { }
 
         public class Glossary {
             public string title { get; set; }
@@ -920,5 +930,65 @@ namespace NetJSON.Tests {
     public class EvntsRoot {
         public List<BetOffer> betoffers { get; set; }
         public List<Event> events { get; set; }
+    }
+
+    public class Root2 {
+        public Data data { get; set; }
+    }
+
+    public class Data {
+        public Data2 data { get; set; }
+    }
+
+    public class Data2 {
+        public Dictionary<String, Sport> sport { get; set; }
+    }
+
+    public class Sport {
+        public int id { get; set; }
+        public string name { get; set; }
+        public Dictionary<String, Region> region { get; set; }
+    }
+
+    public class Region {
+        public int id { get; set; }
+        public string name { get; set; }
+        public Dictionary<String, Competition> competition { get; set; }
+    }
+
+    public class Competition {
+        public int id { get; set; }
+        public string name { get; set; }
+        public Dictionary<String, Game> game { get; set; }
+    }
+
+    public class Game {
+        public int id { get; set; }
+        public int start_ts { get; set; }
+        public string team1_name { get; set; }
+        public string team2_name { get; set; }
+        public int type { get; set; }
+        public Info info { get; set; }
+        public int markets_count { get; set; }
+        public int is_blocked { get; set; }
+        public Dictionary<String, Stat> stats { get; set; }
+        public bool is_stat_available { get; set; }
+    }
+
+    public class Info {
+        public string current_game_state { get; set; }
+        public string current_game_time { get; set; }
+        public string add_minutes { get; set; }
+        public string score1 { get; set; }
+        public string score2 { get; set; }
+        public string shirt1_color { get; set; }
+        public string shirt2_color { get; set; }
+        public string short1_color { get; set; }
+        public string short2_color { get; set; }
+    }
+
+    public class Stat {
+        public int? team1_value { get; set; }
+        //public int? team2_value { get; set; }
     }
 }
