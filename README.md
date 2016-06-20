@@ -48,7 +48,7 @@ Average Exec Time [251.4977] milliseconds
 ```
 
 
-Test Group [NetJson], Test [Serialization] results summary:
+- Test Group [NetJson], Test [Serialization] results summary:
 ```
 Successes   [5]
 Failures    [0]
