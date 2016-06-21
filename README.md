@@ -33,41 +33,45 @@ http://theburningmonk.com/2014/08/json-serializers-benchmarks-updated-2/
 ======================================================
 
 - Without Outcome Filter of Min and Max
-
+```
 Test Group [Protobuf-Net], Test [Serialization] results summary:
 Successes   [5]
 Failures    [0]
+```
 - Average Exec Time [257.9771] milliseconds
+```
 Test Group [Protobuf-Net] average serialized byte array size is [51.72424]
 Test Group [Protobuf-Net], Test [Deserialization] results summary:
 Successes   [5]
 Failures    [0]
 Average Exec Time [251.4977] milliseconds
+```
 
 
-
-Test Group [NetJson], Test [Serialization] results summary:
+- Test Group [NetJson], Test [Serialization] results summary:
+```
 Successes   [5]
 Failures    [0]
+```
 - Average Exec Time [157.98844] milliseconds
+```
 Test Group [NetJson] average serialized byte array size is [98.86456]
 Test Group [NetJson], Test [Deserialization] results summary:
 Successes   [5]
 Failures    [0]
 Average Exec Time [252.18208] milliseconds
-
-
-
+```
 
 How to Use
 ==========
 
+```csharp
 var myObject = new SimpleObject(){ ID = 100, Name = "Test", Value = "Value" };
 
 var json = NetJSON.Serialize(myObject);
 
 var recreatedObject = NetJSON.Deserialize<SimpleObject>(json);
-
+```
 
 Other Downloads
 ===============
