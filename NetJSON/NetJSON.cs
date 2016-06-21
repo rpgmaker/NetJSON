@@ -29,22 +29,51 @@ using System.Runtime.Serialization;
 
 namespace NetJSON {
 
+    /// <summary>
+    /// Attribute for renaming field/property name to use for serialization and deserialization
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class NetJSONPropertyAttribute : Attribute {
+        /// <summary>
+        /// Name of property/field
+        /// </summary>
         public string Name { get; private set; }
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        /// <param name="name"></param>
         public NetJSONPropertyAttribute(string name) {
             Name = name;
         }
     }
 
     public class NetJSONSettings {
+        /// <summary>
+        /// Determine date format: Default: Default
+        /// </summary>
         public NetJSONDateFormat DateFormat { get; set; }
+        /// <summary>
+        /// Determine time zone format: Default : Unspecified
+        /// </summary>
         public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
+        /// <summary>
+        /// Determine formatting for output json: Default: Default
+        /// </summary>
         public NetJSONFormat Format { get; set; }
+        /// <summary>
+        /// Determine if Enum should be serialized as string or int value. Default: True
+        /// </summary>
         public bool UseEnumString { get; set; }
+        /// <summary>
+        /// Determine if default value should be skipped: Default: True
+        /// </summary>
         public bool SkipDefaultValue { get; set; }
         public StringComparison _caseComparison = StringComparison.Ordinal;
         private bool _caseSensitive;
+
+        /// <summary>
+        /// Determine case sensitive for property/field name: Default: True
+        /// </summary>
         public bool CaseSensitive {
             get {
                 return _caseSensitive;
@@ -56,6 +85,9 @@ namespace NetJSON {
         }
 
         private NetJSONQuote _quoteType;
+        /// <summary>
+        /// Quote Type: Default: Double Quote
+        /// </summary>
         public NetJSONQuote QuoteType {
             get {
                 return _quoteType;
@@ -73,6 +105,10 @@ namespace NetJSON {
         public bool HasOverrideQuoteChar {get; internal set;}
 
         public bool UseStringOptimization { get; set; }
+
+        /// <summary>
+        /// Enable including type information for serialization and deserialization
+        /// </summary>
         public bool IncludeTypeInformation { get; set; }
 
         private StringComparison CaseComparison {
@@ -81,6 +117,9 @@ namespace NetJSON {
             }
         }
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
         public NetJSONSettings() {
             IncludeTypeInformation = NetJSON.IncludeTypeInformation;
             DateFormat = NetJSON.DateFormat;
@@ -93,6 +132,10 @@ namespace NetJSON {
             Format = NetJSONFormat.Default;
         }
 
+        /// <summary>
+        /// Clone settings
+        /// </summary>
+        /// <returns></returns>
         public NetJSONSettings Clone() {
             return new NetJSONSettings {
                 IncludeTypeInformation = IncludeTypeInformation,
@@ -109,6 +152,9 @@ namespace NetJSON {
 
         [ThreadStatic]
         private static NetJSONSettings _currentSettings;
+        /// <summary>
+        /// Returns current NetJSONSettings that correspond to old use of settings
+        /// </summary>
         public static NetJSONSettings CurrentSettings {
             get {
                 return _currentSettings ?? (_currentSettings = new NetJSONSettings());
@@ -116,9 +162,19 @@ namespace NetJSON {
         }
     }
 
+    /// <summary>
+    /// Attribute for configuration of Class that requires type information for serialization and deserialization
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public class NetJSONKnownTypeAttribute : Attribute {
+        /// <summary>
+        /// Type
+        /// </summary>
         public Type Type { private set; get; }
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        /// <param name="type"></param>
         public NetJSONKnownTypeAttribute(Type type) {
             Type = type;
         }
@@ -336,19 +392,35 @@ namespace NetJSON {
         }
     }
 
+    /// <summary>
+    /// Exception thrown for invalid json string
+    /// </summary>
     public class NetJSONInvalidJSONException : Exception {
         public NetJSONInvalidJSONException()
             : base("Input is not a valid JSON.") {
         }
     }
 
+    /// <summary>
+    /// Exception thrown for invalid json property attribute
+    /// </summary>
     public class NetJSONInvalidJSONPropertyException : Exception {
+        /// <summary>
+        /// Default constructor
+        /// </summary>
         public NetJSONInvalidJSONPropertyException()
             : base("Class cannot contain any NetJSONProperty with null or blank space character") {
         }
     }
 
+    /// <summary>
+    /// Exception thrown for invalid assembly generation when adding all assembly into a specified assembly file
+    /// </summary>
     public class NetJSONInvalidAssemblyGeneration : Exception {
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        /// <param name="asmName"></param>
         public NetJSONInvalidAssemblyGeneration(string asmName) : base(String.Format("Could not generate assembly with name [{0}] due to empty list of types to include", asmName)) { }
     }
 
@@ -367,27 +439,76 @@ namespace NetJSON {
         public abstract T Deserialize(TextReader reader, NetJSONSettings settings);
     }
 
+    /// <summary>
+    /// Option for determining date formatting
+    /// </summary>
     public enum NetJSONDateFormat {
+        /// <summary>
+        /// Default /Date(...)/
+        /// </summary>
         Default = 0,
+        /// <summary>
+        /// ISO Format
+        /// </summary>
         ISO = 2,
+        /// <summary>
+        /// Unix Epoch Milliseconds
+        /// </summary>
         EpochTime = 4,
+        /// <summary>
+        /// JSON.NET Format for backward compatibility
+        /// </summary>
         JsonNetISO = 6
     }
 
+
+    /// <summary>
+    /// Option for determining timezone formatting
+    /// </summary>
     public enum NetJSONTimeZoneFormat {
+        /// <summary>
+        /// Default unspecified
+        /// </summary>
         Unspecified = 0,
+        /// <summary>
+        /// Utc
+        /// </summary>
         Utc = 2,
+        /// <summary>
+        /// Local time
+        /// </summary>
         Local = 4
     }
 
+    /// <summary>
+    /// Option for determine what type of quote to use for serialization and deserialization
+    /// </summary>
     public enum NetJSONQuote {
+        /// <summary>
+        /// Default: double quote
+        /// </summary>
         Default = 0,
+        /// <summary>
+        /// Use double quote
+        /// </summary>
         Double = Default,
+        /// <summary>
+        /// Use single quote
+        /// </summary>
         Single = 2
     }
 
+    /// <summary>
+    /// Options for controlling serialize json format
+    /// </summary>
     public enum NetJSONFormat {
+        /// <summary>
+        /// Default
+        /// </summary>
         Default = 0,
+        /// <summary>
+        /// Prettify string
+        /// </summary>
         Prettify = 2
     }
 
@@ -1015,12 +1136,16 @@ namespace NetJSON {
 
         private static bool _useSharedAssembly = true;
 
+        /// <summary>
+        /// Flag to determine whether to store all generate serializer for types in a single assembly
+        /// </summary>
         public static bool ShareAssembly {
             set {
                 _useSharedAssembly = value;
             }
         }
 
+        [Obsolete("Use NetJSONSettings.DateFormat")]
         public static NetJSONDateFormat DateFormat {
             set {
                 _dateFormat = value;
@@ -1030,6 +1155,7 @@ namespace NetJSON {
             }
         }
 
+        [Obsolete("Use NetJSONSettings.TimeZoneFormat")]
         public static NetJSONTimeZoneFormat TimeZoneFormat {
             set {
                 _timeZoneFormat = value;
@@ -1041,6 +1167,7 @@ namespace NetJSON {
 
         private static NetJSONQuote _quoteType = NetJSONQuote.Default;
 
+        [Obsolete("Use NetJSONSettings.QuoteType")]
         public static NetJSONQuote QuoteType {
             set {
                 _quoteType = value;
@@ -1053,6 +1180,7 @@ namespace NetJSON {
 
         private static bool _caseSensitive = true;
 
+        [Obsolete("Use NetJSONSettings.CaseSensitive")]
         public static bool CaseSensitive {
             set {
                 _caseSensitive = value;
@@ -1086,6 +1214,7 @@ namespace NetJSON {
 
         private static bool _skipDefaultValue = true;
 
+        [Obsolete("Use NetJSONSettings.SkipDefaultValue")]
         public static bool SkipDefaultValue {
             set {
                 _skipDefaultValue = value;
@@ -1097,6 +1226,7 @@ namespace NetJSON {
 
         private static bool _useStringOptimization = true;
 
+        [Obsolete("Use NetJSONSettings.UseStringOptimization")]
         public static bool UseStringOptimization {
             set {
                 _useStringOptimization = value;
@@ -1107,6 +1237,7 @@ namespace NetJSON {
         }
 
         private static bool _generateAssembly = false;
+        [Obsolete("Use NetJSONSettings.GenerateAssembly")]
         public static bool GenerateAssembly {
             set {
                 _generateAssembly = value;
@@ -3346,6 +3477,12 @@ OpCodes.Callvirt,
         static MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
         static Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
 
+        /// <summary>
+        /// Serialize value using the specified type
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
         public static string Serialize(Type type, object value) {
             return _serializeWithTypes.GetOrAdd(type, _ => {
                 lock (GetDictLockObject("SerializeType", type.Name)) {
@@ -3374,10 +3511,21 @@ OpCodes.Callvirt,
             })(value);
         }
 
+        /// <summary>
+        /// Serialize value using the underlying type of specified value
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
         public static string Serialize(object value) {
             return Serialize(value.GetType(), value);
         }
 
+        /// <summary>
+        /// Deserialize json to specified type
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
         public static object Deserialize(Type type, string value) {
             return _deserializeWithTypes.GetOrAdd(type.FullName, _ => {
                 lock (GetDictLockObject("DeserializeType", type.Name)) {
@@ -3409,7 +3557,7 @@ OpCodes.Callvirt,
         }
 
         /// <summary>
-        /// Register serializer primitive method
+        /// Register serializer primitive method for <typeparamref name="T"/>
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="serializeFunc"></param>
@@ -3428,38 +3576,95 @@ OpCodes.Callvirt,
             _registeredSerializerMethods[type] = method;
         }
 
+        /// <summary>
+        /// Serialize <typeparamref name="T"/> to json
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <returns></returns>
         public static string Serialize<T>(T value) {
            return GetSerializer<T>().Serialize(value);
         }
 
+        /// <summary>
+        /// Serialize <typeparamref name="T"/> to specified writer
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="writer"></param>
         public static void Serialize<T>(T value, TextWriter writer) {
             GetSerializer<T>().Serialize(value, writer);
         }
 
+        /// <summary>
+        /// Deserialize json to <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="json"></param>
+        /// <returns></returns>
         public static T Deserialize<T>(string json) {
            return GetSerializer<T>().Deserialize(json);
         }
 
+        /// <summary>
+        /// Deserialize reader content to <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="reader"></param>
+        /// <returns></returns>
         public static T Deserialize<T>(TextReader reader) {
             return GetSerializer<T>().Deserialize(reader);
         }
 
+        /// <summary>
+        /// Serialize specified <typeparamref name="T"/> using settings
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
         public static string Serialize<T>(T value, NetJSONSettings settings) {
             return GetSerializer<T>().Serialize(value, settings);
         }
 
+        /// <summary>
+        /// Serialize specified <typeparamref name="T"/> to writer using settings
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="writer"></param>
+        /// <param name="settings"></param>
         public static void Serialize<T>(T value, TextWriter writer, NetJSONSettings settings) {
             GetSerializer<T>().Serialize(value, writer, settings);
         }
 
+        /// <summary>
+        /// Deserialize json to <typeparamref name="T"/> using specified settings
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="json"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
         public static T Deserialize<T>(string json, NetJSONSettings settings) {
             return GetSerializer<T>().Deserialize(json, settings);
         }
 
+        /// <summary>
+        /// Deserialize content of reader to <typeparamref name="T"/> using specified settings
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="reader"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
         public static T Deserialize<T>(TextReader reader, NetJSONSettings settings) {
             return GetSerializer<T>().Deserialize(reader, settings);
         }
 
+        /// <summary>
+        /// Deserialize json into Dictionary[string, object]
+        /// </summary>
+        /// <param name="json"></param>
+        /// <returns></returns>
         public static object DeserializeObject(string json) {
             return GetSerializer<object>().Deserialize(json);
         }
