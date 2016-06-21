@@ -3,6 +3,11 @@ NetJSON
 
 Faster than Any Binary?
 
+Build Status
+============
+
+![alt tag](https://ci.appveyor.com/api/projects/status/github/rpgmaker/netjson?svg=true)
+
 Quick Guide
 ===========
 https://github.com/rpgmaker/NetJSON/wiki/Quick-Guide
