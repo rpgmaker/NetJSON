@@ -603,6 +603,7 @@ namespace NetJSON {
             _shortType = typeof(short),
             _longType = typeof(long),
             _jsonType = typeof(NetJSON),
+            _methodInfoType = typeof(MethodBase),
             _textWriterType = typeof(TextWriter),
             _tupleContainerType = typeof(TupleContainer),
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
@@ -692,6 +693,7 @@ namespace NetJSON {
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
             _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
+            _methodGetMethodFromHandle = _methodInfoType.GetMethod("GetMethodFromHandle", MethodBinding, null, new Type[] { typeof(RuntimeMethodHandle) }, null),
             _objectEquals = _objectType.GetMethod("Equals", new []{ _objectType}),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
@@ -702,6 +704,7 @@ namespace NetJSON {
             _settingsHasOverrideQuoteChar = _settingsType.GetProperty("HasOverrideQuoteChar", MethodBinding).GetGetMethod(),
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _jsonType.GetMethod("GetUninitializedInstance", MethodBinding),
+            _setterPropertyValueMethod = _jsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod();
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
@@ -787,6 +790,8 @@ namespace NetJSON {
 
         static ConcurrentDictionary<string, MethodBuilder> _readEnumToStringMethodBuilders =
             new ConcurrentDictionary<string, MethodBuilder>();
+
+        static readonly ConcurrentDictionary<MethodInfo, Delegate> _setMemberValues = new ConcurrentDictionary<MethodInfo, Delegate>();
 
         static ConcurrentDictionary<string, Func<object>> _typeIdentifierFuncs = new ConcurrentDictionary<string, Func<object>>();
 
@@ -4633,6 +4638,39 @@ OpCodes.Callvirt,
             return method;
         }
 
+        delegate void SetterPropertyDelegate<T>(T instance, object value, MethodInfo methodInfo);
+
+        public static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
+            (_setMemberValues.GetOrAdd(methodInfo, key => {
+                lock (GetDictLockObject("SetDynamicMemberValue")) {
+                    var propType = key.GetParameters()[0].ParameterType;
+
+                    var type = key.DeclaringType;
+
+                    var name = String.Concat(type.Name, "_", key.Name);
+                    var meth = new DynamicMethod(name + "_setPropertyValue", _voidType, new[] { type, 
+                    _objectType, _methodInfoType }, restrictedSkipVisibility: true);
+
+                    var il = meth.GetILGenerator();
+
+                    il.Emit(OpCodes.Ldarg_0);
+
+                    il.Emit(OpCodes.Ldarg_1);
+
+                    if (propType.IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, propType);
+                    else
+                        il.Emit(OpCodes.Isinst, propType);
+
+                    il.Emit(OpCodes.Callvirt, key);
+
+                    il.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SetterPropertyDelegate<T>));
+                }
+            }) as SetterPropertyDelegate<T>)(instance, value, methodInfo);
+        }
+
         private static void GenerateTypeSetValueFor(TypeBuilder typeBuilder, Type type, bool isTypeValueType, bool Optimized, ILGenerator il) {
 
             var props = type.GetTypeProperties();
@@ -4648,12 +4686,10 @@ OpCodes.Callvirt,
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
                 var attr = mem.Attribute;
+                MethodInfo setter = null;
                 var isProp = prop != null;
 
-                if (isProp && !prop.CanWrite) {
-                    continue;
-                }
-
+                var canWrite = isProp ? prop.CanWrite : false;
                 var propName = member.Name;
                 var conditionLabel = il.DefineLabel();
                 var propType = isProp ? prop.PropertyType : field.FieldType;
@@ -4661,6 +4697,15 @@ OpCodes.Callvirt,
                 var nullableType = propType.GetNullableType();
                 var isNullable = nullableType != null;
                 propType = isNullable ? nullableType : propType;
+
+                if (canWrite) {
+                    setter = prop.GetSetMethod();
+                    if (setter == null) {
+                        setter = type.GetMethod(String.Concat("set_", propName), MethodBinding);
+                    }
+                }
+
+                var isPublicSetter = canWrite && setter.IsPublic;
 
                 il.Emit(OpCodes.Ldarg_3);
                 il.Emit(OpCodes.Ldstr, attr != null ? (attr.Name ?? propName) : propName);
@@ -4670,18 +4715,26 @@ OpCodes.Callvirt,
 
                 il.Emit(OpCodes.Brfalse, conditionLabel);
 
-
                 if (!Optimized) {
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldarg, 4);
-                    il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
-                    if (isProp) {
-                        if (prop.CanWrite)
-                            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
-                        else
-                            il.Emit(OpCodes.Pop);
-                    } else il.Emit(OpCodes.Stfld, field);
+                    //il.Emit(OpCodes.Ldarg_0);
+                    //il.Emit(OpCodes.Ldarg_1);
+                    //il.Emit(OpCodes.Ldarg, 4);
+                    //il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, propType));
+                    //if (isProp) {
+                    //    if (setter != null) {
+                    //        if (!isPublicSetter) {
+                    //            if (propType.IsValueType)
+                    //                il.Emit(OpCodes.Box, propType);
+                    //            il.Emit(OpCodes.Ldtoken, setter);
+                    //            il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
+                    //            il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
+                    //        } else
+                    //            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                    //    } else {
+                    //        il.Emit(OpCodes.Pop);
+                    //        il.Emit(OpCodes.Pop);
+                    //    }
+                    //} else il.Emit(OpCodes.Stfld, field);
                 } else {
                     var propValue = il.DeclareLocal(originPropType);
                     var isValueType = propType.IsValueType;
@@ -4690,6 +4743,7 @@ OpCodes.Callvirt,
                     var propNullLabel = !isNullable ? il.DefineLabel() : default(Label);
                     var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
                     var equalityMethod = propType.GetMethod("op_Equality");
+
 
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldarg_1);
@@ -4741,10 +4795,19 @@ OpCodes.Callvirt,
                     //}
 
                     if (isProp) {
-                        if (prop.CanWrite)
-                            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod());
-                        else
+                        if (setter != null) {
+                            if (!setter.IsPublic) {
+                                if (propType.IsValueType)
+                                    il.Emit(OpCodes.Box, propType);
+                                il.Emit(OpCodes.Ldtoken, setter);
+                                il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
+                                il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
+                            } else
+                                il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                        } else {
                             il.Emit(OpCodes.Pop);
+                            il.Emit(OpCodes.Pop);
+                        }
 
                     } else il.Emit(OpCodes.Stfld, field);
 

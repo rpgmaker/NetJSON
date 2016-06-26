@@ -459,6 +459,18 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void TestSerializeDeserializeNonPublicSetter() {
+            var model = new Person("John", 12);
+
+            var json = NetJSON.Serialize(model);
+
+            var settings = new NetJSONSettings { IncludeTypeInformation = true };
+            var deserializedModel = NetJSON.Deserialize<Person>(json, settings);
+            Assert.AreEqual("John", deserializedModel.Name);
+            Assert.AreEqual(12, deserializedModel.Age);
+        }
+
+        [TestMethod]
         public void TestSerializeComplexTuple() {
 
             var tuple = new Tuple<int, DateTime, string,
@@ -863,6 +875,16 @@ namespace NetJSON.Tests {
         OnlineCasinoWin,
         OnlineSportsWin,
         LandBasedCasinoWin
+    }
+
+    public sealed class Person {
+        public Person(string name, int age) {
+            this.Name = name;
+            this.Age = age;
+        }
+
+        public string Name { get; private set; }
+        public int Age { get; private set; }
     }
 
     public class Group {
