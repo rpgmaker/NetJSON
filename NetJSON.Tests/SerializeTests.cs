@@ -471,6 +471,22 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void DtoSerialization() {
+            string json;
+            List<MyDto> clone;
+            int count = 30000;
+            var list = new List<MyDto>();
+            for (int i = 0; i < count; i++) {
+                list.Add(new MyDto { ID = i + 1 });
+            }
+
+            json = NetJSON.Serialize(list);
+            clone = NetJSON.Deserialize<List<MyDto>>(json);
+
+            Assert.IsTrue(clone.Count == count);
+        }
+
+        [TestMethod]
         public void TestSerializeComplexTuple() {
 
             var tuple = new Tuple<int, DateTime, string,
@@ -659,7 +675,17 @@ namespace NetJSON.Tests {
     }
 
 
+    public abstract class DtoBase {
+        public int ID { get; set; }
+    }
 
+    public class MyDto : DtoBase {
+        //public int ID { get; set; }
+        public string Code { get; set; }
+        public string DescriptionShort { get; set; }
+        public string DescriptionLong { get; set; }
+        public int GroupID { get; set; }
+    }
 
     public class Graph {
         public string name;

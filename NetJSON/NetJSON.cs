@@ -5687,7 +5687,7 @@ OpCodes.Callvirt,
 
                 var nextLabel = il.DefineLabel();
 
-                foreach (var prop in typeProps) {
+                foreach (var prop in typeProps.OrderBy(x => x.Member.Name.Length)) {
                     var propName = prop.Member.Name;
                     var attr = prop.Attribute;
                     if (attr != null)
