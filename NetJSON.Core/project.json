@@ -1,0 +1,24 @@
+{
+  "buildOptions": {
+    "allowUnsafe": true,
+    "compile": [ "../NetJSON/*.cs" ],
+    "define": [ "NET_CORE" ],
+    "optimize": true
+  },
+  "copyright": "Phoenix Service Bus Inc",
+  "dependencies": {
+    "NETStandard.Library": "1.6.0",
+    "System.Dynamic.Runtime": "4.0.11",
+    "System.Reflection": "4.1.0",
+    "System.Reflection.Emit": "4.0.1",
+    "System.Reflection.Emit.Lightweight": "4.0.1",
+    "System.Reflection.TypeExtensions": "4.1.0"
+  },
+  "frameworks": {
+    "netstandard1.6": {
+      "imports": "dnxcore50"
+    }
+  },
+  "title": "NetJSON",
+  "version": "1.1.0-5"
+}

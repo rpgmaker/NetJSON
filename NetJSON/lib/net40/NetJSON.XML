@@ -9,27 +9,16 @@
             Attribute for renaming field/property name to use for serialization and deserialization
             </summary>
         </member>
-        <member name="M:NetJSON.NetJSONPropertyAttribute.#ctor(System.String)">
-            <summary>
-            Default constructor
-            </summary>
-            <param name="name"></param>
-        </member>
         <member name="P:NetJSON.NetJSONPropertyAttribute.Name">
             <summary>
             Name of property/field
             </summary>
         </member>
-        <member name="M:NetJSON.NetJSONSettings.#ctor">
+        <member name="M:NetJSON.NetJSONPropertyAttribute.#ctor(System.String)">
             <summary>
             Default constructor
             </summary>
-        </member>
-        <member name="M:NetJSON.NetJSONSettings.Clone">
-            <summary>
-            Clone settings
-            </summary>
-            <returns></returns>
+            <param name="name"></param>
         </member>
         <member name="P:NetJSON.NetJSONSettings.DateFormat">
             <summary>
@@ -71,6 +60,17 @@
             Enable including type information for serialization and deserialization
             </summary>
         </member>
+        <member name="M:NetJSON.NetJSONSettings.#ctor">
+            <summary>
+            Default constructor
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONSettings.Clone">
+            <summary>
+            Clone settings
+            </summary>
+            <returns></returns>
+        </member>
         <member name="P:NetJSON.NetJSONSettings.CurrentSettings">
             <summary>
             Returns current NetJSONSettings that correspond to old use of settings
@@ -81,16 +81,16 @@
             Attribute for configuration of Class that requires type information for serialization and deserialization
             </summary>
         </member>
+        <member name="P:NetJSON.NetJSONKnownTypeAttribute.Type">
+            <summary>
+            Type
+            </summary>
+        </member>
         <member name="M:NetJSON.NetJSONKnownTypeAttribute.#ctor(System.Type)">
             <summary>
             Default constructor
             </summary>
             <param name="type"></param>
-        </member>
-        <member name="P:NetJSON.NetJSONKnownTypeAttribute.Type">
-            <summary>
-            Type
-            </summary>
         </member>
         <member name="T:NetJSON.NetJSONInvalidJSONException">
             <summary>
@@ -196,6 +196,11 @@
         <member name="F:NetJSON.NetJSONFormat.Prettify">
             <summary>
             Prettify string
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSON.ShareAssembly">
+            <summary>
+            Flag to determine whether to store all generate serializer for types in a single assembly
             </summary>
         </member>
         <member name="M:NetJSON.NetJSON.Serialize(System.Type,System.Object)">
@@ -316,11 +321,6 @@
             index++
             </summary>
             <param name="il"></param>
-        </member>
-        <member name="P:NetJSON.NetJSON.ShareAssembly">
-            <summary>
-            Flag to determine whether to store all generate serializer for types in a single assembly
-            </summary>
         </member>
     </members>
 </doc>

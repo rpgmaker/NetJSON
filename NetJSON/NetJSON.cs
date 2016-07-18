@@ -210,6 +210,38 @@ namespace NetJSON {
     }
 #endif
 
+
+#if NET_CORE
+    
+    public static class NetCoreExtensions {
+
+        public static bool IsEnum(this Type type){
+            return type.GetTypeInfo().IsEnum;
+        }
+
+        public static bool IsPrimitive(this Type type){
+            return type.GetTypeInfo().IsPrimitive;
+        }
+
+        public static bool IsGenericType(this Type type){
+            return type.GetTypeInfo().IsGenericType;
+        }
+
+        public static bool IsClass(this Type type){
+            return type.GetTypeInfo().IsClass;
+        }
+
+        public static bool IsValueType(this Type type){
+            return type.GetTypeInfo().IsValueType;
+        }
+
+        public static Type GetInterface(this Type type, string name){
+            return type.GetTypeInfo().GetInterface(name);
+        }
+    }
+
+#endif
+
 #if NET_35 || NET_PCL
 
 #if !NET_PCL
@@ -275,7 +307,6 @@ namespace NetJSON {
             return GetMethod(type, name, BindingFlags.Public);
         }
 #endif
-        
         public static Type GetEnumUnderlyingType(this Type type) {
             FieldInfo[] fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
             if ((fields == null) || (fields.Length != 1)) {
@@ -587,7 +618,7 @@ namespace NetJSON {
             
 #if !NET_35
       typeof(ExpandoObject),
-#else 
+#else
       typeof(ExpandoObject),
 #endif
       
@@ -622,7 +653,7 @@ namespace NetJSON {
             _stringBuilderClear = typeof(StringBuilder35Extension).GetMethod("Clear"),
 #else
             _stringBuilderClear = _stringBuilderType.GetMethod("Clear"),
-#endif       
+#endif
             
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
             _tupleContainerAdd = _tupleContainerType.GetMethod("Add"),
@@ -693,7 +724,7 @@ namespace NetJSON {
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
             _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
-            _methodGetMethodFromHandle = _methodInfoType.GetMethod("GetMethodFromHandle", MethodBinding, null, new Type[] { typeof(RuntimeMethodHandle) }, null),
+            _methodGetMethodFromHandle = _methodInfoType.GetMethod("GetMethodFromHandle", new Type[] { typeof(RuntimeMethodHandle) }),
             _objectEquals = _objectType.GetMethod("Equals", new []{ _objectType}),
             _stringEqualCompare = _stringType.GetMethod("Equals", new []{_stringType, _stringType, typeof(StringComparison)}),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
@@ -3319,54 +3350,51 @@ OpCodes.Callvirt,
 
                 if (isNullable) {
                     il.Emit(OpCodes.Stloc, nullablePropValue);
+
+                    var hasValueMethod = originPropType.GetMethod("get_HasValue");
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, hasValueMethod);
+                    il.Emit(OpCodes.Brfalse, propNullLabel);
+
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
+
+                    il.Emit(OpCodes.Stloc, propValue);
                 } else
                     il.Emit(OpCodes.Stloc, propValue);
 
-
                 if (_skipDefaultValue) {
-                    if (isNullable) {
-                        var hasValueMethod = originPropType.GetMethod("get_HasValue");
-                        il.Emit(OpCodes.Ldloca, nullablePropValue);
-                        il.Emit(OpCodes.Call, hasValueMethod);
-                        il.Emit(OpCodes.Brfalse, propNullLabel);
-
-                        il.Emit(OpCodes.Ldloca, nullablePropValue);
-                        il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
-
-                        il.Emit(OpCodes.Stloc, propValue);
+                    if (isStruct)
+                        il.Emit(OpCodes.Ldloca, propValue);
+                    else
+                        il.Emit(OpCodes.Ldloc, propValue);
+                    if (isValueType && isPrimitive) {
+                        LoadDefaultValueByType(il, propType);
                     } else {
-                        if (isStruct)
-                            il.Emit(OpCodes.Ldloca, propValue);
-                        else
-                            il.Emit(OpCodes.Ldloc, propValue);
-                        if (isValueType && isPrimitive) {
-                            LoadDefaultValueByType(il, propType);
-                        } else {
-                            if (!isValueType)
-                                il.Emit(OpCodes.Ldnull);
-                        }
+                        if (!isValueType)
+                            il.Emit(OpCodes.Ldnull);
+                    }
 
-                        if (equalityMethod != null) {
-                            il.Emit(OpCodes.Call, equalityMethod);
+                    if (equalityMethod != null) {
+                        il.Emit(OpCodes.Call, equalityMethod);
+                        il.Emit(OpCodes.Brtrue, propNullLabel);
+                    } else {
+                        if (isStruct) {
+
+                            var tempValue = il.DeclareLocal(propType);
+
+                            il.Emit(OpCodes.Ldloca, tempValue);
+                            il.Emit(OpCodes.Initobj, propType);
+                            il.Emit(OpCodes.Ldloc, tempValue);
+                            il.Emit(OpCodes.Box, propType);
+                            il.Emit(OpCodes.Constrained, propType);
+
+                            il.Emit(OpCodes.Callvirt, _objectEquals);
+
                             il.Emit(OpCodes.Brtrue, propNullLabel);
-                        } else {
-                            if (isStruct) {
 
-                                var tempValue = il.DeclareLocal(propType);
-
-                                il.Emit(OpCodes.Ldloca, tempValue);
-                                il.Emit(OpCodes.Initobj, propType);
-                                il.Emit(OpCodes.Ldloc, tempValue);
-                                il.Emit(OpCodes.Box, propType);
-                                il.Emit(OpCodes.Constrained, propType);
-
-                                il.Emit(OpCodes.Callvirt, _objectEquals);
-
-                                il.Emit(OpCodes.Brtrue, propNullLabel);
-
-                            } else
-                                il.Emit(OpCodes.Beq, propNullLabel);
-                        }
+                        } else
+                            il.Emit(OpCodes.Beq, propNullLabel);
                     }
                 }
 
@@ -5674,7 +5702,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Stloc, startIndex);
 
 
-            #region String Skipping Optimization
+#region String Skipping Optimization
             var skipOptimizeLabel = il.DefineLabel();
             var skipOptimizeLocal = il.DeclareLocal(_boolType);
 
@@ -5717,7 +5745,7 @@ OpCodes.Callvirt,
             }
 
             il.MarkLabel(skipOptimizeLabel);
-            #endregion String Skipping Optimization
+#endregion String Skipping Optimization
 
             il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
             il.MarkLabel(currentQuoteLabel);
@@ -5761,7 +5789,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldloc, isStringBasedLocal);
                 il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
 
-                #region true
+#region true
                 il.Emit(OpCodes.Ldloc, obj);
                 if (isExpandoObject)
                     il.Emit(OpCodes.Isinst, _idictStringObject);
@@ -5776,7 +5804,7 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
                 }
                 il.Emit(OpCodes.Callvirt, dictSetItem);
-                #endregion
+#endregion
 
                 il.MarkLabel(isStringBasedLabel1);
 
@@ -5784,7 +5812,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldloc, isStringBasedLocal);
                 il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
 
-                #region false
+#region false
                 il.Emit(OpCodes.Ldloc, obj);
                 if (isExpandoObject)
                     il.Emit(OpCodes.Isinst, _idictStringObject);
@@ -5799,7 +5827,7 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
                 }
                 il.Emit(OpCodes.Callvirt, dictSetItem);
-                #endregion
+#endregion
 
                 il.MarkLabel(isStringBasedLabel2);
             } else {

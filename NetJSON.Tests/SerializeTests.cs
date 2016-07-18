@@ -548,6 +548,30 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void TestFailedDeserializeOfNullableList() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.SkipDefaultValue = false;
+            var listObj = new List<TestJsonClass>()
+             {
+                new TestJsonClass { time = DateTime.UtcNow.AddYears(1) , id =1 },
+                new TestJsonClass { time = DateTime.UtcNow.AddYears(2), id=2 },
+                new TestJsonClass { time = DateTime.UtcNow.AddYears(3), id=3 }
+            };
+
+            var json = NetJSON.Serialize(listObj);
+            //[{"id":0,"time":"1-01-01T00:00:00.0"},{"id":0,"time":"1-01-01T00:00:00.0"},{"id":0,"time":"1-01-01T00:00:00.0"}]
+
+            listObj = NetJSON.Deserialize<List<TestJsonClass>>(json);
+        }
+
+        [TestMethod]
+        public void TestPossibleInfiniteLoopReproduced() {
+            //var obj = new TestNullableNullClass { ID  = 1, Name = "Hello" };
+            var json = "{\"ID\": null, \"Name\": \"Hello world\"}";
+            var obj = NetJSON.Deserialize<TestNullableNullClass>(json);
+        }
+
+        [TestMethod]
         public void SerializePolyObjects() {
             
             var graph = new Graph { name = "my graph" };
@@ -662,6 +686,11 @@ namespace NetJSON.Tests {
             var obj = NetJSON.Deserialize<GlossaryContainer>(json, new NetJSONSettings { CaseSensitive = false });
             Assert.IsNotNull(obj.glossary.glossdiv);
         }
+    }
+
+    public class TestNullableNullClass {
+        public int? ID { get; set; }
+        public string Name { get; set; }
     }
 
     public class NullableTestType<T> where T : struct {
@@ -919,6 +948,11 @@ namespace NetJSON.Tests {
         public List<Group> groups { get; set; }
     }
 
+    public class TestJsonClass {
+        public int? id { get; set; }
+        public DateTime? time { get; set; }
+    }
+
     public class Root {
         public Group group { get; set; }
     }
@@ -1037,6 +1071,6 @@ namespace NetJSON.Tests {
 
     public class Stat {
         public int? team1_value { get; set; }
-        //public int? team2_value { get; set; }
+        public int? team2_value { get; set; }
     }
 }

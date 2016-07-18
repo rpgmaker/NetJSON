@@ -1012,7 +1012,7 @@ namespace NetJSON {
         "9990999199929993999499959996999799989999"
         };
 
-        static char* cstItoa = (char*)Marshal.StringToHGlobalAuto(String.Join(string.Empty, digits_string)).ToPointer();
+        static char* cstItoa = (char*)Marshal.StringToHGlobalUni(String.Join(string.Empty, digits_string)).ToPointer();
 
         private static unsafe void memcpy(char* dmem, char* smem, int charCount) {
             if ((((int)dmem) & 2) != 0) {
