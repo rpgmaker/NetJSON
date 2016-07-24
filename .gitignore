@@ -4,3 +4,9 @@
 
 /NetJSON/bin/Release
 /NetJSON/obj/Release
+*.suo
+*.user
+_ReSharper.*
+bin
+obj
+packages
