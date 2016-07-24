@@ -5498,7 +5498,7 @@ OpCodes.Callvirt,
                                 GetMemberInfoValue(il, parameter);
                             }
 
-                            il.Emit(OpCodes.Newobj, selectedCtor);//NewObjNoctor
+                            il.Emit(OpCodes.Newobj, selectedCtor);
                             il.Emit(OpCodes.Stloc, sObj);
 
                             //Set field/prop not accounted for in constructor parameters
@@ -5513,16 +5513,6 @@ OpCodes.Callvirt,
                                         setter = type.GetMethod(string.Concat("set_", prop.Name), MethodBinding);
                                     }
                                     var propType = prop.PropertyType;
-                                    //var nullableType = propType.GetNullableType();
-
-                                    //if(nullableType != null) {
-                                    //    var nullableLocal = il.DeclareLocal(propType);
-                                    //    il.Emit(OpCodes.Stloc, nullableLocal);
-
-                                    //    il.Emit(OpCodes.Ldloca, nullableLocal);
-                                    //    il.Emit(OpCodes.Call, propType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
-                                    //    propType = nullableType;
-                                    //}
 
                                     if (!setter.IsPublic) {
                                         if (propType.IsValueType)
