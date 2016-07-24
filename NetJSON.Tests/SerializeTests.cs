@@ -272,10 +272,10 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void TestSerializeAlwaysContainsQuotesEvenAfterBeenSerializedInDifferentThreads() {
             var api = new APIQuote { value = "Test" };
-            var json = NetJSON.Serialize(api);
+            var json = NetJSON.Serialize(api, new NetJSONSettings { QuoteType = NetJSONQuote.Single });
             var json2 = string.Empty;
             Task.Run(() => {
-                json2 = NetJSON.Serialize(api);
+                json2 = NetJSON.Serialize(api, new NetJSONSettings { QuoteType = NetJSONQuote.Single });
             }).Wait();
             Assert.IsTrue(json.Equals(json2), json2);
         }
