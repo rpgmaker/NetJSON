@@ -4826,7 +4826,7 @@ OpCodes.Callvirt,
                         if (setter != null) {
                             if (!setter.IsPublic) {
                                 if (propType.IsValueType)
-                                    il.Emit(OpCodes.Box, propType);
+                                    il.Emit(OpCodes.Box, isNullable ? prop.PropertyType : propType);
                                 il.Emit(OpCodes.Ldtoken, setter);
                                 il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
                                 il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
@@ -5222,6 +5222,7 @@ OpCodes.Callvirt,
             var valueType = hasArgument && arguments.Length > 1 ? arguments[1] : _objectType;
             var isKeyValuePair = false;
             var isExpandoObject = type == _expandoObjectType;
+            ConstructorInfo selectedCtor = null;
 
             if (isDict && keyType == null) {
                 var baseType = type.BaseType;
@@ -5293,7 +5294,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Stloc, tupleCountLocal);
             }
 
-
+            
             if (isTypeValueType) {
                 il.Emit(OpCodes.Ldloca, obj);
                 il.Emit(OpCodes.Initobj, type);
@@ -5304,9 +5305,10 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Stloc, obj);
                 } else {
                     var ctor = type.GetConstructor(Type.EmptyTypes);
-                    if (ctor == null)
+                    if (ctor == null) {
+                        selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
                         il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
-                    else
+                    } else
                         il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
                     il.Emit(OpCodes.Stloc, obj);
                 }
@@ -5482,9 +5484,64 @@ OpCodes.Callvirt,
                         il.Emit(OpCodes.Ldloc, obj);
                         il.Emit(OpCodes.Callvirt, toTupleMethod);
                     }
+                } else {
+                    if(selectedCtor != null) {
+                        var sObj = il.DeclareLocal(type);
+                        var parameters = selectedCtor.GetParameters();
+                        var props = type.GetTypeProperties();
+                        var paramProps = props.Where(x => parameters.Any(y => y.Name.Equals(x.Member.Name, StringComparison.OrdinalIgnoreCase)));
+                        var excludedParams = props.Where(x => !parameters.Any(y => y.Name.Equals(x.Member.Name, StringComparison.OrdinalIgnoreCase)));
+
+                        if (paramProps.Any()) {
+                            foreach (var parameter in paramProps) {
+                                il.Emit(OpCodes.Ldloc, obj);
+                                GetMemberInfoValue(il, parameter);
+                            }
+
+                            il.Emit(OpCodes.Newobj, selectedCtor);//NewObjNoctor
+                            il.Emit(OpCodes.Stloc, sObj);
+
+                            //Set field/prop not accounted for in constructor parameters
+                            foreach (var param in excludedParams) {
+                                il.Emit(OpCodes.Ldloc, sObj);
+                                il.Emit(OpCodes.Ldloc, obj);
+                                GetMemberInfoValue(il, param);
+                                var prop = param.Member.MemberType == MemberTypes.Property ? param.Member as PropertyInfo : null;
+                                if (prop != null) {
+                                    var setter = prop.GetSetMethod();
+                                    if (setter == null) {
+                                        setter = type.GetMethod(string.Concat("set_", prop.Name), MethodBinding);
+                                    }
+                                    var propType = prop.PropertyType;
+                                    //var nullableType = propType.GetNullableType();
+
+                                    //if(nullableType != null) {
+                                    //    var nullableLocal = il.DeclareLocal(propType);
+                                    //    il.Emit(OpCodes.Stloc, nullableLocal);
+
+                                    //    il.Emit(OpCodes.Ldloca, nullableLocal);
+                                    //    il.Emit(OpCodes.Call, propType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
+                                    //    propType = nullableType;
+                                    //}
+
+                                    if (!setter.IsPublic) {
+                                        if (propType.IsValueType)
+                                            il.Emit(OpCodes.Box, propType);
+                                        il.Emit(OpCodes.Ldtoken, setter);
+                                        il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
+                                        il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
+                                    } else
+                                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                                } else
+                                    il.Emit(OpCodes.Stfld, (FieldInfo)param.Member);
+                            }
+
+                            il.Emit(OpCodes.Ldloc, sObj);
+                        } else
+                            il.Emit(OpCodes.Ldloc, obj);
+                    }else
+                        il.Emit(OpCodes.Ldloc, obj);
                 }
-                else                
-                    il.Emit(OpCodes.Ldloc, obj);
             },
             beginIndexIf: (msil, current) => {
                 il.Emit(OpCodes.Ldloc, current);
@@ -5497,6 +5554,13 @@ OpCodes.Callvirt,
 
 
             return method;
+        }
+
+        private static void GetMemberInfoValue(ILGenerator il, NetJSONMemberInfo parameter) {
+            var prop = parameter.Member.MemberType == MemberTypes.Property ? parameter.Member as PropertyInfo : null;
+            if (prop != null)
+                il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+            else il.Emit(OpCodes.Ldfld, (FieldInfo)parameter.Member);
         }
 
         private static void GenerateGetClassOrDictNonStringType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder settings, LocalBuilder startIndex, Type keyType, Type valueType, bool isKeyValuePair, bool isExpandoObject, LocalBuilder obj, MethodInfo dictSetItem, LocalBuilder current, LocalBuilder ptr) {

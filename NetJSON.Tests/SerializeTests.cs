@@ -567,7 +567,7 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void TestPossibleInfiniteLoopReproduced() {
             //var obj = new TestNullableNullClass { ID  = 1, Name = "Hello" };
-            var json = "{\"ID\": null, \"Name\": \"Hello world\"}";
+            var json = "{\"ID\": 2, \"Name\": \"Hello world\"}";
             var obj = NetJSON.Deserialize<TestNullableNullClass>(json);
         }
 
@@ -686,6 +686,27 @@ namespace NetJSON.Tests {
             var obj = NetJSON.Deserialize<GlossaryContainer>(json, new NetJSONSettings { CaseSensitive = false });
             Assert.IsNotNull(obj.glossary.glossdiv);
         }
+
+        [TestMethod]
+        public void TestPersonClassWithMultipleNonDefaultConstructor() {
+            var json = "{ \"name\": \"boss\", \"age\": 2, \"reasonForUnknownAge\": \"he is the boss\" }";
+            var data = NetJSON.Deserialize<PersonTest>(json, new NetJSONSettings { CaseSensitive = false });
+            Assert.IsTrue(data.Age == 2);
+        }
+    }
+
+    public class PersonTest {
+        public string Name { get; private set; }
+        public int? Age { get; private set; }
+        public string ReasonForUnknownAge { get; private set; }
+        public PersonTest(string name, int age) {
+            Age = age;
+            Name = name;
+        } // age is known
+        public PersonTest(string name, string reasonForUnknownAge) {
+            Name = name;
+            ReasonForUnknownAge = reasonForUnknownAge;
+        } // age is unknown, for some reason
     }
 
     public class TestNullableNullClass {
