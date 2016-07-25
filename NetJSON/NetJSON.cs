@@ -734,6 +734,7 @@ namespace NetJSON {
             _settingsUseStringOptimization = _settingsType.GetProperty("UseStringOptimization", MethodBinding).GetGetMethod(),
             _settingsHasOverrideQuoteChar = _settingsType.GetProperty("HasOverrideQuoteChar", MethodBinding).GetGetMethod(),
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
+            _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _jsonType.GetMethod("GetUninitializedInstance", MethodBinding),
             _setterPropertyValueMethod = _jsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod();
@@ -3275,6 +3276,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
             il.Emit(OpCodes.Pop);
 
+            var skipDefaultValue = il.DeclareLocal(_boolType);
             var hasValue = il.DeclareLocal(_boolType);
             var props = type.GetTypeProperties();
             var count = props.Length - 1;
@@ -3283,6 +3285,13 @@ OpCodes.Callvirt,
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasValue);
+
+
+            //Get skip default value setting
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
+            il.Emit(OpCodes.Stloc, skipDefaultValue);
+
 
             if (isPoly) {
                 il.Emit(OpCodes.Ldarg_1);
@@ -3329,7 +3338,7 @@ OpCodes.Callvirt,
 
                 propType = isNullable ? nullableType : propType;
                 var isValueType = propType.IsValueType;
-                var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
+                //var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
                 var equalityMethod = propType.GetMethod("op_Equality");
                 var propValue = il.DeclareLocal(propType);
                 var isStruct = isValueType && !isPrimitive;
@@ -3350,12 +3359,7 @@ OpCodes.Callvirt,
 
                 if (isNullable) {
                     il.Emit(OpCodes.Stloc, nullablePropValue);
-
-                    var hasValueMethod = originPropType.GetMethod("get_HasValue");
-                    il.Emit(OpCodes.Ldloca, nullablePropValue);
-                    il.Emit(OpCodes.Call, hasValueMethod);
-                    il.Emit(OpCodes.Brfalse, propNullLabel);
-
+                    
                     il.Emit(OpCodes.Ldloca, nullablePropValue);
                     il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
 
@@ -3363,90 +3367,117 @@ OpCodes.Callvirt,
                 } else
                     il.Emit(OpCodes.Stloc, propValue);
 
-                if (_skipDefaultValue) {
-                    if (isStruct)
-                        il.Emit(OpCodes.Ldloca, propValue);
-                    else
-                        il.Emit(OpCodes.Ldloc, propValue);
-                    if (isValueType && isPrimitive) {
-                        LoadDefaultValueByType(il, propType);
-                    } else {
-                        if (!isValueType)
-                            il.Emit(OpCodes.Ldnull);
-                    }
 
-                    if (equalityMethod != null) {
-                        il.Emit(OpCodes.Call, equalityMethod);
-                        il.Emit(OpCodes.Brtrue, propNullLabel);
-                    } else {
-                        if (isStruct) {
+                var propNullLabel = il.DefineLabel();
+                var skipDefaultValueTrueLabel = il.DefineLabel();
+                var skipDefaultValueFalseLabel = il.DefineLabel();
 
-                            var tempValue = il.DeclareLocal(propType);
+                il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
 
-                            il.Emit(OpCodes.Ldloca, tempValue);
-                            il.Emit(OpCodes.Initobj, propType);
-                            il.Emit(OpCodes.Ldloc, tempValue);
-                            il.Emit(OpCodes.Box, propType);
-                            il.Emit(OpCodes.Constrained, propType);
-
-                            il.Emit(OpCodes.Callvirt, _objectEquals);
-
-                            il.Emit(OpCodes.Brtrue, propNullLabel);
-
-                        } else
-                            il.Emit(OpCodes.Beq, propNullLabel);
-                    }
+                if (isNullable) {
+                    var hasValueMethod = originPropType.GetMethod("get_HasValue");
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, hasValueMethod);
+                    il.Emit(OpCodes.Brfalse, propNullLabel);
                 }
 
-
-                if (counter > 0) {
-
-                    var hasValueDelimeterLabel = il.DefineLabel();
-
-                    il.Emit(OpCodes.Ldloc, hasValue);
-                    il.Emit(OpCodes.Brfalse, hasValueDelimeterLabel);
-
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldc_I4, Delimeter);
-                    il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
-                    il.Emit(OpCodes.Pop);
-
-                    il.MarkLabel(hasValueDelimeterLabel);
-                }
-
-                il.Emit(OpCodes.Ldarg_1);
-                LoadQuotChar(il);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Ldstr, name);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                LoadQuotChar(il);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                il.Emit(OpCodes.Ldc_I4, ColonChr);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
-                il.Emit(OpCodes.Pop);
-
-
-                if (propType == _intType || propType == _longType) {
-                    il.Emit(OpCodes.Ldarg_1);
+                if (isStruct)
+                    il.Emit(OpCodes.Ldloca, propValue);
+                else
                     il.Emit(OpCodes.Ldloc, propValue);
-
-                    il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
-                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-                    il.Emit(OpCodes.Pop);
+                if (isValueType && isPrimitive) {
+                    LoadDefaultValueByType(il, propType);
                 } else {
-                    il.Emit(OpCodes.Ldloc, propValue);
-
-                    il.Emit(OpCodes.Ldarg_1);
-                    il.Emit(OpCodes.Ldarg_2);
-                    il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
+                    if (!isValueType)
+                        il.Emit(OpCodes.Ldnull);
                 }
 
-                il.Emit(OpCodes.Ldc_I4_1);
-                il.Emit(OpCodes.Stloc, hasValue);
+                if (equalityMethod != null) {
+                    il.Emit(OpCodes.Call, equalityMethod);
+                    il.Emit(OpCodes.Brtrue, propNullLabel);
+                } else {
+                    if (isStruct) {
 
-                if (_skipDefaultValue) {
-                    il.MarkLabel(propNullLabel);
+                        var tempValue = il.DeclareLocal(propType);
+
+                        il.Emit(OpCodes.Ldloca, tempValue);
+                        il.Emit(OpCodes.Initobj, propType);
+                        il.Emit(OpCodes.Ldloc, tempValue);
+                        il.Emit(OpCodes.Box, propType);
+                        il.Emit(OpCodes.Constrained, propType);
+
+                        il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                        il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                    } else
+                        il.Emit(OpCodes.Beq, propNullLabel);
                 }
+
+                WritePropertyForType(typeBuilder, il, hasValue, counter, name, propType, propValue);
+
+                il.MarkLabel(propNullLabel);
+
+                il.MarkLabel(skipDefaultValueTrueLabel);
+
+
+                il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+
+                WritePropertyForType(typeBuilder, il, hasValue, counter, name, propType, propValue);
+
+                il.MarkLabel(skipDefaultValueFalseLabel);
+
+
+                #region
+                //if (_skipDefaultValue) {
+
+                //    if (isNullable) {
+                //        var hasValueMethod = originPropType.GetMethod("get_HasValue");
+                //        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                //        il.Emit(OpCodes.Call, hasValueMethod);
+                //        il.Emit(OpCodes.Brfalse, propNullLabel);
+                //    }
+
+                //    if (isStruct)
+                //        il.Emit(OpCodes.Ldloca, propValue);
+                //    else
+                //        il.Emit(OpCodes.Ldloc, propValue);
+                //    if (isValueType && isPrimitive) {
+                //        LoadDefaultValueByType(il, propType);
+                //    } else {
+                //        if (!isValueType)
+                //            il.Emit(OpCodes.Ldnull);
+                //    }
+
+                //    if (equalityMethod != null) {
+                //        il.Emit(OpCodes.Call, equalityMethod);
+                //        il.Emit(OpCodes.Brtrue, propNullLabel);
+                //    } else {
+                //        if (isStruct) {
+
+                //            var tempValue = il.DeclareLocal(propType);
+
+                //            il.Emit(OpCodes.Ldloca, tempValue);
+                //            il.Emit(OpCodes.Initobj, propType);
+                //            il.Emit(OpCodes.Ldloc, tempValue);
+                //            il.Emit(OpCodes.Box, propType);
+                //            il.Emit(OpCodes.Constrained, propType);
+
+                //            il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                //            il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                //        } else
+                //            il.Emit(OpCodes.Beq, propNullLabel);
+                //    }
+                //}
+                #endregion
+
+                //if (_skipDefaultValue) {
+                //    il.MarkLabel(propNullLabel);
+                //}
 
                 counter++;
             }
@@ -3455,6 +3486,53 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldc_I4_S, ObjectClose);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
             il.Emit(OpCodes.Pop);
+        }
+
+        private static void WritePropertyForType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder hasValue, int counter, string name, Type propType, LocalBuilder propValue) {
+            if (counter > 0) {
+
+                var hasValueDelimeterLabel = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldloc, hasValue);
+                il.Emit(OpCodes.Brfalse, hasValueDelimeterLabel);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldc_I4, Delimeter);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+                il.Emit(OpCodes.Pop);
+
+                il.MarkLabel(hasValueDelimeterLabel);
+            }
+
+            il.Emit(OpCodes.Ldarg_1);
+            LoadQuotChar(il);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+            il.Emit(OpCodes.Ldstr, name);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+            LoadQuotChar(il);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+            il.Emit(OpCodes.Ldc_I4, ColonChr);
+            il.Emit(OpCodes.Callvirt, _stringBuilderAppendChar);
+            il.Emit(OpCodes.Pop);
+
+
+            if (propType == _intType || propType == _longType) {
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldloc, propValue);
+
+                il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+            } else {
+                il.Emit(OpCodes.Ldloc, propValue);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
+            }
+
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Stloc, hasValue);
         }
 
         private static void LoadDefaultValueByType(ILGenerator il, Type type) {

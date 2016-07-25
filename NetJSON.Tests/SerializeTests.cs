@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -693,6 +694,47 @@ namespace NetJSON.Tests {
             var data = NetJSON.Deserialize<PersonTest>(json, new NetJSONSettings { CaseSensitive = false });
             Assert.IsTrue(data.Age == 2);
         }
+
+        [TestMethod]
+        public void TestSkipDefaultValueWithSetting() {
+            var model = new Computer {
+                Timestamp = 12345,
+                Processes = Enumerable.Range(0, 100)
+                    .Select(x => new Process {
+                        Id = (uint)x,
+                        Name = "P: " + x.ToString(),
+                        Description = "This is process " + x.ToString()
+                    })
+                    .ToArray(),
+
+                OperatingSystems = Enumerable.Range(0, 50)
+                    .Select(x => new OperatingSystem {
+                        Name = "OS - " + x.ToString(),
+                        Version = "0.0.0." + x.ToString(),
+                        Price = (decimal)(x * 0.412),
+                        Disks = new[]
+                        {
+                    new Disk
+                    {
+                        Name = "Disk: " + x.ToString(),
+                        Capacity = x * 100
+                    },
+                    new Disk
+                    {
+                        Name = "Disk: " + x.ToString(),
+                        Capacity = x * 100
+                    }
+                        }
+                    })
+                    .ToArray()
+            };
+
+            var setting = new NetJSONSettings { SkipDefaultValue = false };
+
+            var modelAsJson = NetJSON.Serialize(model, setting);
+            var modelFromJson = NetJSON.Deserialize<Computer>(modelAsJson, setting);
+            Assert.AreEqual(model.Processes[0].Id, modelFromJson.Processes[0].Id);
+        }
     }
 
     public class PersonTest {
@@ -945,6 +987,30 @@ namespace NetJSON.Tests {
         public string YourBet { get; set; }
 
         public string LeagueName { get; set; }
+    }
+
+    public sealed class Computer {
+        public long Timestamp { get; set; }
+        public Process[] Processes { get; set; }
+        public OperatingSystem[] OperatingSystems { get; set; }
+    }
+
+    public sealed class Process {
+        public string Name { get; set; }
+        public uint Id { get; set; }
+        public string Description { get; set; }
+    }
+
+    public sealed class OperatingSystem {
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public decimal Price { get; set; }
+        public Disk[] Disks { get; set; }
+    }
+
+    public sealed class Disk {
+        public string Name { get; set; }
+        public long Capacity { get; set; }
     }
 
     public enum TopWinType {
