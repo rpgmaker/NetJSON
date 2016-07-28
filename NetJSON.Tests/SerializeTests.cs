@@ -625,6 +625,29 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void TestSerializeByteArray() {
+            var buffer = new byte[10];
+            new Random().NextBytes(buffer);
+            var json = NetJSON.Serialize(buffer);
+            var data = NetJSON.Deserialize<byte[]>(json);
+            Assert.IsTrue(data.Length == buffer.Length);
+        }
+
+        [TestMethod]
+        public void CanGenerateCamelCaseProperty() {
+            var obj = new TopWinOnlineCasino { GameId = "TestGame" };
+            var json = NetJSON.Serialize(obj, new NetJSONSettings { CamelCase = true });
+            Assert.IsTrue(json.Contains("gameId"));
+        }
+
+        [TestMethod]
+        public void CannotGenerateCamelCaseProperty() {
+            var obj = new TopWinOnlineCasino { GameId = "TestGame" };
+            var json = NetJSON.Serialize(obj, new NetJSONSettings { CamelCase = false });
+            Assert.IsTrue(json.Contains("GameId"), json);
+        }
+
+        [TestMethod]
         public void CanDeserialiseNullableDateTime() {
             var itm = new DateTime(2015, 12, 15);
             var testObj = new NullableTestType<DateTime>(itm);

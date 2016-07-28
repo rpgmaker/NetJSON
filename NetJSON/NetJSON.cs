@@ -118,6 +118,11 @@ namespace NetJSON {
         }
 
         /// <summary>
+        /// Enable camelCasing for property/field names
+        /// </summary>
+        public bool CamelCase { get; set; }
+
+        /// <summary>
         /// Default constructor
         /// </summary>
         public NetJSONSettings() {
@@ -130,6 +135,7 @@ namespace NetJSON {
             QuoteType = NetJSON.QuoteType;
             UseStringOptimization = NetJSON.UseStringOptimization;
             Format = NetJSONFormat.Default;
+            CamelCase = false;
         }
 
         /// <summary>
@@ -737,7 +743,9 @@ namespace NetJSON {
             _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _jsonType.GetMethod("GetUninitializedInstance", MethodBinding),
             _setterPropertyValueMethod = _jsonType.GetMethod("SetterPropertyValue", MethodBinding),
-            _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod();
+            _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
+            _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
+            _toCamelCase = _jsonType.GetMethod("ToCamelCase", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
             _settingQuoteChar = _settingsType.GetField("_quoteChar", MethodBinding),
@@ -1629,8 +1637,32 @@ namespace NetJSON {
             return returnType;
         }
 
-        private static void EmitSettingsGetProperty(ILGenerator il, string name) {
-
+        public unsafe static string ToCamelCase(string str) {
+            fixed (char* p = str) {
+                char* buffer = stackalloc char[str.Length];
+                int c = 0;
+                char* ptr = p;
+                pc:
+                char f = *ptr;
+                if (c == 0 && f >= 65 && f <= 90)
+                    *buffer = (char)(f + 32);
+                else if (c > 0 && f >= 97 && f <= 122)
+                    *buffer = (char)(f - 32);
+                else
+                    *buffer = *ptr;
+                ++c;
+                ptr++;
+                buffer++;
+                while ((f = *(ptr++)) != '\0') {
+                    if (f == ' ' || f == '_') {
+                        goto pc;
+                    }
+                    *(buffer++) = f;
+                    ++c;
+                }
+                buffer -= c;
+                return new string(buffer, 0, c);
+            }
         }
 
         private static TypeBuilder GenerateTypeBuilder(Type objType, ModuleBuilder module) {
@@ -2453,7 +2485,7 @@ OpCodes.Callvirt,
 
                 il.Emit(OpCodes.Ldnull);
             } else {
-                var isArray = type.IsListType() || type.IsArray;
+                var isArray = (type.IsListType() || type.IsArray) && !type.IsPrimitiveType();
 
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
@@ -3277,6 +3309,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Pop);
 
             var skipDefaultValue = il.DeclareLocal(_boolType);
+            var camelCasing = il.DeclareLocal(_boolType);
             var hasValue = il.DeclareLocal(_boolType);
             var props = type.GetTypeProperties();
             var count = props.Length - 1;
@@ -3292,6 +3325,11 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
             il.Emit(OpCodes.Stloc, skipDefaultValue);
 
+
+            //Get camel case setting
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Callvirt, _settingsCamelCase);
+            il.Emit(OpCodes.Stloc, camelCasing);
 
             if (isPoly) {
                 il.Emit(OpCodes.Ldarg_1);
@@ -3343,6 +3381,20 @@ OpCodes.Callvirt,
                 var propValue = il.DeclareLocal(propType);
                 var isStruct = isValueType && !isPrimitive;
                 var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
+                var nameLocal = il.DeclareLocal(_stringType);
+                var camelCaseLabel = il.DefineLabel();
+
+                il.Emit(OpCodes.Ldstr, name);
+                il.Emit(OpCodes.Stloc, nameLocal);
+
+                il.Emit(OpCodes.Ldloc, camelCasing);
+                il.Emit(OpCodes.Brfalse, camelCaseLabel);
+
+                il.Emit(OpCodes.Ldloc, nameLocal);
+                il.Emit(OpCodes.Call, _toCamelCase);
+                il.Emit(OpCodes.Stloc, nameLocal);
+
+                il.MarkLabel(camelCaseLabel);
 
                 if (isClass) {
                     il.Emit(OpCodes.Ldarg_0);
@@ -3415,7 +3467,7 @@ OpCodes.Callvirt,
                         il.Emit(OpCodes.Beq, propNullLabel);
                 }
 
-                WritePropertyForType(typeBuilder, il, hasValue, counter, name, propType, propValue);
+                WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
                 il.MarkLabel(propNullLabel);
 
@@ -3425,7 +3477,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
 
-                WritePropertyForType(typeBuilder, il, hasValue, counter, name, propType, propValue);
+                WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
                 il.MarkLabel(skipDefaultValueFalseLabel);
 
@@ -3488,7 +3540,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Pop);
         }
 
-        private static void WritePropertyForType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder hasValue, int counter, string name, Type propType, LocalBuilder propValue) {
+        private static void WritePropertyForType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder hasValue, int counter, LocalBuilder name, Type propType, LocalBuilder propValue) {
             if (counter > 0) {
 
                 var hasValueDelimeterLabel = il.DefineLabel();
@@ -3507,7 +3559,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldarg_1);
             LoadQuotChar(il);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
-            il.Emit(OpCodes.Ldstr, name);
+            il.Emit(OpCodes.Ldloc, name);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
             LoadQuotChar(il);
             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);

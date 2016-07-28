@@ -60,6 +60,11 @@
             Enable including type information for serialization and deserialization
             </summary>
         </member>
+        <member name="P:NetJSON.NetJSONSettings.CamelCase">
+            <summary>
+            Enable camelCasing for property/field names
+            </summary>
+        </member>
         <member name="M:NetJSON.NetJSONSettings.#ctor">
             <summary>
             Default constructor
