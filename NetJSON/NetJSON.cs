@@ -5027,7 +5027,7 @@ OpCodes.Callvirt,
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
             var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
-            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type);
+            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
             

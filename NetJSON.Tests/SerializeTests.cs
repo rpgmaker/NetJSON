@@ -94,7 +94,6 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestSerializeException() {
-            NetJSON.UseStringOptimization = true;
             var exception = new ExceptionInfoEx {
                 Data = new Dictionary<string, string> { { "Test1", "Hello" } },
                 ExceptionType = typeof(InvalidCastException),
@@ -593,7 +592,7 @@ namespace NetJSON.Tests {
             Assert.IsTrue(nodeB != null && nodeB.text == "hello", json);
         }
 
-        //[TestMethod]
+        [TestMethod]
         public void NestedGraphDoesNotThrow() {
             var o = new GetTopWinsResponse() {
                 TopWins = new List<TopWinDto>()
@@ -622,6 +621,8 @@ namespace NetJSON.Tests {
             };
 
             var actual = NetJSON.Serialize(o.GetType(), o);
+            var data = NetJSON.Deserialize<GetTopWinsResponse>(actual);
+            Assert.IsTrue(o.TopWins.Count() == data.TopWins.Count());
         }
 
         [TestMethod]
@@ -758,6 +759,19 @@ namespace NetJSON.Tests {
             var modelFromJson = NetJSON.Deserialize<Computer>(modelAsJson, setting);
             Assert.AreEqual(model.Processes[0].Id, modelFromJson.Processes[0].Id);
         }
+
+        [TestMethod]
+        public void TestIEnumerableClassHolder() {
+            var d = new TestEnumerableClass { Data = new List<string> { "a", "b" } };
+            var json = NetJSON.Serialize(d);
+            var d2 = NetJSON.Deserialize<TestEnumerableClass>(json);
+            Assert.IsTrue(d2.Data.Count() == d.Data.Count());
+        }
+    }
+
+
+    public class TestEnumerableClass {
+        public IEnumerable<string> Data { get; set; }
     }
 
     public class PersonTest {
@@ -934,7 +948,6 @@ namespace NetJSON.Tests {
 
     public class GetTopWinsResponse : Response {
         public GetTopWinsResponse() {
-            //TopWins = new List<TopWinDto>();
         }
 
         public IEnumerable<TopWinDto> TopWins { get; set; }
