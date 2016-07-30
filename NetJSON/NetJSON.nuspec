@@ -4,11 +4,14 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.1.0.6</version> 
+    <version>1.2.0.0</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Fix issue with skip default value not working when used from NetJSONSettings
+      Fixed issue with serialization of byte array
+      Added support for camelCasing option in NetJSONSetting
+      Added support for using immutable types
+      Added support for IEnumerable property/field type   
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
