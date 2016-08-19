@@ -632,20 +632,46 @@ OpCodes.Call,
 
             private static NetJSONSerializer<T> GetSerializer()
             {
-                var type = typeof(T);
-                if (type
+                NetJSONSerializer<T> serializer = null;
+                try
+                {
+                    serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+                }
+                catch
+                {
+                    var type = typeof(T);
+                    if (type
+#if NET_CORE
+                    .GetTypeInfo()
+#endif
+                        .IsGenericType) {
+                        foreach(var item in type.GetGenericArguments())
+                        {
+                            if (IsPrivate(item))
+                            {
+                                type = item;
+                                break;
+                            }
+                        }
+                    }
+                    if (IsPrivate(type))
+                        serializer = new DynamicNetJSONSerializer<T>();
+                }
+                return serializer;
+            }
+
+            private static bool IsPrivate(Type type)
+            {
+                return type
 #if NET_CORE
                     .GetTypeInfo()
 #endif
                     .IsNotPublic ||
-                    type
+                        type
 #if NET_CORE
                     .GetTypeInfo()
 #endif
-                    .IsNestedPrivate
-                    )
-                    return new DynamicNetJSONSerializer<T>();
-                return (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+                    .IsNestedPrivate;
             }
         }
         

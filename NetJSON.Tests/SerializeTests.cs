@@ -301,7 +301,7 @@ namespace NetJSON.Tests {
         public void SerializeAnonymous()
         {
             var test = new { ID = 100, Name = "Test", Inner = new { ID = 100, N = "ABC" } };
-            var json = NetJSON.Serialize(test);
+            var json = NetJSON.Serialize(Enumerable.Range(0,1).Select(x => test));
             Assert.IsTrue(json != null);
         }
 
