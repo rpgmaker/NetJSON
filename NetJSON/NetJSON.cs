@@ -449,7 +449,7 @@ namespace NetJSON {
         public abstract void Serialize(T value, TextWriter writer, NetJSONSettings settings);
         public abstract T Deserialize(TextReader reader, NetJSONSettings settings);
     }
-
+    
     /// <summary>
     /// Option for determining date formatting
     /// </summary>
@@ -523,20 +523,132 @@ namespace NetJSON {
         Prettify = 2
     }
 
-    public static class NetJSON {
+    public static partial class NetJSON {
 
-        private static class NetJSONCachedSerializer<T> {
-            public static readonly NetJSONSerializer<T> Serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+        public class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
+        {
+            private delegate T DeserializeTextReaderDelegate(TextReader reader);
+            private delegate T DeserializeDelegate(string value);
+            private delegate T DeserializeTextReaderSettingsDelegate(TextReader reader, NetJSONSettings settings);
+            private delegate T DeserializeSettingsDelegate(string value, NetJSONSettings settings);
+            private delegate string SerializeDelegate(T value);
+            private delegate T SerializeSettingsDelegate(T value, NetJSONSettings settings);
+            private delegate T SerializeTextWriterDelegate(T value, TextWriter writer);
+            private delegate T SerializeTextWriterSettingsDelegate(T value, TextWriter writer, NetJSONSettings settings);
+
+            private ConcurrentDictionary<string, Delegate> _delegates = new ConcurrentDictionary<string, Delegate>();
+
+            private Type _objType;
+            public Type ObjType
+            {
+                get
+                {
+                    return _objType ?? (_objType = typeof(T));
+                }
+            }
+
+            public bool IsPrimitive
+            {
+                get
+                {
+                    return ObjType.IsPrimitiveType();
+                }
+            }
+
+            public override T Deserialize(TextReader reader)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override T Deserialize(string value)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override T Deserialize(TextReader reader, NetJSONSettings settings)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override T Deserialize(string value, NetJSONSettings settings)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override string Serialize(T value)
+            {
+                return (_delegates.GetOrAdd("SerializeValue", _ => {
+
+                    var meth = new DynamicMethod(_, _stringType, new[] { typeof(T) }, restrictedSkipVisibility: true);
+
+                    var il = meth.GetILGenerator();
+
+                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                    var sbLocal = il.DeclareLocal(_stringBuilderType);
+                    il.Emit(OpCodes.Call, _generatorGetStringBuilder);
+
+                    il.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+                    OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+
+                    il.Emit(OpCodes.Stloc, sbLocal);
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldloc, sbLocal);
+                    il.Emit(OpCodes.Call, _settingsCurrentSettings);
+                    il.Emit(OpCodes.Call, writeMethod);
+
+                    il.Emit(OpCodes.Ldloc, sbLocal);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderToString);
+                    il.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SerializeDelegate));
+                }) as SerializeDelegate)(value);
+            }
+
+            public override string Serialize(T value, NetJSONSettings settings)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override void Serialize(T value, TextWriter writer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override void Serialize(T value, TextWriter writer, NetJSONSettings settings)
+            {
+                throw new NotImplementedException();
+            }
         }
 
-        //public static string QuotChar {
-        //    get {
-        //        return _ThreadQuoteString;
-        //    }
-        //}
+        private static class NetJSONCachedSerializer<T> {
+            public static readonly NetJSONSerializer<T> Serializer = GetSerializer();
 
-
-
+            private static NetJSONSerializer<T> GetSerializer()
+            {
+                var type = typeof(T);
+                if (type
+#if NET_CORE
+                    .GetTypeInfo()
+#endif
+                    .IsNotPublic ||
+                    type
+#if NET_CORE
+                    .GetTypeInfo()
+#endif
+                    .IsNestedPrivate
+                    )
+                    return new DynamicNetJSONSerializer<T>();
+                return (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+            }
+        }
+        
         const int BUFFER_SIZE = 11;
 
         const int BUFFER_SIZE_DIFF = BUFFER_SIZE - 2;
@@ -740,6 +852,7 @@ namespace NetJSON {
               ICollectionStr = "ICollection`1",
              IEnumerableStr = "IEnumerable`1",
               CreateClassOrDictStr = "CreateClassOrDict",
+              Dynamic = "Dynamic",
               ExtractStr = "Extract",
               SetStr = "Set",
               WriteStr = "Write", ReadStr = "Read", ReadEnumStr = "ReadEnum",
@@ -781,29 +894,29 @@ namespace NetJSON {
 
         static ConcurrentDictionary<Type, Type> _types =
             new ConcurrentDictionary<Type, Type>();
-        static ConcurrentDictionary<string, MethodBuilder> _writeMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _writeMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _setValueMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _setValueMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _readMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _readMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _createListMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _createListMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _extractMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _extractMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _readDeserializeMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _readDeserializeMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _writeEnumToStringMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _writeEnumToStringMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
-        static ConcurrentDictionary<string, MethodBuilder> _readEnumToStringMethodBuilders =
-            new ConcurrentDictionary<string, MethodBuilder>();
+        static ConcurrentDictionary<string, MethodInfo> _readEnumToStringMethodBuilders =
+            new ConcurrentDictionary<string, MethodInfo>();
 
         static readonly ConcurrentDictionary<MethodInfo, Delegate> _setMemberValues = new ConcurrentDictionary<MethodInfo, Delegate>();
 
@@ -818,9 +931,6 @@ namespace NetJSON {
         static ConcurrentDictionary<Type, List<Type>> _includedTypeTypes = new ConcurrentDictionary<Type, List<Type>>();
 
         static ConcurrentDictionary<Type, object> _serializers = new ConcurrentDictionary<Type, object>();
-
-        static ConcurrentDictionary<Type, Delegate> _nonPublicBuilder =
-            new ConcurrentDictionary<Type, Delegate>();
 
         static ConcurrentDictionary<Type, NetJSONMemberInfo[]> _typeProperties =
             new ConcurrentDictionary<Type, NetJSONMemberInfo[]>();
@@ -1483,10 +1593,10 @@ namespace NetJSON {
             return chr.ToString();
         }
 
-        private static MethodBuilder GenerateFastObjectToString(TypeBuilder type) {
+        private static MethodInfo GenerateFastObjectToString(TypeBuilder type) {
             return _readMethodBuilders.GetOrAdd("FastObjectToString", _ => {
                 lock (GetDictLockObject("GenerateFastObjectToString")) {
-                    var method = type.DefineMethod("FastObjectToString", StaticMethodAttribute, _voidType,
+                    var method = type.DefineMethodEx("FastObjectToString", StaticMethodAttribute, _voidType,
                         new[] { _objectType, _stringBuilderType, _settingsType });
 
                     var il = method.GetILGenerator();
@@ -2014,7 +2124,7 @@ OpCodes.Callvirt,
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
-#endif                
+#endif
                 .DefineDynamicAssembly(
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
@@ -2250,13 +2360,13 @@ OpCodes.Callvirt,
         }
 
         internal static MethodInfo ReadStringToEnumFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_readEnumToStringMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(ReadEnumStr, typeName);
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _stringType });
             _readEnumToStringMethodBuilders[key] = method;
 
@@ -2360,13 +2470,13 @@ OpCodes.Callvirt,
         }
 
         internal static MethodInfo WriteEnumToStringFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = String.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_writeEnumToStringMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(WriteStr, typeName);
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 _stringType, new[] { type, _settingsType });
             _writeEnumToStringMethodBuilders[key] = method;
 
@@ -2494,14 +2604,27 @@ OpCodes.Callvirt,
             }
         }
 
+        internal static MethodInfo DefineMethodEx(this TypeBuilder builder, string methodName, MethodAttributes methodAttribute, Type returnType, Type[] parameterTypes)
+        {
+            if (builder == null)
+                return new DynamicMethod(methodName, returnType, parameterTypes, restrictedSkipVisibility: true);
+            return builder.DefineMethod(methodName, methodAttribute, returnType, parameterTypes);
+        }
+
+        internal static ILGenerator GetILGenerator(this MethodInfo methodInfo)
+        {
+            var dynamicMethod = methodInfo as DynamicMethod;
+            return dynamicMethod != null ? dynamicMethod.GetILGenerator() : (methodInfo as MethodBuilder).GetILGenerator();
+        }
+
         internal static MethodInfo WriteDeserializeMethodFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_readDeserializeMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(ReadStr, typeName);
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _stringType, _settingsType });
             _readDeserializeMethodBuilders[key] = method;
             var il = method.GetILGenerator();
@@ -2613,14 +2736,14 @@ OpCodes.Callvirt,
         }
 
         internal static MethodInfo WriteSerializeMethodFor(TypeBuilder typeBuilder, Type type, bool needQuote = true) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_writeMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(WriteStr, typeName);
 
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 _voidType, new[] { type, _stringBuilderType, _settingsType });
             _writeMethodBuilders[key] = method;
             var il = method.GetILGenerator();
@@ -3024,13 +3147,14 @@ OpCodes.Callvirt,
             methodIL.Emit(OpCodes.Ret);
             methodIL.MarkLabel(conditionLabel);
 
-            if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsNotPublic) {
-                throw new InvalidOperationException("Non-Public Types is not supported yet");
-            } else if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
+//            if (type
+//#if NET_CORE
+//    .GetTypeInfo()
+//#endif
+//                .IsNotPublic) {
+//                throw new InvalidOperationException("Non-Public Types is not supported yet");
+//            } else 
+            if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
             else {
                 if (!_includeTypeInformation) {
                     WritePropertiesFor(typeBuilder, type, methodIL);
@@ -4029,14 +4153,14 @@ OpCodes.Callvirt,
         public static Regex //_dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled),
             _dateISORegex = new Regex(@"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}.(\d){3}Z", RegexOptions.Compiled);
 
-        private static MethodBuilder GenerateExtractObject(TypeBuilder type) {
+        private static MethodInfo GenerateExtractObject(TypeBuilder type) {
 
-            MethodBuilder method;
+            MethodInfo method;
             var key = "ExtractObjectValue";
             if (_readMethodBuilders.TryGetValue(key, out method))
                 return method;
 
-            method = type.DefineMethod("ExtractObjectValue", StaticMethodAttribute, _objectType,
+            method = type.DefineMethodEx("ExtractObjectValue", StaticMethodAttribute, _objectType,
                     new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
 
 
@@ -4591,14 +4715,14 @@ OpCodes.Callvirt,
         }
 
         private static MethodInfo GenerateExtractValueFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_extractMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(ExtractStr, typeName);
             var isObjectType = type == _objectType;
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _extractMethodBuilders[key] = method;
 
@@ -4934,8 +5058,8 @@ OpCodes.Callvirt,
         }
 
         private static MethodInfo GenerateSetValueFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_setValueMethodBuilders.TryGetValue(key, out method))
                 return method;
@@ -4947,7 +5071,7 @@ OpCodes.Callvirt,
                 .IsValueType;
             var methodName = String.Concat(SetStr, typeName);
             var isObjectType = type == _objectType;
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 _voidType, new[] { _charPtrType, _intType.MakeByRefType(), isTypeValueType ? type.MakeByRefType() : type, _stringType, _settingsType });
             _setValueMethodBuilders[key] = method;
 
@@ -5218,14 +5342,14 @@ OpCodes.Callvirt,
         }
 
         private static MethodInfo GenerateCreateListFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_createListMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(CreateListStr, typeName);
             var isObjectType = type == _objectType;
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _createListMethodBuilders[key] = method;
 
@@ -5531,14 +5655,14 @@ OpCodes.Callvirt,
         }
         
         private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
-            MethodBuilder method;
-            var key = type.FullName;
+            MethodInfo method;
+            var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
             if (_readMethodBuilders.TryGetValue(key, out method))
                 return method;
             var methodName = String.Concat(CreateClassOrDictStr, typeName);
             var isObjectType = type == _objectType;
-            method = typeBuilder.DefineMethod(methodName, StaticMethodAttribute,
+            method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _charPtrType, _intType.MakeByRefType(), _settingsType });
             _readMethodBuilders[key] = method;
 

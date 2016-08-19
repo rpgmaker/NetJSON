@@ -298,6 +298,29 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void SerializeAnonymous()
+        {
+            var test = new { ID = 100, Name = "Test", Inner = new { ID = 100, N = "ABC" } };
+            var json = NetJSON.Serialize(test);
+            Assert.IsTrue(json != null);
+        }
+
+        private class MyPrivateClass
+        {
+            public int ID { get; set; }
+            public string Name { get; set; }
+            public MyPrivateClass Inner { get; set; }
+        }
+
+        [TestMethod]
+        public void SerializeNonPublicType()
+        {
+            var test = new MyPrivateClass { ID = 100, Name = "Test", Inner = new Tests.SerializeTests.MyPrivateClass { ID = 200, Name = "Inner" } };
+            var json = NetJSON.Serialize(test);
+            Assert.IsTrue(json != null);
+        }
+
+        [TestMethod]
         public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
             var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.Default, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
             var date = DateTime.UtcNow;
