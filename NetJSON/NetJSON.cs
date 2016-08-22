@@ -532,9 +532,9 @@ namespace NetJSON {
             private delegate T DeserializeTextReaderSettingsDelegate(TextReader reader, NetJSONSettings settings);
             private delegate T DeserializeSettingsDelegate(string value, NetJSONSettings settings);
             private delegate string SerializeDelegate(T value);
-            private delegate T SerializeSettingsDelegate(T value, NetJSONSettings settings);
-            private delegate T SerializeTextWriterDelegate(T value, TextWriter writer);
-            private delegate T SerializeTextWriterSettingsDelegate(T value, TextWriter writer, NetJSONSettings settings);
+            private delegate string SerializeSettingsDelegate(T value, NetJSONSettings settings);
+            private delegate void SerializeTextWriterDelegate(T value, TextWriter writer);
+            private delegate void SerializeTextWriterSettingsDelegate(T value, TextWriter writer, NetJSONSettings settings);
 
             private ConcurrentDictionary<string, Delegate> _delegates = new ConcurrentDictionary<string, Delegate>();
 
@@ -555,31 +555,103 @@ namespace NetJSON {
                 }
             }
 
+            private Module ManifestModule
+            {
+                get
+                {
+                    return
+#if NET_CORE
+    Assembly.GetEntryAssembly().ManifestModule
+#else
+    Assembly.GetExecutingAssembly().ManifestModule
+#endif
+                        ;
+                }
+            }
+
             public override T Deserialize(TextReader reader)
             {
-                throw new NotImplementedException();
+                return (_delegates.GetOrAdd("DeserializeValueTextReader", _ => {
+
+                    var meth = new DynamicMethod(_, ObjType, new[] { _textReaderType }, ManifestModule, true);
+
+                    var rdil = meth.GetILGenerator();
+
+                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                    rdil.Emit(OpCodes.Ldarg_0);
+                    rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+                    rdil.Emit(OpCodes.Call, _settingsCurrentSettings);
+                    rdil.Emit(OpCodes.Call, readMethod);
+                    rdil.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(DeserializeTextReaderDelegate));
+                }) as DeserializeTextReaderDelegate)(reader);
             }
 
             public override T Deserialize(string value)
             {
-                throw new NotImplementedException();
+                return (_delegates.GetOrAdd("DeserializeValue", _ => {
+
+                    var meth = new DynamicMethod(_, ObjType, new[] { _stringType }, ManifestModule, true);
+
+                    var dil = meth.GetILGenerator();
+
+                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                    dil.Emit(OpCodes.Ldarg_0);
+                    dil.Emit(OpCodes.Call, _settingsCurrentSettings);
+                    dil.Emit(OpCodes.Call, readMethod);
+                    dil.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(DeserializeDelegate));
+                }) as DeserializeDelegate)(value);
             }
 
             public override T Deserialize(TextReader reader, NetJSONSettings settings)
             {
-                throw new NotImplementedException();
+                return (_delegates.GetOrAdd("DeserializeValueTextReaderSettings", _ => {
+
+                    var meth = new DynamicMethod(_, ObjType, new[] { _textReaderType, _settingsType }, ManifestModule, true);
+
+                    var rdilWithSettings = meth.GetILGenerator();
+
+                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                    rdilWithSettings.Emit(OpCodes.Ldarg_1);
+                    rdilWithSettings.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+                    rdilWithSettings.Emit(OpCodes.Ldarg_2);
+                    rdilWithSettings.Emit(OpCodes.Call, readMethod);
+                    rdilWithSettings.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(DeserializeTextReaderSettingsDelegate));
+                }) as DeserializeTextReaderSettingsDelegate)(reader, settings);
             }
 
             public override T Deserialize(string value, NetJSONSettings settings)
             {
-                throw new NotImplementedException();
+                return (_delegates.GetOrAdd("DeserializeValueSettings", _ => {
+
+                    var meth = new DynamicMethod(_, ObjType, new[] { _stringType, _settingsType }, ManifestModule, true);
+
+                    var dilWithSettings = meth.GetILGenerator();
+
+                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                    dilWithSettings.Emit(OpCodes.Ldarg_0);
+                    dilWithSettings.Emit(OpCodes.Ldarg_1);
+                    dilWithSettings.Emit(OpCodes.Call, readMethod);
+                    dilWithSettings.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(DeserializeSettingsDelegate));
+                }) as DeserializeSettingsDelegate)(value, settings);
             }
 
             public override string Serialize(T value)
             {
                 return (_delegates.GetOrAdd("SerializeValue", _ => {
 
-                    var meth = new DynamicMethod(_, _stringType, new[] { typeof(T) }, restrictedSkipVisibility: true);
+                    var meth = new DynamicMethod(_, _stringType, new[] { ObjType }, ManifestModule, true);
 
                     var il = meth.GetILGenerator();
 
@@ -613,17 +685,126 @@ OpCodes.Call,
 
             public override string Serialize(T value, NetJSONSettings settings)
             {
-                throw new NotImplementedException();
+                return (_delegates.GetOrAdd("SerializeValueSettings", _ => {
+
+                    var meth = new DynamicMethod(_, _stringType, new[] { ObjType, _settingsType }, ManifestModule, true);
+
+                    var ilWithSettings = meth.GetILGenerator();
+
+                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                    var isValueType = ObjType
+#if NET_CORE
+    .GetTypeInfo()
+#endif
+                .IsValueType;
+                    
+                    var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
+                    ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+
+                    ilWithSettings.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+
+                    ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
+
+                    ilWithSettings.Emit(OpCodes.Ldarg_0);
+                    ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+                    ilWithSettings.Emit(OpCodes.Ldarg_1);
+                    ilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+                    ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+                    ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+                    ilWithSettings.Emit(OpCodes.Ldarg_1);
+
+                    ilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
+
+                    ilWithSettings.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SerializeSettingsDelegate));
+                }) as SerializeSettingsDelegate)(value, settings);
             }
 
             public override void Serialize(T value, TextWriter writer)
             {
-                throw new NotImplementedException();
+                (_delegates.GetOrAdd("SerializeValueTextWriter", _ => {
+
+                    var meth = new DynamicMethod(_, _voidType, new[] { typeof(T), _textWriterType }, ManifestModule, true);
+
+                    var wil = meth.GetILGenerator();
+
+                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                    var wsbLocal = wil.DeclareLocal(_stringBuilderType);
+                    wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
+                    wil.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+                    OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+                    wil.Emit(OpCodes.Stloc, wsbLocal);
+
+                    wil.Emit(OpCodes.Ldarg_0);
+                    wil.Emit(OpCodes.Ldloc, wsbLocal);
+                    wil.Emit(OpCodes.Call, _settingsCurrentSettings);
+                    wil.Emit(OpCodes.Call, writeMethod);
+
+                    wil.Emit(OpCodes.Ldarg_1);
+                    wil.Emit(OpCodes.Ldloc, wsbLocal);
+                    wil.Emit(OpCodes.Callvirt, _stringBuilderToString);
+                    wil.Emit(OpCodes.Callvirt, _textWriterWrite);
+                    wil.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SerializeTextWriterDelegate));
+                }) as SerializeTextWriterDelegate)(value, writer);
             }
 
             public override void Serialize(T value, TextWriter writer, NetJSONSettings settings)
             {
-                throw new NotImplementedException();
+                (_delegates.GetOrAdd("SerializeValueTextWriterSettings", _ => {
+
+                    var meth = new DynamicMethod(_, _voidType, new[] { ObjType, _textWriterType, _settingsType }, ManifestModule, true);
+
+                    var wilWithSettings = meth.GetILGenerator();
+
+                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+                    
+                    var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
+                    wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+                    wilWithSettings.Emit(
+#if NET_35
+OpCodes.Call,
+#else
+OpCodes.Callvirt,
+#endif
+ _stringBuilderClear);
+                    wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
+
+                    wilWithSettings.Emit(OpCodes.Ldarg_0);
+                    wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+                    wilWithSettings.Emit(OpCodes.Ldarg_2);
+                    wilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+                    wilWithSettings.Emit(OpCodes.Ldarg_1);
+                    wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+                    wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+                    wilWithSettings.Emit(OpCodes.Ldarg_2);
+
+                    wilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
+
+                    wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
+                    wilWithSettings.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SerializeTextWriterSettingsDelegate));
+                }) as SerializeTextWriterSettingsDelegate)(value, writer, settings);
             }
         }
 
@@ -633,45 +814,46 @@ OpCodes.Call,
             private static NetJSONSerializer<T> GetSerializer()
             {
                 NetJSONSerializer<T> serializer = null;
-                try
-                {
-                    serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
-                }
-                catch
-                {
-                    var type = typeof(T);
-                    if (type
-#if NET_CORE
+                var type = typeof(T);
+                if (type
+#if NET_CORE || NET_PCL
                     .GetTypeInfo()
 #endif
-                        .IsGenericType) {
-                        foreach(var item in type.GetGenericArguments())
+                        .IsGenericType)
+                {
+                    foreach (var item in type.GetGenericArguments())
+                    {
+                        if (IsPrivate(item))
                         {
-                            if (IsPrivate(item))
-                            {
-                                type = item;
-                                break;
-                            }
+                            type = item;
+                            break;
                         }
                     }
-                    if (IsPrivate(type))
-                        serializer = new DynamicNetJSONSerializer<T>();
                 }
+                if (IsPrivate(type))
+                    serializer = new DynamicNetJSONSerializer<T>();
+                else serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
+                
                 return serializer;
             }
 
             private static bool IsPrivate(Type type)
             {
                 return type
-#if NET_CORE
+#if NET_CORE || NET_PCL
                     .GetTypeInfo()
 #endif
                     .IsNotPublic ||
                         type
-#if NET_CORE
+#if NET_CORE || NET_PCL
                     .GetTypeInfo()
 #endif
-                    .IsNestedPrivate;
+                    .IsNestedPrivate ||
+                        !type
+#if NET_CORE || NET_PCL
+                    .GetTypeInfo()
+#endif
+                    .IsVisible; ;
             }
         }
         
@@ -1188,7 +1370,7 @@ OpCodes.Call,
             return _primitiveTypes.GetOrAdd(type, key => {
                 lock (GetDictLockObject("IsPrimitiveType")) {
                     if (key
-#if NET_CORE
+#if NET_CORE || NET_PCL
     .GetTypeInfo()
 #endif
                     .IsGenericType &&
@@ -1197,7 +1379,7 @@ OpCodes.Call,
 
                     return key == _stringType ||
                         key
-#if NET_CORE
+#if NET_CORE || NET_PCL
     .GetTypeInfo()
 #endif
                         .IsPrimitive || key == _dateTimeType ||
@@ -1206,7 +1388,7 @@ OpCodes.Call,
                         key == _guidType || key == _charType ||
                         key == _typeType ||
                         key
-#if NET_CORE
+#if NET_CORE || NET_PCL
     .GetTypeInfo()
 #endif
                         .IsEnum || key == _byteArrayType;
@@ -1547,12 +1729,12 @@ OpCodes.Call,
         }
 
         private static string DateToString(DateTime date, NetJSONSettings settings, TimeSpan offset) {
-            var timeZoneFormat = settings.TimeZoneFormat;
             if (date == DateTime.MinValue)
                 return "\\/Date(-62135596800)\\/";
             else if (date == DateTime.MaxValue)
                 return "\\/Date(253402300800)\\/";
-            //var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
+            
+            var timeZoneFormat = settings.TimeZoneFormat;
             var hours = Math.Abs(offset.Hours);
             var minutes = Math.Abs(offset.Minutes);
             var offsetText = timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
@@ -1570,12 +1752,12 @@ OpCodes.Call,
                 date = date.AddHours(hours).AddMinutes(minutes);
             }
 
-            return String.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
+            return string.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
         }
 
         private static string DateToEpochTime(DateTime date) {
             long epochTime = (long)(date.ToUniversalTime() - UnixEpoch).Ticks;
-            return IntUtility.ltoa(epochTime);
+            return LongToStr(epochTime);// IntUtility.ltoa(epochTime);
         }
 
         [ThreadStatic]
@@ -2137,6 +2319,13 @@ OpCodes.Callvirt,
                             new[] {  typeof(SecurityPermissionAttribute).GetProperty("SkipVerification")
                 },
                             new object[] { true }));
+
+                        //[assembly: SecurityRules(SecurityRuleSet.Level2,SkipVerificationInFullTrust=true)]
+#if !NET_35
+                        _assembly.SetCustomAttribute(new CustomAttributeBuilder(typeof(SecurityRulesAttribute).GetConstructor(new[] { typeof(SecurityRuleSet) }), 
+                            new object[] { SecurityRuleSet.Level2 },
+                            new[] { typeof(SecurityRulesAttribute).GetProperty("SkipVerificationInFullTrust") }, new object[] { true }));
+#endif
 #endif
                     }
                 }
@@ -2633,7 +2822,14 @@ OpCodes.Callvirt,
         internal static MethodInfo DefineMethodEx(this TypeBuilder builder, string methodName, MethodAttributes methodAttribute, Type returnType, Type[] parameterTypes)
         {
             if (builder == null)
-                return new DynamicMethod(methodName, returnType, parameterTypes, restrictedSkipVisibility: true);
+                return new DynamicMethod(methodName, returnType, parameterTypes,
+#if NET_CORE
+                    Assembly.GetEntryAssembly().ManifestModule
+#else
+                    Assembly.GetExecutingAssembly().ManifestModule
+#endif
+                    ,
+                    true);
             return builder.DefineMethod(methodName, methodAttribute, returnType, parameterTypes);
         }
 
@@ -3525,7 +3721,7 @@ OpCodes.Callvirt,
             var countLocal = il.DeclareLocal(typeof(int));
             var diffLocal = il.DeclareLocal(typeof(int));
             var checkCountLabel = il.DefineLabel();
-            var listLocal = isArray ? default(LocalBuilder) : il.DeclareLocal(_listType);
+            var listLocal = isArray ? default(LocalBuilder) : il.DeclareLocal(type);
 
             if (listLocal != null) {
                 il.Emit(OpCodes.Ldarg_0);

@@ -9,6 +9,11 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace NetJSON.Tests {
+    class E
+    {
+        public int V { get; set; }
+    }
+
     [TestClass]
     public class SerializeTests {
         public enum MyEnumTest {
@@ -301,7 +306,7 @@ namespace NetJSON.Tests {
         public void SerializeAnonymous()
         {
             var test = new { ID = 100, Name = "Test", Inner = new { ID = 100, N = "ABC" } };
-            var json = NetJSON.Serialize(Enumerable.Range(0,1).Select(x => test));
+            var json = NetJSON.Serialize(test);
             Assert.IsTrue(json != null);
         }
 
@@ -313,10 +318,48 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void When_serializing_anonymous_objects()
+        {
+            var logEvents = Enumerable.Range(1, 100)
+            .Select(n => new LogEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                Level = n % 2 == 0 ? Level.Debug : Level.Trace,
+                Entry = n.ToString()
+            });
+
+            var anonymousObjects = logEvents
+                .Select(x =>
+                    new
+                    {
+                        TimestampEpoch = x.Timestamp,
+                        x.Level,
+                        Message = x.Entry
+                    }
+                );
+
+            var json = NetJSON.Serialize(anonymousObjects);
+            var resultAsDynamic = NetJSON.Deserialize<dynamic>(json);
+            var resultAsObject = NetJSON.Deserialize<object>(json);
+            var resultAsProjected = NetJSON.Deserialize<List<Projected>>(json);
+        }
+
+        [TestMethod]
+        public void TestSerializeDeserializeNonPublicType()
+        {
+            string s;
+            var e = new List<E> { new E { V = 1 }, new E { V = 2 } };
+            s = NetJSON.Serialize(e);
+            NetJSON.Serialize(NetJSON.Deserialize<List<E>>(s = NetJSON.Serialize(e)));
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(s));
+        }
+
+        [TestMethod]
         public void SerializeNonPublicType()
         {
-            var test = new MyPrivateClass { ID = 100, Name = "Test", Inner = new Tests.SerializeTests.MyPrivateClass { ID = 200, Name = "Inner" } };
+            var test = new MyPrivateClass { ID = 100, Name = "Test", Inner = new MyPrivateClass { ID = 200, Name = "Inner" } };
             var json = NetJSON.Serialize(test);
+            var data = NetJSON.Deserialize<MyPrivateClass>(json);
             Assert.IsTrue(json != null);
         }
 
@@ -790,6 +833,26 @@ namespace NetJSON.Tests {
             var d2 = NetJSON.Deserialize<TestEnumerableClass>(json);
             Assert.IsTrue(d2.Data.Count() == d.Data.Count());
         }
+    }
+
+    public struct LogEvent
+    {
+        public DateTime Timestamp { get; set; }
+        public Level Level { get; set; }
+        public string Entry { get; set; }
+    }
+
+    public enum Level
+    {
+        Debug,
+        Trace
+    }
+
+    public class Projected
+    {
+        public long Timestamp { get; set; }
+        public Level Level { get; set; }
+        public string Message { get; set; }
     }
 
 
