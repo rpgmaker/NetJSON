@@ -6722,14 +6722,13 @@ OpCodes.Callvirt,
             char current = '\0', prev = '\0';
             int count = 0, startIndex = 0;
             string value = string.Empty;
-            var currentQuote = settings._quoteChar;
-
+            
             while (true) {
                 current = ptr[index];
-                if (count == 0 && current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
+                if (count == 0 && current == settings._quoteChar) {
                     startIndex = index + 1;
                     ++count;
-                } else if (count > 0 && current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/ && prev != '\\') {
+                } else if (count > 0 && current == settings._quoteChar && prev != '\\') {
                     value = new string(ptr, startIndex, index - startIndex);
                     ++index;
                     break;
