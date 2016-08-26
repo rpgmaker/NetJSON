@@ -2719,6 +2719,7 @@ OpCodes.Callvirt,
 
 
             il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
             il.Emit(OpCodes.Brfalse, useEnumLabel);
 
             WriteEnumToStringForWithString(type, eType, il);
