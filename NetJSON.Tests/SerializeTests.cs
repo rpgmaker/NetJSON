@@ -333,6 +333,20 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void SerializeEnumValueWithoutCaseUsingAttribute()
+        {
+            var value = MyEnumTestValue.V1;
+            var settings = new NetJSONSettings { UseEnumString = true };
+
+            var json = NetJSON.Serialize(value, settings);
+            var value2 = NetJSON.Deserialize<MyEnumTestValue>(json, settings);
+            var value3 = NetJSON.Deserialize<MyEnumTestValue>(json.Replace("V_1", "V_2"), settings);
+
+            Assert.IsTrue(value2 == value);
+            Assert.IsTrue(value3 == MyEnumTestValue.V2);
+        }
+
+        [TestMethod]
         public void SerializeEnumValueUsingAttribute()
         {
             var settings = new NetJSONSettings { UseEnumString = true };
