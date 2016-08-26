@@ -317,6 +317,36 @@ namespace NetJSON.Tests {
             public MyPrivateClass Inner { get; set; }
         }
 
+        public enum MyEnumTestValue
+        {
+            [NetJSONProperty("V_1")]
+            V1 = 2,
+            [NetJSONProperty("V_2")]
+            V2 = 4,
+            [NetJSONProperty("V_3")]
+            V3 = 5
+        }
+        public class MyEnumClassTest
+        {
+            public string Name { get; set; }
+            public MyEnumTestValue Value { get; set; }
+        }
+
+        [TestMethod]
+        public void SerializeEnumValueUsingAttribute()
+        {
+            var settings = new NetJSONSettings { UseEnumString = true };
+            var obj = new MyEnumClassTest { Name = "Test Enum", Value = MyEnumTestValue.V1 };
+            var json = NetJSON.Serialize(obj, settings);
+
+            var obj2 = NetJSON.Deserialize<MyEnumClassTest>(json, settings);
+
+            var obj3 = NetJSON.Deserialize<MyEnumClassTest>(json.Replace("V_1", "V_3"), settings);
+
+            Assert.IsTrue(obj.Value == obj2.Value);
+            Assert.IsTrue(obj3.Value == MyEnumTestValue.V3);
+        }
+
         [TestMethod]
         public void When_serializing_anonymous_objects()
         {

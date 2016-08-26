@@ -37,7 +37,7 @@ namespace NetJSON {
     /// <summary>
     /// Attribute for renaming field/property name to use for serialization and deserialization
     /// </summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Enum)]
     public class NetJSONPropertyAttribute : Attribute {
         /// <summary>
         /// Name of property/field
@@ -2592,13 +2592,26 @@ OpCodes.Callvirt,
                 .GetEnumUnderlyingType();
             var il = method.GetILGenerator();
 
-            var values = Enum.GetValues(type).Cast<object>().ToArray();
+            var values = Enum.GetValues(type).Cast<object>()
+               .Select(x => new {
+                   Value = x,
+                   Attr = type
+#if NET_CORE
+    .GetTypeInfo()
+#endif
+                    .GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute
+               }).ToArray();
             var keys = Enum.GetNames(type);
 
             for (var i = 0; i < values.Length; i++) {
 
-                var value = values[i];
+                var valueInfo = values[i];
+                var value = valueInfo.Value;
+                var attr = valueInfo.Attr;
                 var k = keys[i];
+
+                if (attr != null)
+                    k = attr.Name;
                 
                 var label = il.DefineLabel();
                 var label2 = il.DefineLabel();
@@ -2778,15 +2791,24 @@ OpCodes.Callvirt,
         }
 
         private static void WriteEnumToStringForWithString(Type type, Type eType, ILGenerator il) {
-            var values = Enum.GetValues(type).Cast<object>().ToArray();
+            var values = Enum.GetValues(type).Cast<object>()
+                .Select(x => new { Value = x,
+                    Attr = type
+#if NET_CORE
+    .GetTypeInfo()
+#endif
+                    .GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute }).ToArray();
             var names = Enum.GetNames(type);
 
             var count = values.Length;
 
             for (var i = 0; i < count; i++) {
 
-                var value = values[i];
+                var valueInfo = values[i];
+                var attr = valueInfo.Attr;
+                var value = valueInfo.Value;
 
+                var name = names[i];
                 var label = il.DefineLabel();
 
                 il.Emit(OpCodes.Ldarg_0);
@@ -2812,7 +2834,10 @@ OpCodes.Callvirt,
 
                 il.Emit(OpCodes.Bne_Un, label);
 
-                il.Emit(OpCodes.Ldstr, names[i]);
+                if(attr != null)
+                    name = attr.Name;
+
+                il.Emit(OpCodes.Ldstr, name);
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(label);
