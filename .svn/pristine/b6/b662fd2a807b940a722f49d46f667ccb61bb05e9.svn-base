@@ -1,0 +1,12 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/NetJSON/bin/Release
+/NetJSON/obj/Release
+*.suo
+*.user
+_ReSharper.*
+bin
+obj
+packages
