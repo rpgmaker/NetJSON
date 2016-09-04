@@ -47,7 +47,9 @@
   <ItemGroup>
     <Compile Include="AutomaticTypeConverter.cs" />
     <Compile Include="IntUtility.cs" />
+    <Compile Include="Models.cs" />
     <Compile Include="NetJSON.cs" />
+    <Compile Include="NetJSON.Internals.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -55,9 +57,7 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="lib\net40\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

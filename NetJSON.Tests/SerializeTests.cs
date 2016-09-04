@@ -83,7 +83,7 @@ namespace NetJSON.Tests {
         public void TestSNDouble() {
             var value = "1.18909";
 
-            var dValue = NetJSON.FastStringToDouble(value);
+            var dValue = Internals.SerializerUtilities.FastStringToDouble(value);
         }
 
         public class BaseApiResponse {

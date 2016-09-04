@@ -43,10 +43,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\NetJSON\Models.cs">
+      <Link>Models.cs</Link>
+    </Compile>
+    <Compile Include="..\NetJSON\NetJSON.Internals.cs">
+      <Link>NetJSON.Internals.cs</Link>
+    </Compile>
     <Compile Include="..\NetJSON\Properties\AssemblyInfo.cs" />
     <Compile Include="..\NetJSON\AutomaticTypeConverter.cs" />
     <Compile Include="..\NetJSON\IntUtility.cs" />
     <Compile Include="..\NetJSON\NetJSON.cs" />
+    <Compile Include="Net35AndPCLExtensions.cs" />
+    <Compile Include="Net35Extensions.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
