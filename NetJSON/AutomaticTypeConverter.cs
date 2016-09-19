@@ -48,9 +48,9 @@ namespace NetJSON {
                     return new DateTime(ticks + _epoch).ToLocalTime();
                 });
                 rules["date3"] = new Func<string, object>(str => { return DateTime.Parse(str); });
-                rules["int"] = new Func<string, object>(str => { return NetJSON.FastStringToInt(str); });
-                rules["long"] = new Func<string, object>(str => { return NetJSON.FastStringToLong(str); });
-                rules["double"] = new Func<string, object>(str => { return NetJSON.FastStringToDouble(str); });
+                rules["int"] = new Func<string, object>(str => { return Internals.SerializerUtilities.FastStringToInt(str); });
+                rules["long"] = new Func<string, object>(str => { return Internals.SerializerUtilities.FastStringToLong(str); });
+                rules["double"] = new Func<string, object>(str => { return Internals.SerializerUtilities.FastStringToDouble(str); });
                 return rules;
             }
         }

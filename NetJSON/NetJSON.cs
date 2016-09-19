@@ -16,14 +16,12 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security;
 
 #if !(NET_PCL || NET_CORE)
 using System.Security.Permissions;
 #endif
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Runtime.Serialization;
 
@@ -31,497 +29,9 @@ using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyModel;
 #endif
 
+using NetJSON.Internals;
 
 namespace NetJSON {
-
-    /// <summary>
-    /// Attribute for renaming field/property name to use for serialization and deserialization
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Enum)]
-    public class NetJSONPropertyAttribute : Attribute {
-        /// <summary>
-        /// Name of property/field
-        /// </summary>
-        public string Name { get; private set; }
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        /// <param name="name"></param>
-        public NetJSONPropertyAttribute(string name) {
-            Name = name;
-        }
-    }
-
-    public class NetJSONSettings {
-        /// <summary>
-        /// Determine date format: Default: Default
-        /// </summary>
-        public NetJSONDateFormat DateFormat { get; set; }
-        /// <summary>
-        /// Determine time zone format: Default : Unspecified
-        /// </summary>
-        public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
-        /// <summary>
-        /// Determine formatting for output json: Default: Default
-        /// </summary>
-        public NetJSONFormat Format { get; set; }
-        /// <summary>
-        /// Determine if Enum should be serialized as string or int value. Default: True
-        /// </summary>
-        public bool UseEnumString { get; set; }
-        /// <summary>
-        /// Determine if default value should be skipped: Default: True
-        /// </summary>
-        public bool SkipDefaultValue { get; set; }
-        public StringComparison _caseComparison = StringComparison.Ordinal;
-        private bool _caseSensitive;
-
-        /// <summary>
-        /// Determine case sensitive for property/field name: Default: True
-        /// </summary>
-        public bool CaseSensitive {
-            get {
-                return _caseSensitive;
-            }
-            set {
-                _caseSensitive = value;
-                _caseComparison = _caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            }
-        }
-
-        private NetJSONQuote _quoteType;
-        /// <summary>
-        /// Quote Type: Default: Double Quote
-        /// </summary>
-        public NetJSONQuote QuoteType {
-            get {
-                return _quoteType;
-            }
-            set {
-                _quoteType = value;
-                _quoteChar = _quoteType == NetJSONQuote.Single ? '\'' : '"';
-                _quoteCharString = _quoteType == NetJSONQuote.Single ? "'" : "\"";
-            }
-        }
-
-        public char _quoteChar;
-        public string _quoteCharString;
-
-        public bool HasOverrideQuoteChar { get; internal set; }
-
-        public bool UseStringOptimization { get; set; }
-
-        /// <summary>
-        /// Enable including type information for serialization and deserialization
-        /// </summary>
-        public bool IncludeTypeInformation { get; set; }
-
-        private StringComparison CaseComparison {
-            get {
-                return CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            }
-        }
-
-        /// <summary>
-        /// Enable camelCasing for property/field names
-        /// </summary>
-        public bool CamelCase { get; set; }
-
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        public NetJSONSettings() {
-            IncludeTypeInformation = NetJSON.IncludeTypeInformation;
-            DateFormat = NetJSON.DateFormat;
-            TimeZoneFormat = NetJSON.TimeZoneFormat;
-            UseEnumString = NetJSON.UseEnumString;
-            SkipDefaultValue = NetJSON.SkipDefaultValue;
-            CaseSensitive = NetJSON.CaseSensitive;
-            QuoteType = NetJSON.QuoteType;
-            UseStringOptimization = NetJSON.UseStringOptimization;
-            Format = NetJSONFormat.Default;
-            CamelCase = false;
-        }
-
-        /// <summary>
-        /// Clone settings
-        /// </summary>
-        /// <returns></returns>
-        public NetJSONSettings Clone() {
-            return new NetJSONSettings {
-                IncludeTypeInformation = IncludeTypeInformation,
-                DateFormat = DateFormat,
-                TimeZoneFormat = TimeZoneFormat,
-                UseEnumString = UseEnumString,
-                SkipDefaultValue = SkipDefaultValue,
-                CaseSensitive = CaseSensitive,
-                QuoteType = QuoteType,
-                UseStringOptimization = UseStringOptimization,
-                Format = Format
-            };
-        }
-
-        [ThreadStatic]
-        private static NetJSONSettings _currentSettings;
-        /// <summary>
-        /// Returns current NetJSONSettings that correspond to old use of settings
-        /// </summary>
-        public static NetJSONSettings CurrentSettings {
-            get {
-                return _currentSettings ?? (_currentSettings = new NetJSONSettings());
-            }
-        }
-    }
-
-    /// <summary>
-    /// Attribute for configuration of Class that requires type information for serialization and deserialization
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class NetJSONKnownTypeAttribute : Attribute {
-        /// <summary>
-        /// Type
-        /// </summary>
-        public Type Type { private set; get; }
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        /// <param name="type"></param>
-        public NetJSONKnownTypeAttribute(Type type) {
-            Type = type;
-        }
-    }
-
-    public class NetJSONMemberInfo {
-        public MemberInfo Member { get; set; }
-        public NetJSONPropertyAttribute Attribute { get; set; }
-    }
-
-#if NET_PCL
-    public enum BindingFlags {
-        Default = 0,
-        IgnoreCase = 1,
-        DeclaredOnly = 2,
-        Instance = 4,
-        Static = 8,
-        Public = 16,
-        NonPublic = 32,
-        FlattenHierarchy = 64,
-        InvokeMethod = 256,
-        CreateInstance = 512,
-        GetField = 1024,
-        SetField = 2048,
-        GetProperty = 4096,
-        SetProperty = 8192,
-        PutDispProperty = 16384,
-        PutRefDispProperty = 32768,
-        ExactBinding = 65536,
-        SuppressChangeType = 131072,
-        OptionalParamBinding = 262144,
-        IgnoreReturn = 16777216
-    }
-#endif
-
-
-#if NET_35 || NET_PCL
-
-#if !NET_PCL
-    public class ExpandoObject {
-
-    }
-#endif
-
-    public class ConcurrentDictionary<K,V> : Dictionary<K, V> {
-
-        public V GetOrAdd(K key, Func<K, V> func) {
-            V value = default(V);
-            if (!this.TryGetValue(key, out value)) {
-                value = this[key] = func(key);
-            }
-            return value;
-        }
-        public V GetOrAdd(K key, V val) {
-            V value = default(V);
-            if (!this.TryGetValue(key, out value)) {
-                value = this[key] = val;
-            }
-            return value;
-        }
-    }
-
-    public static class String35Extension {
-        public static bool IsNullOrWhiteSpace(this string value) {
-            if (value != null) {
-                for (int i = 0; i < value.Length; i++) {
-                    if (!char.IsWhiteSpace(value[i])) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-    }
-
-    public static class StringBuilder35Extension {
-        public static StringBuilder Clear(this StringBuilder value) {
-            value.Length = 0;
-            return value;
-        }
-    }
-
-    public static class Type35Extension {
-        
-#if NET_PCL
-        public static FieldInfo[] GetFields(this Type type, BindingFlags binding) {
-            return type.GetRuntimeFields().ToArray();
-        }
-
-        public static MethodInfo GetMethod(this Type type, string name, Type[] types) {
-            return type.GetRuntimeMethod(name, types);
-        }
-
-        public static MethodInfo GetMethod(this Type type, string name, BindingFlags binding) {
-            return type.GetRuntimeMethods().FirstOrDefault(x => x.Name == name);
-        }
-
-        public static MethodInfo GetMethod(this Type type, string name) {
-            return GetMethod(type, name, BindingFlags.Public);
-        }
-#endif
-        public static Type GetEnumUnderlyingType(this Type type) {
-            FieldInfo[] fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-            if ((fields == null) || (fields.Length != 1)) {
-                throw new ArgumentException("Invalid enum");
-            }
-            return fields[0].FieldType;
-        }
-    }
-#endif
-
-    public class TupleContainer {
-        private int _size;
-        private int _index;
-
-        private object _1, _2, _3, _4, _5, _6, _7, _8;
-
-        public TupleContainer(int size) {
-            _size = size;
-        }
-
-
-#if NET_35
-        public NetJSON.Tuple<T1> ToTuple<T1>() {
-            return new NetJSON.Tuple<T1>((T1)_1);
-        }
-        
-        public NetJSON.Tuple<T1, T2> ToTuple<T1, T2>() {
-            return new NetJSON.Tuple<T1, T2>((T1)_1, (T2)_2);
-        }
-
-        public NetJSON.Tuple<T1, T2, T3> ToTuple<T1, T2, T3>() {
-            return new NetJSON.Tuple<T1, T2, T3>((T1)_1, (T2)_2, (T3)_3);
-        }
-
-        public NetJSON.Tuple<T1, T2, T3, T4> ToTuple<T1, T2, T3, T4>() {
-            return new NetJSON.Tuple<T1, T2, T3, T4>((T1)_1, (T2)_2, (T3)_3, (T4)_4);
-        }
-
-
-        public NetJSON.Tuple<T1, T2, T3, T4, T5> ToTuple<T1, T2, T3, T4, T5>() {
-            return new NetJSON.Tuple<T1, T2, T3, T4, T5>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5);
-        }
-
-        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6> ToTuple<T1, T2, T3, T4, T5, T6>() {
-            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6);
-        }
-
-        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7> ToTuple<T1, T2, T3, T4, T5, T6, T7>() {
-            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7);
-        }
-
-        public NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> ToTuple<T1, T2, T3, T4, T5, T6, T7, TRest>() {
-            return new NetJSON.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7, (TRest)_8);
-        }
-#else
-        public Tuple<T1, T2> ToTuple<T1, T2>() {
-            return new Tuple<T1, T2>((T1)_1, (T2)_2);
-        }
-
-        public Tuple<T1, T2, T3> ToTuple<T1, T2, T3>() {
-            return new Tuple<T1, T2, T3>((T1)_1, (T2)_2, (T3)_3);
-        }
-
-        public Tuple<T1, T2, T3, T4> ToTuple<T1, T2, T3, T4>() {
-            return new Tuple<T1, T2, T3, T4>((T1)_1, (T2)_2, (T3)_3, (T4)_4);
-        }
-
-
-        public Tuple<T1, T2, T3, T4, T5> ToTuple<T1, T2, T3, T4, T5>() {
-            return new Tuple<T1, T2, T3, T4, T5>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5);
-        }
-
-        public Tuple<T1, T2, T3, T4, T5, T6> ToTuple<T1, T2, T3, T4, T5, T6>() {
-            return new Tuple<T1, T2, T3, T4, T5, T6>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6);
-        }
-
-        public Tuple<T1, T2, T3, T4, T5, T6, T7> ToTuple<T1, T2, T3, T4, T5, T6, T7>() {
-            return new Tuple<T1, T2, T3, T4, T5, T6, T7>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7);
-        }
-
-        public Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> ToTuple<T1, T2, T3, T4, T5, T6, T7, TRest>() {
-            return new Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>((T1)_1, (T2)_2, (T3)_3, (T4)_4, (T5)_5, (T6)_6, (T7)_7, (TRest)_8);
-        }
-#endif
-
-        public void Add(object value) {
-            switch (_index) {
-                case 0:
-                    _1 = value;
-                    break;
-                case 1:
-                    _2 = value;
-                    break;
-                case 2:
-                    _3 = value;
-                    break;
-                case 3:
-                    _4 = value;
-                    break;
-                case 4:
-                    _5 = value;
-                    break;
-                case 5:
-                    _6 = value;
-                    break;
-                case 6:
-                    _7 = value;
-                    break;
-                case 7:
-                    _8 = value;
-                    break;
-            }
-            _index++;
-        }
-    }
-
-    /// <summary>
-    /// Exception thrown for invalid json string
-    /// </summary>
-    public class NetJSONInvalidJSONException : Exception {
-        public NetJSONInvalidJSONException()
-            : base("Input is not a valid JSON.") {
-        }
-    }
-
-    /// <summary>
-    /// Exception thrown for invalid json property attribute
-    /// </summary>
-    public class NetJSONInvalidJSONPropertyException : Exception {
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        public NetJSONInvalidJSONPropertyException()
-            : base("Class cannot contain any NetJSONProperty with null or blank space character") {
-        }
-    }
-
-    /// <summary>
-    /// Exception thrown for invalid assembly generation when adding all assembly into a specified assembly file
-    /// </summary>
-    public class NetJSONInvalidAssemblyGeneration : Exception {
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        /// <param name="asmName"></param>
-        public NetJSONInvalidAssemblyGeneration(string asmName) : base(String.Format("Could not generate assembly with name [{0}] due to empty list of types to include", asmName)) { }
-    }
-
-    public abstract class NetJSONSerializer<T> {
-
-        public abstract string Serialize(T value);
-        public abstract T Deserialize(string value);
-
-        public abstract void Serialize(T value, TextWriter writer);
-        public abstract T Deserialize(TextReader reader);
-
-        //With Settings
-        public abstract string Serialize(T value, NetJSONSettings settings);
-        public abstract T Deserialize(string value, NetJSONSettings settings);
-        public abstract void Serialize(T value, TextWriter writer, NetJSONSettings settings);
-        public abstract T Deserialize(TextReader reader, NetJSONSettings settings);
-    }
-    
-    /// <summary>
-    /// Option for determining date formatting
-    /// </summary>
-    public enum NetJSONDateFormat {
-        /// <summary>
-        /// Default /Date(...)/
-        /// </summary>
-        Default = 0,
-        /// <summary>
-        /// ISO Format
-        /// </summary>
-        ISO = 2,
-        /// <summary>
-        /// Unix Epoch Milliseconds
-        /// </summary>
-        EpochTime = 4,
-        /// <summary>
-        /// JSON.NET Format for backward compatibility
-        /// </summary>
-        JsonNetISO = 6
-    }
-
-
-    /// <summary>
-    /// Option for determining timezone formatting
-    /// </summary>
-    public enum NetJSONTimeZoneFormat {
-        /// <summary>
-        /// Default unspecified
-        /// </summary>
-        Unspecified = 0,
-        /// <summary>
-        /// Utc
-        /// </summary>
-        Utc = 2,
-        /// <summary>
-        /// Local time
-        /// </summary>
-        Local = 4
-    }
-
-    /// <summary>
-    /// Option for determine what type of quote to use for serialization and deserialization
-    /// </summary>
-    public enum NetJSONQuote {
-        /// <summary>
-        /// Default: double quote
-        /// </summary>
-        Default = 0,
-        /// <summary>
-        /// Use double quote
-        /// </summary>
-        Double = Default,
-        /// <summary>
-        /// Use single quote
-        /// </summary>
-        Single = 2
-    }
-
-    /// <summary>
-    /// Options for controlling serialize json format
-    /// </summary>
-    public enum NetJSONFormat {
-        /// <summary>
-        /// Default
-        /// </summary>
-        Default = 0,
-        /// <summary>
-        /// Prettify string
-        /// </summary>
-        Prettify = 2
-    }
 
     public static partial class NetJSON {
 
@@ -660,13 +170,7 @@ namespace NetJSON {
                     var sbLocal = il.DeclareLocal(_stringBuilderType);
                     il.Emit(OpCodes.Call, _generatorGetStringBuilder);
 
-                    il.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-                    OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
+                    il.EmitClearStringBuilder();
 
                     il.Emit(OpCodes.Stloc, sbLocal);
 
@@ -693,22 +197,12 @@ OpCodes.Call,
 
                     var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
 
-                    var isValueType = ObjType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType;
+                    var isValueType = ObjType.GetTypeInfo().IsValueType;
                     
                     var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
                     ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
 
-                    ilWithSettings.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
+                    ilWithSettings.EmitClearStringBuilder();
 
                     ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
 
@@ -742,14 +236,8 @@ OpCodes.Callvirt,
 
                     var wsbLocal = wil.DeclareLocal(_stringBuilderType);
                     wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
-                    wil.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-                    OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
-                    wil.Emit(OpCodes.Stloc, wsbLocal);
+                    wil.EmitClearStringBuilder();
+					wil.Emit(OpCodes.Stloc, wsbLocal);
 
                     wil.Emit(OpCodes.Ldarg_0);
                     wil.Emit(OpCodes.Ldloc, wsbLocal);
@@ -778,14 +266,8 @@ OpCodes.Call,
                     
                     var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
                     wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
-                    wilWithSettings.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
-                    wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
+                    wilWithSettings.EmitClearStringBuilder();
+					wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
 
                     wilWithSettings.Emit(OpCodes.Ldarg_0);
                     wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
@@ -815,11 +297,7 @@ OpCodes.Callvirt,
             {
                 NetJSONSerializer<T> serializer = null;
                 var type = typeof(T);
-                if (type
-#if NET_CORE || NET_PCL
-                    .GetTypeInfo()
-#endif
-                        .IsGenericType)
+                if (type.GetTypeInfo().IsGenericType)
                 {
                     foreach (var item in type.GetGenericArguments())
                     {
@@ -839,21 +317,9 @@ OpCodes.Callvirt,
 
             private static bool IsPrivate(Type type)
             {
-                return type
-#if NET_CORE || NET_PCL
-                    .GetTypeInfo()
-#endif
-                    .IsNotPublic ||
-                        type
-#if NET_CORE || NET_PCL
-                    .GetTypeInfo()
-#endif
-                    .IsNestedPrivate ||
-                        !type
-#if NET_CORE || NET_PCL
-                    .GetTypeInfo()
-#endif
-                    .IsVisible; ;
+                return type.GetTypeInfo().IsNotPublic ||
+                        type.GetTypeInfo().IsNestedPrivate ||
+                        !type.GetTypeInfo().IsVisible;
             }
         }
         
@@ -883,10 +349,11 @@ OpCodes.Callvirt,
             | MethodAttributes.SpecialName;
 
 
-        static readonly Type _dateTimeType = typeof(DateTime),
+        static readonly Type 
+			_dateTimeType = typeof(DateTime),
             _dateTimeOffsetType = typeof(DateTimeOffset),
             _enumType = typeof(Enum),
-            _stringType = typeof(String),
+            _stringType = typeof(string),
             _byteArrayType = typeof(byte[]),
             _charType = typeof(char),
             _charPtrType = typeof(char*),
@@ -901,7 +368,7 @@ OpCodes.Callvirt,
             _dictStringObject = typeof(Dictionary<string, object>),
             _genericDictType = typeof(Dictionary<,>),
             _genericListType = typeof(List<>),
-            _objectType = typeof(Object),
+            _objectType = typeof(object),
             _nullableType = typeof(Nullable<>),
             _decimalType = typeof(decimal),
             _genericCollectionType = typeof(ICollection<>),
@@ -914,26 +381,16 @@ OpCodes.Callvirt,
             _genericKeyValuePairType = typeof(KeyValuePair<,>),
             _invalidJSONExceptionType = typeof(NetJSONInvalidJSONException),
             _serializerType = typeof(NetJSONSerializer<>),
-            _expandoObjectType =
-
-#if !NET_35
-      typeof(ExpandoObject),
-#else
-      typeof(ExpandoObject),
-#endif
-
-
-
-            _genericDictionaryEnumerator =
-                Type.GetType("System.Collections.Generic.Dictionary`2+Enumerator"),
-            _genericListEnumerator =
-                Type.GetType("System.Collections.Generic.List`1+Enumerator"),
+            _expandoObjectType = typeof(ExpandoObject),
+            _genericDictionaryEnumerator = typeof(Dictionary<,>.Enumerator),
+            _genericListEnumerator = typeof(List<>.Enumerator),
             _typeType = typeof(Type),
             _voidType = typeof(void),
             _intType = typeof(int),
             _shortType = typeof(short),
             _longType = typeof(long),
             _jsonType = typeof(NetJSON),
+			_internalJsonType = typeof(SerializerUtilities),
             _methodInfoType = typeof(MethodBase),
             _textWriterType = typeof(TextWriter),
             _tupleContainerType = typeof(TupleContainer),
@@ -947,99 +404,90 @@ OpCodes.Callvirt,
             _stringBuilderAppend = _stringBuilderType.GetMethod("Append", new[] { _stringType }),
             _stringBuilderAppendObject = _stringBuilderType.GetMethod("Append", new[] { _objectType }),
             _stringBuilderAppendChar = _stringBuilderType.GetMethod("Append", new[] { _charType }),
-
-
-#if NET_35
-            _stringBuilderClear = typeof(StringBuilder35Extension).GetMethod("Clear"),
-#else
-            _stringBuilderClear = _stringBuilderType.GetMethod("Clear"),
-#endif
-
             _stringOpEquality = _stringType.GetMethod("op_Equality", MethodBinding),
             _tupleContainerAdd = _tupleContainerType.GetMethod("Add"),
-            _generatorGetStringBuilder = _jsonType.GetMethod("GetStringBuilder", MethodBinding),
-            _generatorIntToStr = _jsonType.GetMethod("IntToStr", MethodBinding),
-            _generatorCharToStr = _jsonType.GetMethod("CharToStr", MethodBinding),
-            _generatorEnumToStr = _jsonType.GetMethod("CustomEnumToStr", MethodBinding),
-            _generatorLongToStr = _jsonType.GetMethod("LongToStr", MethodBinding),
-            _generatorFloatToStr = _jsonType.GetMethod("FloatToStr", MethodBinding),
-            _generatorDoubleToStr = _jsonType.GetMethod("DoubleToStr", MethodBinding),
-            _generatorDecimalToStr = _jsonType.GetMethod("DecimalToStr", MethodBinding),
-            _generatorDateToString = _jsonType.GetMethod("AllDateToString", MethodBinding),
-            _generatorDateOffsetToString = _jsonType.GetMethod("AllDateOffsetToString", MethodBinding),
-            _generatorSByteToStr = _jsonType.GetMethod("SByteToStr", MethodBinding),
-            _guidToStr = _jsonType.GetMethod("GuidToStr", MethodBinding),
-            _byteArrayToStr = _jsonType.GetMethod("ByteArrayToStr", MethodBinding),
+            _generatorGetStringBuilder = _internalJsonType.GetMethod("GetStringBuilder", MethodBinding),
+            _generatorIntToStr = _internalJsonType.GetMethod("IntToStr", MethodBinding),
+            _generatorCharToStr = _internalJsonType.GetMethod("CharToStr", MethodBinding),
+            _generatorEnumToStr = _internalJsonType.GetMethod("CustomEnumToStr", MethodBinding),
+            _generatorLongToStr = _internalJsonType.GetMethod("LongToStr", MethodBinding),
+            _generatorFloatToStr = _internalJsonType.GetMethod("FloatToStr", MethodBinding),
+            _generatorDoubleToStr = _internalJsonType.GetMethod("DoubleToStr", MethodBinding),
+            _generatorDecimalToStr = _internalJsonType.GetMethod("DecimalToStr", MethodBinding),
+            _generatorDateToString = _internalJsonType.GetMethod("AllDateToString", MethodBinding),
+            _generatorDateOffsetToString = _internalJsonType.GetMethod("AllDateOffsetToString", MethodBinding),
+            _generatorSByteToStr = _internalJsonType.GetMethod("SByteToStr", MethodBinding),
+            _guidToStr = _internalJsonType.GetMethod("GuidToStr", MethodBinding),
+            _byteArrayToStr = _internalJsonType.GetMethod("ByteArrayToStr", MethodBinding),
             _objectToString = _objectType.GetMethod("ToString", Type.EmptyTypes),
             _stringFormat = _stringType.GetMethod("Format", new[] { _stringType, _objectType }),
             _convertBase64 = typeof(Convert).GetMethod("ToBase64String", new[] { _byteArrayType }),
             _convertFromBase64 = typeof(Convert).GetMethod("FromBase64String", new[] { _stringType }),
-            _getStringBasedValue = _jsonType.GetMethod("GetStringBasedValue", MethodBinding),
-            _getNonStringValue = _jsonType.GetMethod("GetNonStringValue", MethodBinding),
-            _isDateValue = _jsonType.GetMethod("IsValueDate", MethodBinding),
+            _getStringBasedValue = _internalJsonType.GetMethod("GetStringBasedValue", MethodBinding),
+            _getNonStringValue = _internalJsonType.GetMethod("GetNonStringValue", MethodBinding),
+            _isDateValue = _internalJsonType.GetMethod("IsValueDate", MethodBinding),
             _iDisposableDispose = typeof(IDisposable).GetMethod("Dispose"),
             _toExpectedType = typeof(AutomaticTypeConverter).GetMethod("ToExpectedType"),
-            _fastStringToInt = _jsonType.GetMethod("FastStringToInt", MethodBinding),
-            _fastStringToUInt = _jsonType.GetMethod("FastStringToUInt", MethodBinding),
-            _fastStringToUShort = _jsonType.GetMethod("FastStringToUShort", MethodBinding),
-            _fastStringToShort = _jsonType.GetMethod("FastStringToShort", MethodBinding),
-            _fastStringToByte = _jsonType.GetMethod("FastStringToByte", MethodBinding),
-            _fastStringToLong = _jsonType.GetMethod("FastStringToLong", MethodBinding),
-            _fastStringToULong = _jsonType.GetMethod("FastStringToULong", MethodBinding),
-            _fastStringToDecimal = _jsonType.GetMethod("FastStringToDecimal", MethodBinding),
-            _fastStringToFloat = _jsonType.GetMethod("FastStringToFloat", MethodBinding),
-            _fastStringToDate = _jsonType.GetMethod("FastStringToDate", MethodBinding),
-            _fastStringToDateTimeoffset = _jsonType.GetMethod("FastStringToDateTimeoffset", MethodBinding),
-            _fastStringToChar = _jsonType.GetMethod("FastStringToChar", MethodBinding),
-            _fastStringToDouble = _jsonType.GetMethod("FastStringToDouble", MethodBinding),
-            _fastStringToBool = _jsonType.GetMethod("FastStringToBool", MethodBinding),
-            _fastStringToGuid = _jsonType.GetMethod("FastStringToGuid", MethodBinding),
-            _fastStringToType = _jsonType.GetMethod("FastStringToType", MethodBinding),
-            _moveToArrayBlock = _jsonType.GetMethod("MoveToArrayBlock", MethodBinding),
-            _fastStringToByteArray = _jsonType.GetMethod("FastStringToByteArray", MethodBinding),
-            _listToListObject = _jsonType.GetMethod("ListToListObject", MethodBinding),
-            _isListType = _jsonType.GetMethod("IsListType", MethodBinding),
-            _isDictType = _jsonType.GetMethod("IsDictionaryType", MethodBinding),
+            _fastStringToInt = _internalJsonType.GetMethod("FastStringToInt", MethodBinding),
+            _fastStringToUInt = _internalJsonType.GetMethod("FastStringToUInt", MethodBinding),
+            _fastStringToUShort = _internalJsonType.GetMethod("FastStringToUShort", MethodBinding),
+            _fastStringToShort = _internalJsonType.GetMethod("FastStringToShort", MethodBinding),
+            _fastStringToByte = _internalJsonType.GetMethod("FastStringToByte", MethodBinding),
+            _fastStringToLong = _internalJsonType.GetMethod("FastStringToLong", MethodBinding),
+            _fastStringToULong = _internalJsonType.GetMethod("FastStringToULong", MethodBinding),
+            _fastStringToDecimal = _internalJsonType.GetMethod("FastStringToDecimal", MethodBinding),
+            _fastStringToFloat = _internalJsonType.GetMethod("FastStringToFloat", MethodBinding),
+            _fastStringToDate = _internalJsonType.GetMethod("FastStringToDate", MethodBinding),
+            _fastStringToDateTimeoffset = _internalJsonType.GetMethod("FastStringToDateTimeoffset", MethodBinding),
+            _fastStringToChar = _internalJsonType.GetMethod("FastStringToChar", MethodBinding),
+            _fastStringToDouble = _internalJsonType.GetMethod("FastStringToDouble", MethodBinding),
+            _fastStringToBool = _internalJsonType.GetMethod("FastStringToBool", MethodBinding),
+            _fastStringToGuid = _internalJsonType.GetMethod("FastStringToGuid", MethodBinding),
+            _fastStringToType = _internalJsonType.GetMethod("FastStringToType", MethodBinding),
+            _moveToArrayBlock = _internalJsonType.GetMethod("MoveToArrayBlock", MethodBinding),
+            _fastStringToByteArray = _internalJsonType.GetMethod("FastStringToByteArray", MethodBinding),
+            _listToListObject = _internalJsonType.GetMethod("ListToListObject", MethodBinding),
+            _isListType = _internalJsonType.GetMethod("IsListType", MethodBinding),
+            _isDictType = _internalJsonType.GetMethod("IsDictionaryType", MethodBinding),
             _stringLength = _stringType.GetMethod("get_Length"),
-            _createString = _jsonType.GetMethod("CreateString"),
-            _isCharTag = _jsonType.GetMethod("IsCharTag"),
-            _isEndChar = _jsonType.GetMethod("IsEndChar", MethodBinding),
-            _isArrayEndChar = _jsonType.GetMethod("IsArrayEndChar", MethodBinding),
+            _createString = _internalJsonType.GetMethod("CreateString"),
+            _isCharTag = _internalJsonType.GetMethod("IsCharTag"),
+            _isEndChar = _internalJsonType.GetMethod("IsEndChar", MethodBinding),
+            _isArrayEndChar = _internalJsonType.GetMethod("IsArrayEndChar", MethodBinding),
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
             _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
-            _skipProperty = _jsonType.GetMethod("SkipProperty", MethodBinding),
+            _skipProperty = _internalJsonType.GetMethod("SkipProperty", MethodBinding),
             _prettifyJSONIfNeeded = _jsonType.GetMethod("PrettifyJSONIfNeeded", MethodBinding),
-            _isRawPrimitive = _jsonType.GetMethod("IsRawPrimitive", MethodBinding),
-            _isInRange = _jsonType.GetMethod("IsInRange", MethodBinding),
+            _isRawPrimitive = _internalJsonType.GetMethod("IsRawPrimitive", MethodBinding),
+            _isInRange = _internalJsonType.GetMethod("IsInRange", MethodBinding),
             _dateTimeParse = _dateTimeType.GetMethod("Parse", new[] { _stringType }),
             _timeSpanParse = _timeSpanType.GetMethod("Parse", new[] { _stringType }),
             _getChars = _stringType.GetMethod("get_Chars"),
             _dictSetItem = _dictType.GetMethod("set_Item"),
             _textWriterWrite = _textWriterType.GetMethod("Write", new[] { _stringType }),
-            _fastObjectToStr = _jsonType.GetMethod("FastObjectToString", MethodBinding),
             _textReaderReadToEnd = _textReaderType.GetMethod("ReadToEnd"),
             _typeopEquality = _typeType.GetMethod("op_Equality", MethodBinding),
-            _cTypeOpEquality = _jsonType.GetMethod("CustomTypeEquality", MethodBinding),
+            _cTypeOpEquality = _internalJsonType.GetMethod("CustomTypeEquality", MethodBinding),
             _assemblyQualifiedName = _typeType.GetProperty("AssemblyQualifiedName").GetGetMethod(),
             _objectGetType = _objectType.GetMethod("GetType", MethodBinding),
-            _needQuote = _jsonType.GetMethod("NeedQuotes", MethodBinding),
+            _needQuote = _internalJsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
             _methodGetMethodFromHandle = _methodInfoType.GetMethod("GetMethodFromHandle", new Type[] { typeof(RuntimeMethodHandle) }),
             _objectEquals = _objectType.GetMethod("Equals", new[] { _objectType }),
             _stringEqualCompare = _stringType.GetMethod("Equals", new[] { _stringType, _stringType, typeof(StringComparison) }),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
-            _IsCurrentAQuotMethod = _jsonType.GetMethod("IsCurrentAQuot", MethodBinding),
-            _getTypeIdentifierInstanceMethod = _jsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding),
+            _IsCurrentAQuotMethod = _internalJsonType.GetMethod("IsCurrentAQuot", MethodBinding),
+            _getTypeIdentifierInstanceMethod = _internalJsonType.GetMethod("GetTypeIdentifierInstance", MethodBinding),
             _settingsUseEnumStringProp = _settingsType.GetProperty("UseEnumString", MethodBinding).GetGetMethod(),
             _settingsUseStringOptimization = _settingsType.GetProperty("UseStringOptimization", MethodBinding).GetGetMethod(),
             _settingsHasOverrideQuoteChar = _settingsType.GetProperty("HasOverrideQuoteChar", MethodBinding).GetGetMethod(),
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
             _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
-            _getUninitializedInstance = _jsonType.GetMethod("GetUninitializedInstance", MethodBinding),
-            _setterPropertyValueMethod = _jsonType.GetMethod("SetterPropertyValue", MethodBinding),
+            _getUninitializedInstance = _internalJsonType.GetMethod("GetUninitializedInstance", MethodBinding),
+            _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
-            _toCamelCase = _jsonType.GetMethod("ToCamelCase", MethodBinding);
+            _toCamelCase = _internalJsonType.GetMethod("ToCamelCase", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
             _settingQuoteChar = _settingsType.GetField("_quoteChar", MethodBinding),
@@ -1053,12 +501,12 @@ OpCodes.Callvirt,
              TypeIdentifier = "$type",
              ClassStr = "Class", _dllStr = ".dll",
              NullStr = "null",
-              IListStr = "IList`1",
-              IDictStr = "IDictionary`2",
-              KeyValueStr = "KeyValuePair`2",
+		     IListStr = "IList`1",
+			  IDictStr = "IDictionary`2",
+			  KeyValueStr = "KeyValuePair`2",
+			  ICollectionStr = "ICollection`1",
+			 IEnumerableStr = "IEnumerable`1",
               CreateListStr = "CreateList",
-              ICollectionStr = "ICollection`1",
-             IEnumerableStr = "IEnumerable`1",
               CreateClassOrDictStr = "CreateClassOrDict",
               Dynamic = "Dynamic",
               ExtractStr = "Extract",
@@ -1070,9 +518,6 @@ OpCodes.Callvirt,
               Colon = ":",
               ToTupleStr = "ToTuple",
               SerializeStr = "Serialize", DeserializeStr = "Deserialize", SettingsFieldName = "_settingsField";
-
-        const char QuotDoubleChar = '"',
-                   QuotSingleChar = '\'';
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
@@ -1146,25 +591,7 @@ OpCodes.Callvirt,
         static ConcurrentDictionary<string, string> _fixes =
             new ConcurrentDictionary<string, string>();
 
-        const int DefaultStringBuilderCapacity = 1024 * 2;
-
         private static object _lockObject = new object();
-
-        public static string FloatToStr(float value) {
-            return value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        public static string DoubleToStr(double value) {
-            return value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        public static string SByteToStr(sbyte value) {
-            return value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        public static string DecimalToStr(decimal value) {
-            return value.ToString(CultureInfo.InvariantCulture);
-        }
 
         private static unsafe void memcpy(char* dmem, char* smem, int charCount) {
             if ((((int)dmem) & 2) != 0) {
@@ -1198,200 +625,20 @@ OpCodes.Callvirt,
             }
         }
 
-        public unsafe static string IntToStr(int snum) {
-            char* s = stackalloc char[12];
-            char* ps = s;
-            int num1 = snum, num2, num3, div;
-            if (snum < 0) {
-                *ps++ = '-';
-                //Can't negate int min
-                if (snum == -2147483648)
-                    return "-2147483648";
-                num1 = -num1;
-            }
-            if (num1 < 10000) {
-                if (num1 < 10) goto L1;
-                if (num1 < 100) goto L2;
-                if (num1 < 1000) goto L3;
-            } else {
-                num2 = num1 / 10000;
-                num1 -= num2 * 10000;
-                if (num2 < 10000) {
-                    if (num2 < 10) goto L5;
-                    if (num2 < 100) goto L6;
-                    if (num2 < 1000) goto L7;
-                } else {
-                    num3 = num2 / 10000;
-                    num2 -= num3 * 10000;
-                    if (num3 >= 10) {
-                        *ps++ = (char)('0' + (char)(div = (num3 * 6554) >> 16));
-                        num3 -= div * 10;
-                    }
-                    *ps++ = (char)('0' + (num3));
-                }
-                *ps++ = (char)('0' + (div = (num2 * 8389) >> 23));
-                num2 -= div * 1000;
-                L7:
-                *ps++ = (char)('0' + (div = (num2 * 5243) >> 19));
-                num2 -= div * 100;
-                L6:
-                *ps++ = (char)('0' + (div = (num2 * 6554) >> 16));
-                num2 -= div * 10;
-                L5:
-                *ps++ = (char)('0' + (num2));
-            }
-            *ps++ = (char)('0' + (div = (num1 * 8389) >> 23));
-            num1 -= div * 1000;
-            L3:
-            *ps++ = (char)('0' + (div = (num1 * 5243) >> 19));
-            num1 -= div * 100;
-            L2:
-            *ps++ = (char)('0' + (div = (num1 * 6554) >> 16));
-            num1 -= div * 10;
-            L1:
-            *ps++ = (char)('0' + (num1));
-
-            return new string(s);
-        }
-
-        public unsafe static string LongToStr(long snum) {
-            char* s = stackalloc char[21];
-            char* ps = s;
-            long num1 = snum, num2, num3, num4, num5, div;
-
-            if (snum < 0) {
-                *ps++ = '-';
-                if (snum == -9223372036854775808) return "-9223372036854775808";
-                num1 = -snum;
-            }
-
-            if (num1 < 10000) {
-                if (num1 < 10) goto L1;
-                if (num1 < 100) goto L2;
-                if (num1 < 1000) goto L3;
-            } else {
-                num2 = num1 / 10000;
-                num1 -= num2 * 10000;
-                if (num2 < 10000) {
-                    if (num2 < 10) goto L5;
-                    if (num2 < 100) goto L6;
-                    if (num2 < 1000) goto L7;
-                } else {
-                    num3 = num2 / 10000;
-                    num2 -= num3 * 10000;
-                    if (num3 < 10000) {
-                        if (num3 < 10) goto L9;
-                        if (num3 < 100) goto L10;
-                        if (num3 < 1000) goto L11;
-                    } else {
-                        num4 = num3 / 10000;
-                        num3 -= num4 * 10000;
-                        if (num4 < 10000) {
-                            if (num4 < 10) goto L13;
-                            if (num4 < 100) goto L14;
-                            if (num4 < 1000) goto L15;
-                        } else {
-                            num5 = num4 / 10000;
-                            num4 -= num5 * 10000;
-                            if (num5 < 10000) {
-                                if (num5 < 10) goto L17;
-                                if (num5 < 100) goto L18;
-                            }
-                            *ps++ = (char)('0' + (div = (num5 * 5243) >> 19));
-                            num5 -= div * 100;
-                            L18:
-                            *ps++ = (char)('0' + (div = (num5 * 6554) >> 16));
-                            num5 -= div * 10;
-                            L17:
-                            *ps++ = (char)('0' + (num5));
-                        }
-                        *ps++ = (char)('0' + (div = (num4 * 8389) >> 23));
-                        num4 -= div * 1000;
-                        L15:
-                        *ps++ = (char)('0' + (div = (num4 * 5243) >> 19));
-                        num4 -= div * 100;
-                        L14:
-                        *ps++ = (char)('0' + (div = (num4 * 6554) >> 16));
-                        num4 -= div * 10;
-                        L13:
-                        *ps++ = (char)('0' + (num4));
-                    }
-                    *ps++ = (char)('0' + (div = (num3 * 8389) >> 23));
-                    num3 -= div * 1000;
-                    L11:
-                    *ps++ = (char)('0' + (div = (num3 * 5243) >> 19));
-                    num3 -= div * 100;
-                    L10:
-                    *ps++ = (char)('0' + (div = (num3 * 6554) >> 16));
-                    num3 -= div * 10;
-                    L9:
-                    *ps++ = (char)('0' + (num3));
-                }
-                *ps++ = (char)('0' + (div = (num2 * 8389) >> 23));
-                num2 -= div * 1000;
-                L7:
-                *ps++ = (char)('0' + (div = (num2 * 5243) >> 19));
-                num2 -= div * 100;
-                L6:
-                *ps++ = (char)('0' + (div = (num2 * 6554) >> 16));
-                num2 -= div * 10;
-                L5:
-                *ps++ = (char)('0' + (num2));
-            }
-            *ps++ = (char)('0' + (div = (num1 * 8389) >> 23));
-            num1 -= div * 1000;
-            L3:
-            *ps++ = (char)('0' + (div = (num1 * 5243) >> 19));
-            num1 -= div * 100;
-            L2:
-            *ps++ = (char)('0' + (div = (num1 * 6554) >> 16));
-            num1 -= div * 10;
-            L1:
-            *ps++ = (char)('0' + (num1));
-
-            return new string(s);
-        }
-
-        public static string GuidToStr(Guid value) {
-            //TODO: Optimize
-            return value.ToString();
-        }
-
-        public static string ByteArrayToStr(byte[] value) {
-            //TODO: Optimize
-            return Convert.ToBase64String(value);
-        }
-
-        public static List<object> ListToListObject(IList list) {
-            return list.Cast<object>().ToList();
-        }
-
-        private static bool IsPrimitiveType(this Type type) {
+        static bool IsPrimitiveType(this Type type) {
             return _primitiveTypes.GetOrAdd(type, key => {
                 lock (GetDictLockObject("IsPrimitiveType")) {
-                    if (key
-#if NET_CORE || NET_PCL
-    .GetTypeInfo()
-#endif
-                    .IsGenericType &&
+                    if (key.GetTypeInfo().IsGenericType &&
                         key.GetGenericTypeDefinition() == _nullableType)
                         key = key.GetGenericArguments()[0];
 
                     return key == _stringType ||
-                        key
-#if NET_CORE || NET_PCL
-    .GetTypeInfo()
-#endif
-                        .IsPrimitive || key == _dateTimeType ||
+                        key.GetTypeInfo().IsPrimitive || key == _dateTimeType ||
                         key == _dateTimeOffsetType ||
                         key == _decimalType || key == _timeSpanType ||
                         key == _guidType || key == _charType ||
                         key == _typeType ||
-                        key
-#if NET_CORE || NET_PCL
-    .GetTypeInfo()
-#endif
-                        .IsEnum || key == _byteArrayType;
+                        key.GetTypeInfo().IsEnum || key == _byteArrayType;
                 }
             });
         }
@@ -1427,58 +674,10 @@ OpCodes.Callvirt,
             });
         }
 
-
-        public static bool IsListType(this Type type) {
-            Type interfaceType = null;
-            //Skip type == typeof(String) since String is same as IEnumerable<Char>
-            return type != _stringType && (_listType.IsAssignableFrom(type) || type.Name == IListStr ||
-                (type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
-                (type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
-                ((interfaceType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
-                ((interfaceType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr));
-        }
-
-        public static bool IsDictionaryType(this Type type) {
-            Type interfaceType = null;
-            return _dictType.IsAssignableFrom(type) || type.Name == IDictStr
-                || ((interfaceType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
-        }
-
-        public static bool IsCollectionType(this Type type) {
-            return type.IsListType() || type.IsDictionaryType();
-        }
-
-        public static bool IsClassType(this Type type) {
-            return !type.IsCollectionType() && !type.IsPrimitiveType();
-        }
-
-        public static bool IsRawPrimitive(string value) {
-            value = value.Trim();
-            return !value.StartsWith("{") && !value.StartsWith("[");
-        }
-
         private static void LoadQuotChar(ILGenerator il) {
             il.Emit(OpCodes.Ldarg_2);
             il.Emit(OpCodes.Ldfld, _settingQuoteCharString);
             //il.Emit(OpCodes.Ldsfld, _threadQuoteStringField);
-        }
-
-        [ThreadStatic]
-        private static StringBuilder _cachedStringBuilder;
-        public static StringBuilder GetStringBuilder() {
-            return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
         }
 
         private static bool _useTickFormat = true;
@@ -1634,15 +833,7 @@ OpCodes.Callvirt,
         }
 #endif
 
-        public static T GetUninitializedInstance<T>() {
-#if NET_CORE
-            return (T)GetUninitializedObject(typeof(T));
-#else
-            return (T)FormatterServices.GetUninitializedObject(typeof(T));
-#endif
-        }
-
-        public static object GetTypeIdentifierInstance(string typeName) {
+        internal static object GetTypeIdentifierInstance(string typeName) {
             return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
                 lock (GetDictLockObject("GetTypeIdentifier")) {
                     var type = Type.GetType(typeName, throwOnError: false);
@@ -1669,136 +860,9 @@ OpCodes.Callvirt,
             })();
         }
 
-        [ThreadStatic]
-        private static StringBuilder _cachedDateStringBuilder;
 
-        private static string DateToISOFormat(DateTime date, NetJSONSettings settings, TimeSpan offset) {
-            var timeZoneFormat = settings.TimeZoneFormat;
-            var minute = date.Minute;
-            var hour = date.Hour;
-            var second = date.Second;
-            var timeOfDay = date.TimeOfDay;
-            int totalSeconds = (int)(date.Ticks - (Math.Floor((decimal)date.Ticks / TimeSpan.TicksPerSecond) * TimeSpan.TicksPerSecond));
-            var day = date.Day;
-            var month = date.Month;
-            var year = date.Year;
-
-            var value = (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
-                .Clear().Append(IntToStr(year)).Append('-')
-                .Append(month < 10 ? "0" : string.Empty)
-                .Append(IntToStr(month))
-            .Append('-').Append(day < 10 ? "0" : string.Empty).Append(IntToStr(day)).Append('T').Append(hour < 10 ? "0" : string.Empty).Append(IntToStr(hour)).Append(':')
-            .Append(minute < 10 ? "0" : string.Empty).Append(IntToStr(minute)).Append(':')
-            .Append(second < 10 ? "0" : string.Empty).Append(IntToStr(second)).Append('.')
-            .Append(IntToStr(totalSeconds));
-
-            if (timeZoneFormat == NetJSONTimeZoneFormat.Utc)
-                value.Append('Z');
-            else if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
-                //var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
-                var hours = Math.Abs(offset.Hours);
-                var minutes = Math.Abs(offset.Minutes);
-                value.Append(offset.Ticks >= 0 ? '+' : '-').Append(hours < 10 ? "0" : string.Empty).Append(IntToStr(hours)).Append(minutes < 10 ? "0" : string.Empty).Append(IntToStr(minutes));
-            }
-
-            return value.ToString();
-        }
-
-        private static DateTime Epoch = new DateTime(1970, 1, 1),
-            UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-
-
-        public static string AllDateToString(DateTime date, NetJSONSettings settings) {
-            var offset =
-#if NET_CORE
-                    TimeZoneInfo.Local.GetUtcOffset(date);
-#else
-                    TimeZone.CurrentTimeZone.GetUtcOffset(date);
-#endif
-            return DateToStringWithOffset(date, settings, offset);
-        }
-
-        private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
-            return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
-                settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
-                DateToISOFormat(date, settings, offset);
-        }
-
-        public static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
-            return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
-        }
-
-        private static string DateToString(DateTime date, NetJSONSettings settings, TimeSpan offset) {
-            if (date == DateTime.MinValue)
-                return "\\/Date(-62135596800)\\/";
-            else if (date == DateTime.MaxValue)
-                return "\\/Date(253402300800)\\/";
-            
-            var timeZoneFormat = settings.TimeZoneFormat;
-            var hours = Math.Abs(offset.Hours);
-            var minutes = Math.Abs(offset.Minutes);
-            var offsetText = timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
-                hours, minutes < 10 ? "0" : string.Empty, minutes)) : string.Empty;
-
-            if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
-                offset =
-#if NET_CORE
-                    TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-#else
-                    TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
-#endif
-                hours = Math.Abs(offset.Hours);
-                minutes = Math.Abs(offset.Minutes);
-                date = date.AddHours(hours).AddMinutes(minutes);
-            }
-
-            return string.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
-        }
-
-        private static string DateToEpochTime(DateTime date) {
-            long epochTime = (long)(date.ToUniversalTime() - UnixEpoch).Ticks;
-            return LongToStr(epochTime);// IntUtility.ltoa(epochTime);
-        }
-
-        [ThreadStatic]
-        private static StringBuilder _cachedObjectStringBuilder;
-
-        public static StringBuilder CachedObjectStringBuilder() {
-            return (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
-        }
-
-        public static bool NeedQuotes(Type type, NetJSONSettings settings) {
-            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || ((type == _dateTimeType || type == _dateTimeOffsetType) && settings.DateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (settings.UseEnumString && type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum);
-        }
-
-        public static bool CustomTypeEquality(Type type1, Type type2) {
-            if (type1
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum) {
-                if(type1
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsEnum && type2 == typeof(Enum))
-                    return true;
-            }
-            return type1 == type2;
-        }
-
-        public static string CustomEnumToStr(Enum @enum, NetJSONSettings settings) {
-            if (settings.UseEnumString)
-                return @enum.ToString();
-            return IntToStr((int)((object)@enum));
-        }
-
-        public static string CharToStr(char chr) {
-            return chr.ToString();
+        internal static bool NeedQuotes(Type type, NetJSONSettings settings) {
+            return type == _stringType || type == _charType || type == _guidType || type == _timeSpanType || ((type == _dateTimeType || type == _dateTimeOffsetType) && settings.DateFormat != NetJSONDateFormat.EpochTime) || type == _byteArrayType || (settings.UseEnumString && type.GetTypeInfo().IsEnum);
         }
 
         private static MethodInfo GenerateFastObjectToString(TypeBuilder type) {
@@ -1931,11 +995,7 @@ OpCodes.Callvirt,
                         } else {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldarg_0);
-                            if (objType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                            .IsValueType)
+                            if (objType.GetTypeInfo().IsValueType)
                                 il.Emit(OpCodes.Unbox_Any, objType);
                             else il.Emit(OpCodes.Castclass, objType);
                             if (objType == _dateTimeType || objType == _dateTimeOffsetType)
@@ -2017,34 +1077,6 @@ OpCodes.Callvirt,
             return returnType;
         }
 
-        public unsafe static string ToCamelCase(string str) {
-            fixed (char* p = str) {
-                char* buffer = stackalloc char[str.Length];
-                int c = 0;
-                char* ptr = p;
-                pc:
-                char f = *ptr;
-                if (c == 0 && f >= 65 && f <= 90)
-                    *buffer = (char)(f + 32);
-                else if (c > 0 && f >= 97 && f <= 122)
-                    *buffer = (char)(f - 32);
-                else
-                    *buffer = *ptr;
-                ++c;
-                ptr++;
-                buffer++;
-                while ((f = *(ptr++)) != '\0') {
-                    if (f == ' ' || f == '_') {
-                        goto pc;
-                    }
-                    *(buffer++) = f;
-                    ++c;
-                }
-                buffer -= c;
-                return new string(buffer, 0, c);
-            }
-        }
-
         private static TypeBuilder GenerateTypeBuilder(Type objType, ModuleBuilder module) {
 
             var genericType = _serializerType.MakeGenericType(objType);
@@ -2087,15 +1119,9 @@ OpCodes.Callvirt,
             var sbLocal = il.DeclareLocal(_stringBuilderType);
             il.Emit(OpCodes.Call, _generatorGetStringBuilder);
 
-            il.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-                    OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
+            il.EmitClearStringBuilder();
 
-            il.Emit(OpCodes.Stloc, sbLocal);
+			il.Emit(OpCodes.Stloc, sbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
@@ -2111,14 +1137,8 @@ OpCodes.Call,
 
             var wsbLocal = wil.DeclareLocal(_stringBuilderType);
             wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
-            wil.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-                    OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
-            wil.Emit(OpCodes.Stloc, wsbLocal);
+            wil.EmitClearStringBuilder();
+			wil.Emit(OpCodes.Stloc, wsbLocal);
 
             //il.Emit(OpCodes.Ldarg_0);
             wil.Emit(OpCodes.Ldarg_1);
@@ -2148,25 +1168,15 @@ OpCodes.Call,
             rdil.Emit(OpCodes.Ret);
 
             //With Settings
-            var isValueType = objType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType;
+            var isValueType = objType.GetTypeInfo().IsValueType;
             var ilWithSettings = serializeMethodWithSettings.GetILGenerator();
 
             var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
             ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
 
-            ilWithSettings.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
+            ilWithSettings.EmitClearStringBuilder();
 
-            ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
+			ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
 
             //il.Emit(OpCodes.Ldarg_0);
             ilWithSettings.Emit(OpCodes.Ldarg_1);
@@ -2187,14 +1197,8 @@ OpCodes.Callvirt,
 
             var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
             wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
-            wilWithSettings.Emit(
-#if NET_35
-OpCodes.Call,
-#else
-OpCodes.Callvirt,
-#endif
- _stringBuilderClear);
-            wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
+            wilWithSettings.EmitClearStringBuilder();
+			wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
 
             //il.Emit(OpCodes.Ldarg_0);
             wilWithSettings.Emit(OpCodes.Ldarg_1);
@@ -2375,52 +1379,6 @@ OpCodes.Callvirt,
             return assembly;
         }
 
-        public static unsafe void SkipProperty(char* ptr, ref int index, NetJSONSettings settings) {
-            var currentIndex = index;
-            char current = '\0';
-            char bchar = '\0';
-            char echar = '\0';
-            bool isStringType = false;
-            bool isNonStringType = false;
-            int counter = 0;
-            bool hasChar = false;
-            var currentQuote = settings._quoteChar;
-
-            while (true) {
-                current = *(ptr + index);
-                if (current != ' ' && current != ':' && current != '\n' && current != '\r' && current != '\t') {
-                    if (!hasChar) {
-                        isStringType = current == currentQuote;
-                        if (!isStringType)
-                            isNonStringType = current != '{' && current != '[';
-                        if (isStringType || isNonStringType)
-                            break;
-                        bchar = current;
-                        echar = current == '{' ? '}' :
-                            current == '[' ? ']' : '\0';
-                        counter = 1;
-                        hasChar = true;
-                    } else {
-                        if ((current == '{' && bchar == '{') || (current == '[' && bchar == '['))
-                            counter++;
-                        else if ((current == '}' && echar == '}') || (current == ']' && echar == ']'))
-                            counter--;
-                    }
-                }
-                index++;
-                if (hasChar && counter == 0)
-                    break;
-            }
-
-            if (isStringType || isNonStringType) {
-                index = currentIndex;
-                if (isStringType)
-                    GetStringBasedValue(ptr, ref index, settings);
-                else if (isNonStringType)
-                    GetNonStringValue(ptr, ref index);
-            }
-        }
-
         public static string PrettifyJSONIfNeeded(string str, NetJSONSettings settings) {
             if (settings.Format == NetJSONFormat.Prettify)
                 return PrettifyJSON(str);
@@ -2538,20 +1496,12 @@ OpCodes.Callvirt,
             }
         }
 
-        public static string GetName(this Type type) {
+        static string GetName(this Type type) {
             var sb = new StringBuilder();
             var arguments =
-                !type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsGenericType ? Type.EmptyTypes :
+                !type.GetTypeInfo().IsGenericType ? Type.EmptyTypes :
                 type.GetGenericArguments();
-            if (!type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsGenericType) {
+            if (!type.GetTypeInfo().IsGenericType) {
                 sb.Append(type.Name);
             } else {
                 sb.Append(type.Name);
@@ -2561,7 +1511,7 @@ OpCodes.Callvirt,
             return sb.ToString();
         }
 
-        public static string Fix(this string name) {
+        static string Fix(this string name) {
             return _fixes.GetOrAdd(name, key => {
                 lock (GetDictLockObject("FixName")) {
                     var index = key.IndexOf(CarrotQuoteChar, StringComparison.OrdinalIgnoreCase);
@@ -2585,21 +1535,13 @@ OpCodes.Callvirt,
                 type, new[] { _stringType });
             _readEnumToStringMethodBuilders[key] = method;
 
-            var eType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .GetEnumUnderlyingType();
+            var eType = type.GetTypeInfo().GetEnumUnderlyingType();
             var il = method.GetILGenerator();
 
             var values = Enum.GetValues(type).Cast<object>()
                .Select(x => new {
                    Value = x,
-                   Attr = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute
+                   Attr = type.GetTypeInfo().GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute
                }).ToArray();
             var keys = Enum.GetNames(type);
 
@@ -2649,19 +1591,19 @@ OpCodes.Callvirt,
 
 
                 if (eType == _intType)
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)value));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)value));
                 else if (eType == _longType)
-                    il.Emit(OpCodes.Ldstr, LongToStr((long)value));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.LongToStr((long)value));
                 else if (eType == typeof(ulong))
                     il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
                 else if (eType == typeof(uint))
                     il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
                 else if (eType == typeof(byte))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((byte)value)));
                 else if (eType == typeof(ushort))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((ushort)value)));
                 else if (eType == typeof(short))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((short)value)));
                  
                 il.Emit(OpCodes.Call, _stringOpEquality);
                 il.Emit(OpCodes.Brfalse, label2);
@@ -2708,11 +1650,7 @@ OpCodes.Callvirt,
                 _stringType, new[] { type, _settingsType });
             _writeEnumToStringMethodBuilders[key] = method;
 
-            var eType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .GetEnumUnderlyingType();
+            var eType = type.GetTypeInfo().GetEnumUnderlyingType();
 
             var il = method.GetILGenerator();
             var useEnumLabel = il.DefineLabel();
@@ -2770,19 +1708,19 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Bne_Un, label);
 
                 if (eType == _intType)
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)value));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)value));
                 else if (eType == _longType)
-                    il.Emit(OpCodes.Ldstr, LongToStr((long)value));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.LongToStr((long)value));
                 else if (eType == typeof(ulong))
                     il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
                 else if (eType == typeof(uint))
                     il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
                 else if (eType == typeof(byte))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((byte)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((byte)value)));
                 else if (eType == typeof(ushort))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((ushort)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((ushort)value)));
                 else if (eType == typeof(short))
-                    il.Emit(OpCodes.Ldstr, IntToStr((int)((short)value)));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.IntToStr((int)((short)value)));
 
 
                 il.Emit(OpCodes.Ret);
@@ -2794,11 +1732,7 @@ OpCodes.Callvirt,
         private static void WriteEnumToStringForWithString(Type type, Type eType, ILGenerator il) {
             var values = Enum.GetValues(type).Cast<object>()
                 .Select(x => new { Value = x,
-                    Attr = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute }).ToArray();
+                    Attr = type.GetTypeInfo().GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute }).ToArray();
             var names = Enum.GetNames(type);
 
             var count = values.Length;
@@ -3220,11 +2154,7 @@ OpCodes.Callvirt,
                         il.Emit(OpCodes.Ldloc, boolLocal);
                         il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                         il.Emit(OpCodes.Pop);
-                    } else if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                        .IsEnum) {
+                    } else if (type.GetTypeInfo().IsEnum) {
                         var useEnumStringLocal = il.DeclareLocal(_boolType);
                         var useEnumLabel1 = il.DefineLabel();
                         var useEnumLabel2 = il.DefineLabel();
@@ -3365,11 +2295,7 @@ OpCodes.Callvirt,
         internal static void WriteSerializeFor(TypeBuilder typeBuilder, Type type, ILGenerator methodIL) {
             var conditionLabel = methodIL.DefineLabel();
 
-            if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType) {
+            if (type.GetTypeInfo().IsValueType) {
                 var defaultValue = methodIL.DeclareLocal(type);
 
                 methodIL.Emit(OpCodes.Ldarga, 0);
@@ -3444,16 +2370,8 @@ OpCodes.Callvirt,
         private static List<Type> GetIncludedTypeTypes(Type type) {
             var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
                 lock (GetDictLockObject("GetIncludeTypeTypes")) {
-                    var attrs = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
-                    var types = attrs.Any() ? attrs.Where(x => !x.Type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsAbstract).Select(x => x.Type).ToList() : null;
+                    var attrs = type.GetTypeInfo().GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
+                    var types = attrs.Any() ? attrs.Where(x => !x.Type.GetTypeInfo().IsAbstract).Select(x => x.Type).ToList() : null;
                     
                     //Expense call to auto-magically figure all subclass of current type
                     if (types == null) {
@@ -3465,28 +2383,16 @@ OpCodes.Callvirt,
 #endif
                         foreach (var asm in assemblies) {
                             try {
-                                types.AddRange(asm.GetTypes().Where(x => x
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                                .IsSubclassOf(type)));
+                                types.AddRange(asm.GetTypes().Where(x => x.GetTypeInfo().IsSubclassOf(type)));
                             } catch (ReflectionTypeLoadException ex) {
-                                var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                                .IsSubclassOf(type)) : null;
+                                var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.GetTypeInfo().IsSubclassOf(type)) : null;
                                 if (exTypes != null)
                                     types.AddRange(exTypes);
                             }
                         }
                     }
 
-                    if (!types.Contains(type) && !type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsAbstract)
+                    if (!types.Contains(type) && !type.GetTypeInfo().IsAbstract)
                         types.Insert(0, type);
 
                     return types;
@@ -3521,17 +2427,9 @@ OpCodes.Callvirt,
 
 
             if (keyType == null || valueType == null) {
-                var baseType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .BaseType;
+                var baseType = type.GetTypeInfo().BaseType;
                 if (baseType == _objectType) {
-                    baseType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                        .GetInterface(IEnumerableStr);
+                    baseType = type.GetTypeInfo().GetInterface(IEnumerableStr);
                     if (baseType == null) {
                         throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
                     }
@@ -3602,11 +2500,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Call, keyType == _intType ? _generatorIntToStr : _generatorLongToStr);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
             } else {
-                if (keyType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsValueType)
+                if (keyType.GetTypeInfo().IsValueType)
                     il.Emit(OpCodes.Box, keyType);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
             }
@@ -3841,11 +2735,7 @@ OpCodes.Callvirt,
             var props = type.GetTypeProperties();
             var count = props.Length - 1;
             var counter = 0;
-            var isClass = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsClass;
+            var isClass = type.GetTypeInfo().IsClass;
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasValue);
@@ -3875,11 +2765,7 @@ OpCodes.Callvirt,
                 LoadQuotChar(il);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
-                il.Emit(OpCodes.Ldstr, string.Format("{0}, {1}", type.FullName, type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .Assembly.GetName().Name));
+                il.Emit(OpCodes.Ldstr, string.Format("{0}, {1}", type.FullName, type.GetTypeInfo().Assembly.GetName().Name));
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
 
                 LoadQuotChar(il);
@@ -3910,11 +2796,7 @@ OpCodes.Callvirt,
                 var isNullable = nullableType != null && !originPropType.IsArray;
 
                 propType = isNullable ? nullableType : propType;
-                var isValueType = propType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsValueType;
+                var isValueType = propType.GetTypeInfo().IsValueType;
                 //var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
                 var equalityMethod = propType.GetMethod("op_Equality");
                 var propValue = il.DeclareLocal(propType);
@@ -4159,11 +3041,7 @@ OpCodes.Callvirt,
             else if (type == _decimalType) {
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Newobj, _decimalType.GetConstructor(new[] { _intType }));
-            } else if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum)
+            } else if (type.GetTypeInfo().IsEnum)
                 il.Emit(OpCodes.Ldc_I4_0);
         }
 
@@ -4171,8 +3049,8 @@ OpCodes.Callvirt,
             return NetJSONCachedSerializer<T>.Serializer;
         }
 
-        public delegate object DeserializeWithTypeDelegate(string value);
-        public delegate string SerializeWithTypeDelegate(object value);
+        delegate object DeserializeWithTypeDelegate(string value);
+        delegate string SerializeWithTypeDelegate(object value);
 
         static ConcurrentDictionary<string, DeserializeWithTypeDelegate> _deserializeWithTypes =
             new ConcurrentDictionary<string, DeserializeWithTypeDelegate>();
@@ -4204,11 +3082,7 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Call, genericMethod);
 
                     il.Emit(OpCodes.Ldarg_0);
-                    if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsClass)
+                    if (type.GetTypeInfo().IsClass)
                         il.Emit(OpCodes.Isinst, type);
                     else il.Emit(OpCodes.Unbox_Any, type);
 
@@ -4253,11 +3127,7 @@ OpCodes.Callvirt,
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Callvirt, genericDeserialize);
 
-                    if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsClass)
+                    if (type.GetTypeInfo().IsClass)
                         il.Emit(OpCodes.Isinst, type);
                     else {
                         il.Emit(OpCodes.Box, type);
@@ -4397,9 +3267,6 @@ OpCodes.Callvirt,
             }
             index++;
         }
-
-        public static Regex //_dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled),
-            _dateISORegex = new Regex(@"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}.(\d){3}Z", RegexOptions.Compiled);
 
         private static MethodInfo GenerateExtractObject(TypeBuilder type) {
 
@@ -4550,139 +3417,6 @@ OpCodes.Callvirt,
             return method;
         }
 
-#if NET_35
-        public delegate void Action<T1, T2, T3, T4, T5>(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
-
-        public class Tuple<T1> {
-
-            public Tuple(T1 item1) {
-                Item1 = item1;
-            }
-
-            public T1 Item1 { get; set; }
-        }
-
-        public class Tuple<T1, T2> {
-
-            public Tuple(T1 item1, T2 item2) {
-                Item1 = item1;
-                Item2 = item2;
-            }
-
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3> {
-
-            public Tuple(T1 item1, T2 item2, T3 item3) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3, T4> {
-
-            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-                Item4 = item4;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-            public T4 Item4 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3, T4, T5> {
-
-            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-                Item4 = item4;
-                Item5 = item5;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-            public T4 Item4 { get; set;}
-            public T5 Item5 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3, T4, T5, T6> {
-
-            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-                Item4 = item4;
-                Item5 = item5;
-                Item6 = item6;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-            public T4 Item4 { get; set;}
-            public T5 Item5 { get; set;}
-            public T6 Item6 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3, T4, T5, T6, T7> {
-
-            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-                Item4 = item4;
-                Item5 = item5;
-                Item6 = item6;
-                Item7 = item7;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-            public T4 Item4 { get; set;}
-            public T5 Item5 { get; set;}
-            public T6 Item6 { get; set;}
-            public T7 Item7 { get; set;}
-        }
-
-        public class Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> {
-
-
-            public Tuple(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, TRest rest) {
-                Item1 = item1;
-                Item2 = item2;
-                Item3 = item3;
-                Item4 = item4;
-                Item5 = item5;
-                Item6 = item6;
-                Item7 = item7;
-                Rest = rest;
-            }
-            
-            public T1 Item1 { get; set;}
-            public T2 Item2 { get; set;}
-            public T3 Item3 { get; set;}
-            public T4 Item4 { get; set;}
-            public T5 Item5 { get; set;}
-            public T6 Item6 { get; set;}
-            public T7 Item7 { get; set;}
-            public TRest Rest { get; set;}
-        }
-#endif
-
         private static void ILFixedWhile(ILGenerator il, Action<ILGenerator, LocalBuilder, LocalBuilder, Label, Label> whileAction,
             bool needBreak = false, Action<ILGenerator> returnAction = null,
             Action<ILGenerator, LocalBuilder> beforeAction = null,
@@ -4756,141 +3490,6 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Add);
             il.Emit(OpCodes.Ldind_U2);
             il.Emit(OpCodes.Stloc, current);
-        }
-
-        public static bool IsValueDate(string value) {
-            return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
-        }
-
-        public static unsafe byte FastStringToByte(string str) {
-            unchecked {
-                return (byte)FastStringToInt(str);
-            }
-        }
-
-        public static unsafe short FastStringToShort(string str) {
-            unchecked {
-                return (short)FastStringToInt(str);
-            }
-        }
-
-        public static unsafe ushort FastStringToUShort(string str) {
-            unchecked {
-                return (ushort)FastStringToInt(str);
-            }
-        }
-
-        public static unsafe int FastStringToInt(string strNum) {
-            int val = 0;
-            int neg = 1;
-            fixed (char* ptr = strNum) {
-                char* str = ptr;
-                if (*str == '-') {
-                    neg = -1;
-                    ++str;
-                }
-                while (*str != '\0') {
-                    val = val * 10 + (*str++ - '0');
-                }
-            }
-            return val * neg;
-        }
-
-        public static unsafe uint FastStringToUInt(string strNum) {
-            uint val = 0;
-            fixed (char* ptr = strNum) {
-                char* str = ptr;
-                if (*str == '-') {
-                    val = (uint)-val;
-                    ++str;
-                }
-                while (*str != '\0') {
-                    val = val * 10 + (uint)(*str++ - '0');
-                }
-            }
-            return val;
-        }
-
-        public static unsafe long FastStringToLong(string strNum) {
-            long val = 0;
-            long neg = 1;
-            fixed (char* ptr = strNum) {
-                char* str = ptr;
-                if (*str == '-') {
-                    neg = -1;
-                    ++str;
-                }
-                while (*str != '\0') {
-                    val = val * 10 + (*str++ - '0');
-                }
-            }
-            return val * neg;
-        }
-
-        public static unsafe ulong FastStringToULong(string strNum) {
-            ulong val = 0;
-            fixed (char* ptr = strNum) {
-                char* str = ptr;
-                while (*str != '\0') {
-                    val = val * 10 + (ulong)(*str++ - '0');
-                }
-            }
-            return val;
-        }
-
-        public static unsafe double FastStringToDouble(string numStr) {
-            double val = 0.0;
-            double neg = 1;
-            fixed (char* ptr = numStr) {
-                char* p = ptr;
-                if (*p == '-') {
-                    neg = -1;
-                    ++p;
-                }
-                int count = 0;
-                while (*p != '\0') {
-                    if (*p == '.') {
-                        double rem = 0.0;
-                        double div = 1;
-                        ++p;
-                        while (*p != '\0') {
-                            if (*p == 'E' || *p == 'e') {
-                                var e = 0;
-                                val += rem * (Math.Pow(10, -1 * count));
-                                ++p;
-                                var ePlusMinus = 1;
-                                if (*p == '-' || *p == '+') {
-                                    if (*p == '-')
-                                        ePlusMinus = -1;
-                                    ++p;
-                                }
-                                while (*p != '\0') {
-                                    e = e * 10 + (*p++ - '0');
-                                }
-                                val *= Math.Pow(10, e * ePlusMinus);
-                                return val * neg;
-                            }
-                            rem = (rem * 10.0) + (*p - '0');
-                            div *= 10.0;
-                            ++p;
-                            count++;
-                        }
-                        val += rem / div;
-                        return ((double)(decimal)val) * neg;
-                    }
-                    val = (val * 10) + (*p - '0');
-                    ++p;
-                }
-            }
-            return ((double)(decimal)val) * neg;
-        }
-        
-        public static unsafe float FastStringToFloat(string numStr) {
-            return (float)FastStringToDouble(numStr);
-        }
-
-        public static decimal FastStringToDecimal(string numStr) {
-            return new Decimal(FastStringToDouble(numStr));
         }
 
         [ThreadStatic]
@@ -4988,11 +3587,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldc_I4, type.IsStringBasedType() ? 1 : 0);
             il.Emit(OpCodes.Stloc, isStringBasedLocal);
 
-            if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum) {
+            if (type.GetTypeInfo().IsEnum) {
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
@@ -5070,148 +3665,6 @@ OpCodes.Callvirt,
             return method;
         }
 
-        public unsafe static bool FastStringToBool(string value) {
-            return value[0] == 't';
-        }
-
-        public static byte[] FastStringToByteArray(string value) {
-
-#if NET_35
-            if (value.IsNullOrWhiteSpace())
-                return null;
-#else
-            if (string.IsNullOrWhiteSpace(value))
-                return null;
-#endif
-            return Convert.FromBase64String(value);
-        }
-
-        public static char FastStringToChar(string value) {
-            return value[0];
-        }
-
-        public static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
-            TimeSpan offset;
-            var date = StringToDate(value, settings, out offset, isDateTimeOffset: true);
-            return new DateTimeOffset(date.Ticks, offset);
-        }
-
-        private static char[] _dateNegChars = new[] { '-' },
-            _datePosChars = new[] { '+' };
-        public static DateTime FastStringToDate(string value, NetJSONSettings settings) {
-            TimeSpan offset;
-            return StringToDate(value, settings, out offset, isDateTimeOffset: false);
-        }
-
-        private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
-            offset = TimeSpan.Zero;
-            if (settings.DateFormat == NetJSONDateFormat.EpochTime) {
-                var unixTimeStamp = FastStringToLong(value);
-                var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-                return date.AddTicks(unixTimeStamp).ToLocalTime();
-            }
-
-            DateTime dt;
-            string[] tokens = null;
-            bool negative = false;
-            string offsetText = null;
-            int tickMilliseconds = 0;
-            bool noOffSetValue = false;
-            var timeZoneFormat = settings.TimeZoneFormat;
-
-            if (value == "\\/Date(-62135596800)\\/")
-                return DateTime.MinValue;
-            else if (value == "\\/Date(253402300800)\\/")
-                return DateTime.MaxValue;
-            else if (value[0] == '\\') {
-                var dateText = value.Substring(7, value.IndexOf(')', 7) - 7);
-                negative = dateText.IndexOf('-') >= 0;
-                tokens = negative ? dateText.Split(_dateNegChars, StringSplitOptions.RemoveEmptyEntries)
-                    : dateText.Split(_datePosChars, StringSplitOptions.RemoveEmptyEntries);
-                dateText = tokens[0];
-
-                var ticks = FastStringToLong(dateText);
-
-                dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-                dt = dt.AddTicks(ticks);
-
-                if (timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || timeZoneFormat == NetJSONTimeZoneFormat.Utc)
-                    dt = dt.ToLocalTime();
-
-                var kind = timeZoneFormat == NetJSONTimeZoneFormat.Local ? DateTimeKind.Local :
-                    timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
-                    DateTimeKind.Unspecified;
-
-                dt = new DateTime(dt.Ticks, kind);
-
-                offsetText = tokens.Length > 1 ? tokens[1] : offsetText;
-            } else {
-                var dateText = value.Substring(0, 19);
-                var diff = value.Length - dateText.Length;
-                var hasOffset = diff > 0;
-                var utcOffsetText = hasOffset ? value.Substring(dateText.Length, diff) : string.Empty;
-                var firstChar = utcOffsetText[0];
-                negative = diff > 0 && firstChar == '-';
-                if (hasOffset) {
-                    noOffSetValue = timeZoneFormat == NetJSONTimeZoneFormat.Utc || timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
-                    offsetText = utcOffsetText.Substring(1, utcOffsetText.Length - 1).Replace(":", string.Empty).Replace("Z", string.Empty);
-                    if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
-                        int indexOfSign = offsetText.IndexOf('-');
-                        negative = indexOfSign >= 0;
-                        if (!negative) {
-                            indexOfSign = offsetText.IndexOf('+');
-                        }
-                        tickMilliseconds = FastStringToInt(offsetText.Substring(0, indexOfSign));
-                        offsetText = offsetText.Substring(indexOfSign + 1, offsetText.Length - indexOfSign - 1);
-                        if (negative)
-                            offsetText = offsetText.Replace("-", string.Empty);
-                        else
-                            offsetText = offsetText.Replace("+", string.Empty);
-                    } else {
-                        tickMilliseconds = FastStringToInt(offsetText);
-                    }
-                }
-                dt = DateTime.Parse(dateText, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
-                if (timeZoneFormat == NetJSONTimeZoneFormat.Local) {
-                    if (!isDateTimeOffset)
-                        dt = dt.ToUniversalTime();
-                    dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Local);
-                } else if (timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
-                    dt = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond, DateTimeKind.Utc);
-                }
-            }
-
-            var isNullOrWhiteSpace = false;
-
-#if NET_35
-            isNullOrWhiteSpace = offsetText.IsNullOrWhiteSpace();
-#else
-            isNullOrWhiteSpace = string.IsNullOrWhiteSpace(offsetText);
-#endif
-
-            if (!isNullOrWhiteSpace) {
-                var hours = noOffSetValue ? 0 : FastStringToInt(offsetText.Substring(0, 2));
-                var minutes = noOffSetValue ? 0 : (offsetText.Length > 2 ? FastStringToInt(offsetText.Substring(2, 2)) : 0);
-                if (negative)
-                    hours *= -1;
-                offset = new TimeSpan(hours, minutes, 0);
-                if (!isDateTimeOffset)
-                    dt = dt.AddHours(hours).AddMinutes(minutes);
-                dt = dt.AddTicks(tickMilliseconds);
-            }
-
-            return dt;
-        }
-
-        public static Guid FastStringToGuid(string value) {
-            //TODO: Optimize
-            return new Guid(value);
-        }
-
-        public static Type FastStringToType(string value) {
-            return Type.GetType(value, false);
-        }
-
         private static void GenerateChangeTypeFor(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder value, LocalBuilder settings, Type originalType = null) {
 
             var nullableType = type;
@@ -5285,11 +3738,7 @@ OpCodes.Callvirt,
                 il.Emit(OpCodes.Call, _fastStringToBool);
             else if (type == _guidType) {
                 il.Emit(OpCodes.Call, _fastStringToGuid);
-            } else if (type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum)
+            } else if (type.GetTypeInfo().IsEnum)
                 il.Emit(OpCodes.Call, ReadStringToEnumFor(typeBuilder, type));
             else if (type == _typeType) {
                 il.Emit(OpCodes.Call, _fastStringToType);
@@ -5312,11 +3761,7 @@ OpCodes.Callvirt,
             if (_setValueMethodBuilders.TryGetValue(key, out method))
                 return method;
 
-            var isTypeValueType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType;
+            var isTypeValueType = type.GetTypeInfo().IsValueType;
             var methodName = String.Concat(SetStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
@@ -5353,11 +3798,7 @@ OpCodes.Callvirt,
 
                         il.Emit(OpCodes.Brfalse, compareLabel);
 
-                        GenerateTypeSetValueFor(typeBuilder, pType, pType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                            .IsValueType, Optimized, il);
+                        GenerateTypeSetValueFor(typeBuilder, pType, pType.GetTypeInfo().IsValueType, Optimized, il);
 
                         il.MarkLabel(compareLabel);
                     }
@@ -5371,7 +3812,7 @@ OpCodes.Callvirt,
 
         delegate void SetterPropertyDelegate<T>(T instance, object value, MethodInfo methodInfo);
 
-        public static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
+        internal static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
             (_setMemberValues.GetOrAdd(methodInfo, key => {
                 lock (GetDictLockObject("SetDynamicMemberValue")) {
                     var propType = key.GetParameters()[0].ParameterType;
@@ -5388,11 +3829,7 @@ OpCodes.Callvirt,
 
                     il.Emit(OpCodes.Ldarg_1);
 
-                    if (propType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .IsValueType)
+                    if (propType.GetTypeInfo().IsValueType)
                         il.Emit(OpCodes.Unbox_Any, propType);
                     else
                         il.Emit(OpCodes.Isinst, propType);
@@ -5472,11 +3909,7 @@ OpCodes.Callvirt,
                     //} else il.Emit(OpCodes.Stfld, field);
                 } else {
                     var propValue = il.DeclareLocal(originPropType);
-                    var isValueType = propType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                        .IsValueType;
+                    var isValueType = propType.GetTypeInfo().IsValueType;
                     var isPrimitiveType = propType.IsPrimitiveType();
                     var isStruct = isValueType && !isPrimitiveType;
                     var propNullLabel = !isNullable ? il.DefineLabel() : default(Label);
@@ -5536,11 +3969,7 @@ OpCodes.Callvirt,
                     if (isProp) {
                         if (setter != null) {
                             if (!setter.IsPublic) {
-                                if (propType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                                    .IsValueType)
+                                if (propType.GetTypeInfo().IsValueType)
                                     il.Emit(OpCodes.Box, isNullable ? prop.PropertyType : propType);
                                 il.Emit(OpCodes.Ldtoken, setter);
                                 il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
@@ -5569,24 +3998,6 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg, 4);
             il.Emit(OpCodes.Call, _skipProperty);
-        }
-
-        public unsafe static int MoveToArrayBlock(char* str, ref int index) {
-            char* ptr = str + index;
-
-            if (*ptr == '[')
-                index++;
-            else {
-                do {
-                    index++;
-                    if (*(ptr = str + index) == 'n') {
-                        index += 3;
-                        return 0;
-                    }
-                } while (*ptr != '[');
-                index++;
-            }
-            return 1;
         }
 
         private static MethodInfo GenerateCreateListFor(TypeBuilder typeBuilder, Type type) {
@@ -5630,11 +4041,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldc_I4, isStringBased ? 1 : 0);
             il.Emit(OpCodes.Stloc, isStringBasedLocal);
 
-            if (nullableType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum) {
+            if (nullableType.GetTypeInfo().IsEnum) {
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
@@ -5879,30 +4286,23 @@ OpCodes.Callvirt,
             il.MarkLabel(blankNewLineLabel);
         }
 
-        public unsafe static string CreateString(string str, int startIndex, int length) {
-            fixed (char* ptr = str)
-                return new string(ptr, startIndex, length);
-        }
+		internal static bool IsListType(this Type type) {
+			Type interfaceType = null;
+			//Skip type == typeof(String) since String is same as IEnumerable<Char>
+			return type != _stringType && (_listType.IsAssignableFrom(type) || type.Name == IListStr ||
+				(type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+				(type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+				((interfaceType = type.GetTypeInfo().GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
+				((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr));
+		}
 
-        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
-            var inRangeChr = *(ptr + index + offset + 2);
-            return (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r'));
-        }
+		internal static bool IsDictionaryType(this Type type) {
+			Type interfaceType = null;
+			return _dictType.IsAssignableFrom(type) || type.Name == IDictStr
+				|| ((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
+		}
 
-        public static bool IsCurrentAQuot(char current, NetJSONSettings settings) {
-            if (settings.HasOverrideQuoteChar)
-                return current == settings._quoteChar;
-            var quote = settings._quoteChar;
-            var isQuote = current == QuotSingleChar || current == QuotDoubleChar;
-            if (isQuote) {
-                if (quote != current)
-                    settings._quoteCharString = (settings._quoteChar = current).ToString();
-                settings.HasOverrideQuoteChar = true;
-            }
-            return isQuote;
-        }
-        
-        private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
+		private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
             MethodInfo method;
             var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
             var typeName = type.GetName().Fix();
@@ -5944,17 +4344,9 @@ OpCodes.Callvirt,
             ConstructorInfo selectedCtor = null;
 
             if (isDict && keyType == null) {
-                var baseType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                    .BaseType;
+                var baseType = type.GetTypeInfo().BaseType;
                 if (baseType == _objectType) {
-                    baseType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                        .GetInterface(IEnumerableStr);
+                    baseType = type.GetTypeInfo().GetInterface(IEnumerableStr);
                     if (baseType == null)
                         throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
                 }
@@ -5971,11 +4363,7 @@ OpCodes.Callvirt,
             }
 
 
-            var isTuple = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsGenericType && type.Name.StartsWith("Tuple");
+            var isTuple = type.GetTypeInfo().IsGenericType && type.Name.StartsWith("Tuple");
             var tupleType = isTuple ? type : null;
             var tupleArguments = tupleType != null ? tupleType.GetGenericArguments() : null;
             var tupleCount = tupleType != null ? tupleArguments.Length : 0;
@@ -5986,11 +4374,7 @@ OpCodes.Callvirt,
 
             var obj = il.DeclareLocal(type);
             var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType;
-            var isTypeValueType = type
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType;
+            var isTypeValueType = type.GetTypeInfo().IsValueType;
             var tupleCountLocal = isTuple ? il.DeclareLocal(_intType) : null;
             var isStringTypeLocal = il.DeclareLocal(_boolType);
 
@@ -6018,11 +4402,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Stloc, isStringTypeLocal);
 
 
-            if (keyType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum) {
+            if (keyType.GetTypeInfo().IsEnum) {
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
                 il.Emit(OpCodes.Stloc, isStringTypeLocal);
@@ -6254,11 +4634,7 @@ OpCodes.Callvirt,
                                     var propType = prop.PropertyType;
 
                                     if (!setter.IsPublic) {
-                                        if (propType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                                        .IsValueType)
+                                        if (propType.GetTypeInfo().IsValueType)
                                             il.Emit(OpCodes.Box, propType);
                                         il.Emit(OpCodes.Ldtoken, setter);
                                         il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
@@ -6419,11 +4795,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldc_I4, keyType.IsStringBasedType() ? 1 : 0);
             il.Emit(OpCodes.Stloc, isStringBasedLocal);
 
-            if (keyType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsEnum) {
+            if (keyType.GetTypeInfo().IsEnum) {
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Callvirt, _settingsUseEnumStringProp);
                 il.Emit(OpCodes.Stloc, isStringBasedLocal);
@@ -6704,11 +5076,7 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldloc, settings);
             il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, tupleItemType));
-            if (tupleItemType
-#if NET_CORE
-    .GetTypeInfo()
-#endif
-                .IsValueType)
+            if (tupleItemType.GetTypeInfo().IsValueType)
                 il.Emit(OpCodes.Box, tupleItemType);
 
             il.Emit(OpCodes.Callvirt, _tupleContainerAdd);
@@ -6731,92 +5099,12 @@ OpCodes.Callvirt,
             il.Emit(OpCodes.Stind_I4);
         }
 
-        public static bool IsEndChar(char current) {
-            return current == ':' || current == '{' || current == ' ';
-        }
 
-        public static bool IsArrayEndChar(char current) {
-            return current == ',' || current == ']' || current == ' ';
-        }
-
-        public static bool IsCharTag(char current) {
-            return current == '{' || current == '}';
-        }
-
-
-        public unsafe static string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
-            char current = '\0', prev = '\0';
-            int count = 0, startIndex = 0;
-            string value = string.Empty;
-            
-            while (true) {
-                current = ptr[index];
-                if (count == 0 && current == settings._quoteChar) {
-                    startIndex = index + 1;
-                    ++count;
-                } else if (count > 0 && current == settings._quoteChar && prev != '\\') {
-                    value = new string(ptr, startIndex, index - startIndex);
-                    ++index;
-                    break;
-                } else if (count == 0 && current == 'n') {
-                    index += 3;
-                    return null;
-                }
-
-                prev = current;
-                ++index;
-            }
-
-            return value;
-        }
-
-        public unsafe static string GetNonStringValue(char* ptr, ref int index) {
-            char current = '\0';
-            int startIndex = -1;
-            string value = string.Empty;
-            int indexDiff = 0;
-
-            while (true) {
-                current = ptr[index];
-                if (startIndex > -1) {
-                    switch (current) {
-                        case '\n':
-                        case '\r':
-                        case '\t':
-                        case ' ':
-                            ++indexDiff;
-                            break;
-                    }
-                }
-                if (current != ' ' && current != ':') {
-                    if (startIndex == -1)
-                        startIndex = index;
-                    if (current == ',' || current == ']' || current == '}' || current == '\0') {
-                        value = new string(ptr, startIndex, index - startIndex - indexDiff);
-                        --index;
-                        break;
-                    } else if (current == 't') {
-                        index += 4;
-                        return "true";
-                    } else if (current == 'f') {
-                        index += 5;
-                        return "false";
-                    } else if (current == 'n') {
-                        index += 4;
-                        return null;
-                    }
-                }
-                ++index;
-            }
-            if (value == "null")
-                return null;
-            return value;
-        }
-
-        public static bool IsStringBasedType(this Type type) {
+        static bool IsStringBasedType(this Type type) {
             var nullableType = type.GetNullableType() ?? type;
             type = nullableType;
             return type == _stringType || type == _typeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
         }
+
     }
 }

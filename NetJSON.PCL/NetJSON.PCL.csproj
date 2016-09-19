@@ -38,6 +38,13 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\NetJSON.V3_5\Net35AndPCLExtensions.cs">
+      <Link>Net35AndPCLExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\NetJSON\Models.cs">
+      <Link>Models.cs</Link>
+    </Compile>
+    <Compile Include="NetPCLExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\NetJSON\AutomaticTypeConverter.cs" />
     <Compile Include="..\NetJSON\IntUtility.cs" />

@@ -34,7 +34,7 @@ using System.Security;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.2.1.2")]
-[assembly: AssemblyFileVersion("1.2.1.2")]
+[assembly: AssemblyFileVersion("1.2.1.74")]
 #if !NET_35
 [assembly: SecurityRules(SecurityRuleSet.Level2, SkipVerificationInFullTrust = true)]
 #endif
