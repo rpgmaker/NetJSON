@@ -204,6 +204,21 @@ namespace NetJSON.Tests {
             var sobj2 = NetJSON.Serialize(obj2);
         }
 
+        [TestMethod]
+        public void TestDateTimeWithMissingZ()
+        {
+            var dateString = "{\"DateTimeValue\":\"2015-11-08T19:18:00\"}";
+            var date = NetJSON.Deserialize<TestDateTimeFormatting>(dateString);
+
+            var date2 = NetJSON.Serialize(date, 
+                new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO,
+                 TimeZoneFormat = NetJSONTimeZoneFormat.Utc,
+                 QuoteType = NetJSONQuote.Double})
+                .Replace("Z", string.Empty).Replace(".0", string.Empty);
+
+            Assert.AreEqual(dateString, date2);
+        }
+
         public class TestJSON {
             public List<Rec> d { get; set; }
             public List<int?> v { get; set; }

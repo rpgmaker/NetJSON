@@ -337,7 +337,7 @@ namespace NetJSON.Internals
 				var diff = value.Length - dateText.Length;
 				var hasOffset = diff > 0;
 				var utcOffsetText = hasOffset ? value.Substring(dateText.Length, diff) : string.Empty;
-				var firstChar = utcOffsetText[0];
+				var firstChar = utcOffsetText.Length > 0 ? utcOffsetText[0] : '\0';
 				negative = diff > 0 && firstChar == '-';
 				if (hasOffset) {
 					noOffSetValue = timeZoneFormat == NetJSONTimeZoneFormat.Utc || timeZoneFormat == NetJSONTimeZoneFormat.Unspecified;
