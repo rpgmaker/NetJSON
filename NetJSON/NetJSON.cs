@@ -815,24 +815,6 @@ namespace NetJSON {
         }
 
 
-#if NET_CORE
-        // Retrieved from https://github.com/dotnet/corefx/pull/10088
-        private static readonly Func<Type, object> s_getUninitializedObjectDelegate = (Func<Type, object>)
- typeof(string).GetTypeInfo().Assembly.GetType("System.Runtime.Serialization.FormatterServices")
-            ?.GetMethod("GetUninitializedObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
-            ?.CreateDelegate(typeof(Func<Type, object>));
-
-        public static object GetUninitializedObject(Type type)
-        {
-            if (type == null)
-            {
-                throw new ArgumentNullException(nameof(type));
-            }
-
-            return s_getUninitializedObjectDelegate(type);
-        }
-#endif
-
         internal static object GetTypeIdentifierInstance(string typeName) {
             return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
                 lock (GetDictLockObject("GetTypeIdentifier")) {
