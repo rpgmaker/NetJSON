@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON", "NetJSON\NetJSON.csproj", "{1308D326-02BB-45BD-8549-18F78A81F204}"
+	ProjectSection(ProjectDependencies) = postProject
+		{02A93376-FF15-461A-8095-176FE1E8D8D5} = {02A93376-FF15-461A-8095-176FE1E8D8D5}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.V3_5", "NetJSON.V3_5\NetJSON.V3_5.csproj", "{BF485716-70B1-43FB-A8CE-A4EEE1EA48FA}"
 EndProject
