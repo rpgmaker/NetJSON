@@ -349,7 +349,7 @@ namespace NetJSON {
             | MethodAttributes.SpecialName;
 
 
-        static readonly Type 
+        internal static readonly Type 
 			_dateTimeType = typeof(DateTime),
             _dateTimeOffsetType = typeof(DateTimeOffset),
             _enumType = typeof(Enum),
@@ -484,6 +484,7 @@ namespace NetJSON {
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
             _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _internalJsonType.GetMethod("GetUninitializedInstance", MethodBinding),
+            _flagEnumToString = _internalJsonType.GetMethod("FlagEnumToString", MethodBinding),
             _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
@@ -1647,8 +1648,11 @@ namespace NetJSON {
             il.MarkLabel(useEnumLabel);
 
             WriteEnumToStringForWithInt(type, eType, il);
-
-            il.Emit(OpCodes.Ldstr, "0");
+            
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Box, type);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Call, _flagEnumToString);
 
             il.Emit(OpCodes.Ret);
 

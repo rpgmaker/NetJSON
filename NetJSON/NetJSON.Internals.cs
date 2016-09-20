@@ -899,7 +899,41 @@ namespace NetJSON.Internals
 			return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
 		}
 
-		private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
+        public static string FlagEnumToString(object value, NetJSONSettings settings)
+        {
+            if ((int)value == 0)
+            {
+                return "0";
+            }
+            if (settings.UseEnumString)
+            {
+                return ((Enum)value).ToString();
+            }
+            var eType = value.GetType().GetTypeInfo().GetEnumUnderlyingType();
+            if (eType == NetJSON._intType)
+                return IntToStr((int)value);
+            else if (eType == NetJSON._longType)
+                return LongToStr((long)value);
+            else if (eType == typeof(ulong))
+                return LongToStr((long)((ulong)value));
+            else if (eType == typeof(uint))
+                return IntUtility.uitoa((uint)value);
+            else if (eType == typeof(byte))
+            {
+                return IntToStr((int)((byte)value));
+            }
+            else if (eType == typeof(ushort))
+            {
+                return IntToStr((int)((ushort)value));
+            }
+            else if (eType == typeof(short))
+            {
+                return IntToStr((int)((short)value));
+            }
+            return IntToStr((int)value);
+        }
+
+        private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
 			return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
 				settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
 				DateToISOFormat(date, settings, offset);

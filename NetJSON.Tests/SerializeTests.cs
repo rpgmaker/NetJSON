@@ -391,6 +391,16 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void TestSerializeEnumFlag()
+        {
+            var eStr = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = true });
+            var eInt = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = false });
+
+            Assert.IsTrue(eStr == "\"Read, Delete\"");
+            Assert.IsTrue(eInt == "5");
+        }
+
+        [TestMethod]
         public void When_serializing_anonymous_objects()
         {
             var logEvents = Enumerable.Range(1, 100)
