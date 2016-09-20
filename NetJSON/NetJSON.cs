@@ -2826,12 +2826,14 @@ namespace NetJSON {
                 var propNullLabel = il.DefineLabel();
                 var skipDefaultValueTrueLabel = il.DefineLabel();
                 var skipDefaultValueFalseLabel = il.DefineLabel();
+                var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
+
+                var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
 
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
 
                 if (isNullable) {
-                    var hasValueMethod = originPropType.GetMethod("get_HasValue");
                     il.Emit(OpCodes.Ldloca, nullablePropValue);
                     il.Emit(OpCodes.Call, hasValueMethod);
                     il.Emit(OpCodes.Brfalse, propNullLabel);
@@ -2884,8 +2886,20 @@ namespace NetJSON {
 
                 il.MarkLabel(skipDefaultValueFalseLabel);
 
+                if (isNullable)
+                {
+                    il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, hasValueMethod);
+                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
 
-#region
+                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+
+                    il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
+                }
+
+                #region
                 //if (_skipDefaultValue) {
 
                 //    if (isNullable) {
@@ -2928,7 +2942,7 @@ namespace NetJSON {
                 //            il.Emit(OpCodes.Beq, propNullLabel);
                 //    }
                 //}
-#endregion
+                #endregion
 
                 //if (_skipDefaultValue) {
                 //    il.MarkLabel(propNullLabel);

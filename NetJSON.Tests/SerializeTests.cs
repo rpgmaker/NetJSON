@@ -53,12 +53,11 @@ namespace NetJSON.Tests {
             };
 
             var str = "Test";
+            var settings = new NetJSONSettings { QuoteType = NetJSONQuote.Single };
 
-            NetJSON.QuoteType = NetJSONQuote.Single;
-
-            var json = NetJSON.Serialize(dict);
-            var jsonList = NetJSON.Serialize(list);
-            var jsonStr = NetJSON.Serialize(str);
+            var json = NetJSON.Serialize(dict, settings);
+            var jsonList = NetJSON.Serialize(list, settings);
+            var jsonStr = NetJSON.Serialize(str, settings);
 
             var jsonWithDouble = json.Replace("'", "\"");
             var jsonListWithDouble = jsonList.Replace("'", "\"");
@@ -217,6 +216,21 @@ namespace NetJSON.Tests {
                 .Replace("Z", string.Empty).Replace(".0", string.Empty);
 
             Assert.AreEqual(dateString, date2);
+        }
+
+        public class NullableTest
+        {
+            public int? x { get; set; }
+            public int? y { get; set; }
+        }
+
+        [TestMethod]
+        public void NullableWithDefaultValueSetSerializes()
+        {
+            var obj = new NullableTest { x = 0, y = null };
+            var settings = new NetJSONSettings { SkipDefaultValue = true };
+            var json = NetJSON.Serialize(obj, settings);
+            Assert.AreEqual("{\"x\":0}", json);
         }
 
         public class TestJSON {
