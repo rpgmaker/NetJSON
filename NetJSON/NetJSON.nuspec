@@ -4,13 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.1.3</version> 
+    <version>1.2.1.4</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Added support for netstandard1.6
-      Fixed issue with skipping default value when nullable is used
-      Fixed issue with failure for date serialization due to missing "Z"
+      Fixed nullable issue with skip default option
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>

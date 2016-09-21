@@ -233,6 +233,15 @@ namespace NetJSON.Tests {
             Assert.AreEqual("{\"x\":0}", json);
         }
 
+        [TestMethod]
+        public void NonDefaultNullableValueSerializes()
+        {
+            var obj = new NullableTest { x = 5 };
+            var settings = new NetJSONSettings { SkipDefaultValue = true };
+            var json = NetJSON.Serialize(obj, settings);
+            Assert.AreEqual("{\"x\":5}", json);
+        }
+
         public class TestJSON {
             public List<Rec> d { get; set; }
             public List<int?> v { get; set; }

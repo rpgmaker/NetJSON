@@ -2831,8 +2831,12 @@ namespace NetJSON {
                 var skipDefaultValueTrueLabel = il.DefineLabel();
                 var skipDefaultValueFalseLabel = il.DefineLabel();
                 var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
+                var successLocal = il.DeclareLocal(_boolType);
 
                 var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
+
+                il.Emit(OpCodes.Ldc_I4, 0);
+                il.Emit(OpCodes.Stloc, successLocal);
 
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
@@ -2878,6 +2882,9 @@ namespace NetJSON {
 
                 WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
+                il.Emit(OpCodes.Ldc_I4, 1);
+                il.Emit(OpCodes.Stloc, successLocal);
+
                 il.MarkLabel(propNullLabel);
 
                 il.MarkLabel(skipDefaultValueTrueLabel);
@@ -2885,8 +2892,13 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+                il.Emit(OpCodes.Ldloc, successLocal);
+                il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
 
                 WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+
+                il.Emit(OpCodes.Ldc_I4, 1);
+                il.Emit(OpCodes.Stloc, successLocal);
 
                 il.MarkLabel(skipDefaultValueFalseLabel);
 
@@ -2897,6 +2909,8 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldloca, nullablePropValue);
                     il.Emit(OpCodes.Call, hasValueMethod);
                     il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Ldloc, successLocal);
+                    il.Emit(OpCodes.Brtrue, skipDefaultValueTrueAndHasValueLabel);
 
                     WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
