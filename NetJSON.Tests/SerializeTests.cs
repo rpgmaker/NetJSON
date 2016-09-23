@@ -53,12 +53,11 @@ namespace NetJSON.Tests {
             };
 
             var str = "Test";
+            var settings = new NetJSONSettings { QuoteType = NetJSONQuote.Single };
 
-            NetJSON.QuoteType = NetJSONQuote.Single;
-
-            var json = NetJSON.Serialize(dict);
-            var jsonList = NetJSON.Serialize(list);
-            var jsonStr = NetJSON.Serialize(str);
+            var json = NetJSON.Serialize(dict, settings);
+            var jsonList = NetJSON.Serialize(list, settings);
+            var jsonStr = NetJSON.Serialize(str, settings);
 
             var jsonWithDouble = json.Replace("'", "\"");
             var jsonListWithDouble = jsonList.Replace("'", "\"");
@@ -202,6 +201,45 @@ namespace NetJSON.Tests {
             NetJSON.DateFormat = NetJSONDateFormat.JsonNetISO;
             var obj2 = NetJSON.Deserialize<TestDateTimeFormatting>(json2);
             var sobj2 = NetJSON.Serialize(obj2);
+        }
+
+        [TestMethod]
+        public void TestDateTimeWithMissingZ()
+        {
+            var dateString = "{\"DateTimeValue\":\"2015-11-08T19:18:00\"}";
+            var date = NetJSON.Deserialize<TestDateTimeFormatting>(dateString);
+
+            var date2 = NetJSON.Serialize(date, 
+                new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO,
+                 TimeZoneFormat = NetJSONTimeZoneFormat.Utc,
+                 QuoteType = NetJSONQuote.Double})
+                .Replace("Z", string.Empty).Replace(".0", string.Empty);
+
+            Assert.AreEqual(dateString, date2);
+        }
+
+        public class NullableTest
+        {
+            public int? x { get; set; }
+            public int? y { get; set; }
+        }
+
+        [TestMethod]
+        public void NullableWithDefaultValueSetSerializes()
+        {
+            var obj = new NullableTest { x = 0, y = null };
+            var settings = new NetJSONSettings { SkipDefaultValue = true };
+            var json = NetJSON.Serialize(obj, settings);
+            Assert.AreEqual("{\"x\":0}", json);
+        }
+
+        [TestMethod]
+        public void NonDefaultNullableValueSerializes()
+        {
+            var obj = new NullableTest { x = 5 };
+            var settings = new NetJSONSettings { SkipDefaultValue = true };
+            var json = NetJSON.Serialize(obj, settings);
+            Assert.AreEqual("{\"x\":5}", json);
         }
 
         public class TestJSON {
@@ -359,6 +397,16 @@ namespace NetJSON.Tests {
 
             Assert.IsTrue(obj.Value == obj2.Value);
             Assert.IsTrue(obj3.Value == MyEnumTestValue.V3);
+        }
+
+        [TestMethod]
+        public void TestSerializeEnumFlag()
+        {
+            var eStr = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = true });
+            var eInt = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = false });
+
+            Assert.IsTrue(eStr == "\"Read, Delete\"");
+            Assert.IsTrue(eInt == "5");
         }
 
         [TestMethod]

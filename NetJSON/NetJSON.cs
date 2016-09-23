@@ -349,7 +349,7 @@ namespace NetJSON {
             | MethodAttributes.SpecialName;
 
 
-        static readonly Type 
+        internal static readonly Type 
 			_dateTimeType = typeof(DateTime),
             _dateTimeOffsetType = typeof(DateTimeOffset),
             _enumType = typeof(Enum),
@@ -484,6 +484,7 @@ namespace NetJSON {
             _settingsDateFormat = _settingsType.GetProperty("DateFormat", MethodBinding).GetGetMethod(),
             _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _internalJsonType.GetMethod("GetUninitializedInstance", MethodBinding),
+            _flagEnumToString = _internalJsonType.GetMethod("FlagEnumToString", MethodBinding),
             _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
@@ -814,24 +815,6 @@ namespace NetJSON {
             }
         }
 
-
-#if NET_CORE
-        // Retrieved from https://github.com/dotnet/corefx/pull/10088
-        private static readonly Func<Type, object> s_getUninitializedObjectDelegate = (Func<Type, object>)
- typeof(string).GetTypeInfo().Assembly.GetType("System.Runtime.Serialization.FormatterServices")
-            ?.GetMethod("GetUninitializedObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
-            ?.CreateDelegate(typeof(Func<Type, object>));
-
-        public static object GetUninitializedObject(Type type)
-        {
-            if (type == null)
-            {
-                throw new ArgumentNullException(nameof(type));
-            }
-
-            return s_getUninitializedObjectDelegate(type);
-        }
-#endif
 
         internal static object GetTypeIdentifierInstance(string typeName) {
             return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
@@ -1665,8 +1648,11 @@ namespace NetJSON {
             il.MarkLabel(useEnumLabel);
 
             WriteEnumToStringForWithInt(type, eType, il);
-
-            il.Emit(OpCodes.Ldstr, "0");
+            
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Box, type);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Call, _flagEnumToString);
 
             il.Emit(OpCodes.Ret);
 
@@ -2844,12 +2830,18 @@ namespace NetJSON {
                 var propNullLabel = il.DefineLabel();
                 var skipDefaultValueTrueLabel = il.DefineLabel();
                 var skipDefaultValueFalseLabel = il.DefineLabel();
+                var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
+                var successLocal = il.DeclareLocal(_boolType);
+
+                var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
+
+                il.Emit(OpCodes.Ldc_I4, 0);
+                il.Emit(OpCodes.Stloc, successLocal);
 
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
 
                 if (isNullable) {
-                    var hasValueMethod = originPropType.GetMethod("get_HasValue");
                     il.Emit(OpCodes.Ldloca, nullablePropValue);
                     il.Emit(OpCodes.Call, hasValueMethod);
                     il.Emit(OpCodes.Brfalse, propNullLabel);
@@ -2890,6 +2882,9 @@ namespace NetJSON {
 
                 WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
+                il.Emit(OpCodes.Ldc_I4, 1);
+                il.Emit(OpCodes.Stloc, successLocal);
+
                 il.MarkLabel(propNullLabel);
 
                 il.MarkLabel(skipDefaultValueTrueLabel);
@@ -2897,13 +2892,32 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldloc, skipDefaultValue);
                 il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+                il.Emit(OpCodes.Ldloc, successLocal);
+                il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
 
                 WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
+                il.Emit(OpCodes.Ldc_I4, 1);
+                il.Emit(OpCodes.Stloc, successLocal);
+
                 il.MarkLabel(skipDefaultValueFalseLabel);
 
+                if (isNullable)
+                {
+                    il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    il.Emit(OpCodes.Call, hasValueMethod);
+                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Ldloc, successLocal);
+                    il.Emit(OpCodes.Brtrue, skipDefaultValueTrueAndHasValueLabel);
 
-#region
+                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+
+                    il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
+                }
+
+                #region
                 //if (_skipDefaultValue) {
 
                 //    if (isNullable) {
@@ -2946,7 +2960,7 @@ namespace NetJSON {
                 //            il.Emit(OpCodes.Beq, propNullLabel);
                 //    }
                 //}
-#endregion
+                #endregion
 
                 //if (_skipDefaultValue) {
                 //    il.MarkLabel(propNullLabel);
