@@ -35,18 +35,16 @@ namespace NetJSON {
 
     public static partial class NetJSON {
 
-        public class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
+        class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
         {
-            private delegate T DeserializeTextReaderDelegate(TextReader reader);
-            private delegate T DeserializeDelegate(string value);
-            private delegate T DeserializeTextReaderSettingsDelegate(TextReader reader, NetJSONSettings settings);
-            private delegate T DeserializeSettingsDelegate(string value, NetJSONSettings settings);
-            private delegate string SerializeDelegate(T value);
-            private delegate string SerializeSettingsDelegate(T value, NetJSONSettings settings);
-            private delegate void SerializeTextWriterDelegate(T value, TextWriter writer);
-            private delegate void SerializeTextWriterSettingsDelegate(T value, TextWriter writer, NetJSONSettings settings);
-
-            private ConcurrentDictionary<string, Delegate> _delegates = new ConcurrentDictionary<string, Delegate>();
+			readonly Func<TextReader, T> _DeserializeTextReader;
+			readonly Func<string, T> _Deserialize;
+			readonly Func<TextReader, NetJSONSettings, T> _DeserializeTextReaderWithSettings;
+			readonly Func<string, NetJSONSettings, T> _DeserializeWithSettings;
+			readonly Func<T, string> _Serialize;
+			readonly Func<T, NetJSONSettings, string> _SerializeWithSettings;
+			readonly Action<T, TextWriter> _SerializeTextWriter;
+			readonly Action<T, TextWriter, NetJSONSettings> _SerializeTextWriterWithSettings;
 
             private Type _objType;
             public Type ObjType
@@ -79,214 +77,230 @@ namespace NetJSON {
                 }
             }
 
-            public override T Deserialize(TextReader reader)
+			public DynamicNetJSONSerializer() {
+				_DeserializeTextReader = CreateDeserializerWithTextReader();
+				_Deserialize = CreateDeserializer();
+				_DeserializeTextReaderWithSettings = CreateDeserializerWithTextReaderSettings();
+				_DeserializeWithSettings = CreateDeserializerWithSettings();
+				_Serialize = CreateSerializer();
+				_SerializeTextWriter = CreateSerializerWithTextWriter();
+				_SerializeTextWriterWithSettings = CreateSerializerWithTextWriterSettings();
+				_SerializeWithSettings = CreateSerializerWithSettings();
+			}
+			Func<TextReader, T> CreateDeserializerWithTextReader() {
+				var meth = new DynamicMethod("DeserializeValueTextReader", ObjType, new[] { _textReaderType }, ManifestModule, true);
+
+				var rdil = meth.GetILGenerator();
+
+				var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+				rdil.Emit(OpCodes.Ldarg_0);
+				rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+				rdil.Emit(OpCodes.Call, _settingsCurrentSettings);
+				rdil.Emit(OpCodes.Call, readMethod);
+				rdil.Emit(OpCodes.Ret);
+
+				return meth.CreateDelegate(typeof(Func<TextReader, T>)) as Func<TextReader, T>;
+			}
+			Func<string, T> CreateDeserializer() {
+                var meth = new DynamicMethod("DeserializeValue", ObjType, new[] { _stringType }, ManifestModule, true);
+
+                var dil = meth.GetILGenerator();
+
+                var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                dil.Emit(OpCodes.Ldarg_0);
+                dil.Emit(OpCodes.Call, _settingsCurrentSettings);
+                dil.Emit(OpCodes.Call, readMethod);
+                dil.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<string, T>)) as Func<string, T>;
+			}
+			Func<TextReader, NetJSONSettings, T> CreateDeserializerWithTextReaderSettings() {
+                var meth = new DynamicMethod("DeserializeValueTextReaderSettings", ObjType, new[] { _textReaderType, _settingsType }, ManifestModule, true);
+
+                var rdilWithSettings = meth.GetILGenerator();
+
+                var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                rdilWithSettings.Emit(OpCodes.Ldarg_1);
+                rdilWithSettings.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
+                rdilWithSettings.Emit(OpCodes.Ldarg_2);
+                rdilWithSettings.Emit(OpCodes.Call, readMethod);
+                rdilWithSettings.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<TextReader, NetJSONSettings, T>)) as Func<TextReader, NetJSONSettings, T>;
+			}
+			Func<string, NetJSONSettings, T> CreateDeserializerWithSettings() {
+                var meth = new DynamicMethod("DeserializeValueSettings", ObjType, new[] { _stringType, _settingsType }, ManifestModule, true);
+
+                var dilWithSettings = meth.GetILGenerator();
+
+                var readMethod = WriteDeserializeMethodFor(null, ObjType);
+
+                dilWithSettings.Emit(OpCodes.Ldarg_0);
+                dilWithSettings.Emit(OpCodes.Ldarg_1);
+                dilWithSettings.Emit(OpCodes.Call, readMethod);
+                dilWithSettings.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<string, NetJSONSettings, T>)) as Func<string, NetJSONSettings, T>;
+
+			}
+			Func<T, string> CreateSerializer() {
+                var meth = new DynamicMethod("SerializeValue", _stringType, new[] { ObjType }, ManifestModule, true);
+
+                var il = meth.GetILGenerator();
+
+                var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                var sbLocal = il.DeclareLocal(_stringBuilderType);
+                il.Emit(OpCodes.Call, _generatorGetStringBuilder);
+
+                il.EmitClearStringBuilder();
+
+                il.Emit(OpCodes.Stloc, sbLocal);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloc, sbLocal);
+                il.Emit(OpCodes.Call, _settingsCurrentSettings);
+                il.Emit(OpCodes.Call, writeMethod);
+
+                il.Emit(OpCodes.Ldloc, sbLocal);
+                il.Emit(OpCodes.Callvirt, _stringBuilderToString);
+                il.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<T, string>)) as Func<T, string>;
+
+			}
+			Func<T, NetJSONSettings, string> CreateSerializerWithSettings() {
+                var meth = new DynamicMethod("SerializeValueSettings", _stringType, new[] { ObjType, _settingsType }, ManifestModule, true);
+
+
+				var ilWithSettings = meth.GetILGenerator();
+
+                var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                var isValueType = ObjType.GetTypeInfo().IsValueType;
+                    
+                var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
+                ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+
+                ilWithSettings.EmitClearStringBuilder();
+
+                ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
+
+                ilWithSettings.Emit(OpCodes.Ldarg_0);
+                ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+                ilWithSettings.Emit(OpCodes.Ldarg_1);
+                ilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+                ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
+                ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+                ilWithSettings.Emit(OpCodes.Ldarg_1);
+
+                ilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
+
+                ilWithSettings.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Func<T, NetJSONSettings, string>)) as Func<T, NetJSONSettings, string>;
+			}
+			Action<T, TextWriter> CreateSerializerWithTextWriter() {
+                var meth = new DynamicMethod("SerializeValueTextWriter", _voidType, new[] { typeof(T), _textWriterType }, ManifestModule, true);
+
+
+				var wil = meth.GetILGenerator();
+
+                var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+
+                var wsbLocal = wil.DeclareLocal(_stringBuilderType);
+                wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
+                wil.EmitClearStringBuilder();
+				wil.Emit(OpCodes.Stloc, wsbLocal);
+
+                wil.Emit(OpCodes.Ldarg_0);
+                wil.Emit(OpCodes.Ldloc, wsbLocal);
+                wil.Emit(OpCodes.Call, _settingsCurrentSettings);
+                wil.Emit(OpCodes.Call, writeMethod);
+
+                wil.Emit(OpCodes.Ldarg_1);
+                wil.Emit(OpCodes.Ldloc, wsbLocal);
+                wil.Emit(OpCodes.Callvirt, _stringBuilderToString);
+                wil.Emit(OpCodes.Callvirt, _textWriterWrite);
+                wil.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Action<T, TextWriter>)) as Action<T, TextWriter>;
+
+			}
+			Action<T, TextWriter, NetJSONSettings> CreateSerializerWithTextWriterSettings() {
+                var meth = new DynamicMethod("SerializeValueTextWriterSettings", _voidType, new[] { ObjType, _textWriterType, _settingsType }, ManifestModule, true);
+
+
+				var wilWithSettings = meth.GetILGenerator();
+
+                var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
+                    
+                var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
+                wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
+                wilWithSettings.EmitClearStringBuilder();
+				wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
+
+                wilWithSettings.Emit(OpCodes.Ldarg_0);
+                wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+                wilWithSettings.Emit(OpCodes.Ldarg_2);
+                wilWithSettings.Emit(OpCodes.Call, writeMethod);
+
+                wilWithSettings.Emit(OpCodes.Ldarg_1);
+                wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
+                wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
+
+                wilWithSettings.Emit(OpCodes.Ldarg_2);
+
+                wilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
+
+                wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
+                wilWithSettings.Emit(OpCodes.Ret);
+
+                return meth.CreateDelegate(typeof(Action<T, TextWriter, NetJSONSettings>)) as Action<T, TextWriter, NetJSONSettings>;
+			}
+			public override T Deserialize(TextReader reader)
             {
-                return (_delegates.GetOrAdd("DeserializeValueTextReader", _ => {
-
-                    var meth = new DynamicMethod(_, ObjType, new[] { _textReaderType }, ManifestModule, true);
-
-                    var rdil = meth.GetILGenerator();
-
-                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
-
-                    rdil.Emit(OpCodes.Ldarg_0);
-                    rdil.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
-                    rdil.Emit(OpCodes.Call, _settingsCurrentSettings);
-                    rdil.Emit(OpCodes.Call, readMethod);
-                    rdil.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(DeserializeTextReaderDelegate));
-                }) as DeserializeTextReaderDelegate)(reader);
+                return _DeserializeTextReader(reader);
             }
 
             public override T Deserialize(string value)
             {
-                return (_delegates.GetOrAdd("DeserializeValue", _ => {
-
-                    var meth = new DynamicMethod(_, ObjType, new[] { _stringType }, ManifestModule, true);
-
-                    var dil = meth.GetILGenerator();
-
-                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
-
-                    dil.Emit(OpCodes.Ldarg_0);
-                    dil.Emit(OpCodes.Call, _settingsCurrentSettings);
-                    dil.Emit(OpCodes.Call, readMethod);
-                    dil.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(DeserializeDelegate));
-                }) as DeserializeDelegate)(value);
+                return _Deserialize(value);
             }
 
             public override T Deserialize(TextReader reader, NetJSONSettings settings)
             {
-                return (_delegates.GetOrAdd("DeserializeValueTextReaderSettings", _ => {
-
-                    var meth = new DynamicMethod(_, ObjType, new[] { _textReaderType, _settingsType }, ManifestModule, true);
-
-                    var rdilWithSettings = meth.GetILGenerator();
-
-                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
-
-                    rdilWithSettings.Emit(OpCodes.Ldarg_1);
-                    rdilWithSettings.Emit(OpCodes.Callvirt, _textReaderReadToEnd);
-                    rdilWithSettings.Emit(OpCodes.Ldarg_2);
-                    rdilWithSettings.Emit(OpCodes.Call, readMethod);
-                    rdilWithSettings.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(DeserializeTextReaderSettingsDelegate));
-                }) as DeserializeTextReaderSettingsDelegate)(reader, settings);
+                return _DeserializeTextReaderWithSettings(reader, settings);
             }
 
             public override T Deserialize(string value, NetJSONSettings settings)
             {
-                return (_delegates.GetOrAdd("DeserializeValueSettings", _ => {
-
-                    var meth = new DynamicMethod(_, ObjType, new[] { _stringType, _settingsType }, ManifestModule, true);
-
-                    var dilWithSettings = meth.GetILGenerator();
-
-                    var readMethod = WriteDeserializeMethodFor(null, ObjType);
-
-                    dilWithSettings.Emit(OpCodes.Ldarg_0);
-                    dilWithSettings.Emit(OpCodes.Ldarg_1);
-                    dilWithSettings.Emit(OpCodes.Call, readMethod);
-                    dilWithSettings.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(DeserializeSettingsDelegate));
-                }) as DeserializeSettingsDelegate)(value, settings);
+                return _DeserializeWithSettings(value, settings);
             }
 
             public override string Serialize(T value)
             {
-                return (_delegates.GetOrAdd("SerializeValue", _ => {
-
-                    var meth = new DynamicMethod(_, _stringType, new[] { ObjType }, ManifestModule, true);
-
-                    var il = meth.GetILGenerator();
-
-                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
-
-                    var sbLocal = il.DeclareLocal(_stringBuilderType);
-                    il.Emit(OpCodes.Call, _generatorGetStringBuilder);
-
-                    il.EmitClearStringBuilder();
-
-                    il.Emit(OpCodes.Stloc, sbLocal);
-
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldloc, sbLocal);
-                    il.Emit(OpCodes.Call, _settingsCurrentSettings);
-                    il.Emit(OpCodes.Call, writeMethod);
-
-                    il.Emit(OpCodes.Ldloc, sbLocal);
-                    il.Emit(OpCodes.Callvirt, _stringBuilderToString);
-                    il.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(SerializeDelegate));
-                }) as SerializeDelegate)(value);
+                return _Serialize(value);
             }
 
             public override string Serialize(T value, NetJSONSettings settings)
             {
-                return (_delegates.GetOrAdd("SerializeValueSettings", _ => {
-
-                    var meth = new DynamicMethod(_, _stringType, new[] { ObjType, _settingsType }, ManifestModule, true);
-
-                    var ilWithSettings = meth.GetILGenerator();
-
-                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
-
-                    var isValueType = ObjType.GetTypeInfo().IsValueType;
-                    
-                    var sbLocalWithSettings = ilWithSettings.DeclareLocal(_stringBuilderType);
-                    ilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
-
-                    ilWithSettings.EmitClearStringBuilder();
-
-                    ilWithSettings.Emit(OpCodes.Stloc, sbLocalWithSettings);
-
-                    ilWithSettings.Emit(OpCodes.Ldarg_0);
-                    ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
-                    ilWithSettings.Emit(OpCodes.Ldarg_1);
-                    ilWithSettings.Emit(OpCodes.Call, writeMethod);
-
-                    ilWithSettings.Emit(OpCodes.Ldloc, sbLocalWithSettings);
-                    ilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
-
-                    ilWithSettings.Emit(OpCodes.Ldarg_1);
-
-                    ilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
-
-                    ilWithSettings.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(SerializeSettingsDelegate));
-                }) as SerializeSettingsDelegate)(value, settings);
+                return _SerializeWithSettings(value, settings);
             }
 
             public override void Serialize(T value, TextWriter writer)
             {
-                (_delegates.GetOrAdd("SerializeValueTextWriter", _ => {
-
-                    var meth = new DynamicMethod(_, _voidType, new[] { typeof(T), _textWriterType }, ManifestModule, true);
-
-                    var wil = meth.GetILGenerator();
-
-                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
-
-                    var wsbLocal = wil.DeclareLocal(_stringBuilderType);
-                    wil.Emit(OpCodes.Call, _generatorGetStringBuilder);
-                    wil.EmitClearStringBuilder();
-					wil.Emit(OpCodes.Stloc, wsbLocal);
-
-                    wil.Emit(OpCodes.Ldarg_0);
-                    wil.Emit(OpCodes.Ldloc, wsbLocal);
-                    wil.Emit(OpCodes.Call, _settingsCurrentSettings);
-                    wil.Emit(OpCodes.Call, writeMethod);
-
-                    wil.Emit(OpCodes.Ldarg_1);
-                    wil.Emit(OpCodes.Ldloc, wsbLocal);
-                    wil.Emit(OpCodes.Callvirt, _stringBuilderToString);
-                    wil.Emit(OpCodes.Callvirt, _textWriterWrite);
-                    wil.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(SerializeTextWriterDelegate));
-                }) as SerializeTextWriterDelegate)(value, writer);
+                _SerializeTextWriter(value, writer);
             }
 
             public override void Serialize(T value, TextWriter writer, NetJSONSettings settings)
             {
-                (_delegates.GetOrAdd("SerializeValueTextWriterSettings", _ => {
-
-                    var meth = new DynamicMethod(_, _voidType, new[] { ObjType, _textWriterType, _settingsType }, ManifestModule, true);
-
-                    var wilWithSettings = meth.GetILGenerator();
-
-                    var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
-                    
-                    var wsbLocalWithSettings = wilWithSettings.DeclareLocal(_stringBuilderType);
-                    wilWithSettings.Emit(OpCodes.Call, _generatorGetStringBuilder);
-                    wilWithSettings.EmitClearStringBuilder();
-					wilWithSettings.Emit(OpCodes.Stloc, wsbLocalWithSettings);
-
-                    wilWithSettings.Emit(OpCodes.Ldarg_0);
-                    wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
-                    wilWithSettings.Emit(OpCodes.Ldarg_2);
-                    wilWithSettings.Emit(OpCodes.Call, writeMethod);
-
-                    wilWithSettings.Emit(OpCodes.Ldarg_1);
-                    wilWithSettings.Emit(OpCodes.Ldloc, wsbLocalWithSettings);
-                    wilWithSettings.Emit(OpCodes.Callvirt, _stringBuilderToString);
-
-                    wilWithSettings.Emit(OpCodes.Ldarg_2);
-
-                    wilWithSettings.Emit(OpCodes.Call, _prettifyJSONIfNeeded);
-
-                    wilWithSettings.Emit(OpCodes.Callvirt, _textWriterWrite);
-                    wilWithSettings.Emit(OpCodes.Ret);
-
-                    return meth.CreateDelegate(typeof(SerializeTextWriterSettingsDelegate));
-                }) as SerializeTextWriterSettingsDelegate)(value, writer, settings);
+                _SerializeTextWriterWithSettings(value, writer, settings);
             }
         }
 
