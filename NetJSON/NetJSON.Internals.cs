@@ -173,6 +173,23 @@ namespace NetJSON.Internals
 			return NetJSON.GetTypeIdentifierInstance(typeName);
 		}
 
+        public unsafe static void ThrowIfInvalidJSON(string json, char chr)
+        {
+#if NET_35
+            if(json.IsNullOrWhiteSpace())
+#else
+            if (String.IsNullOrWhiteSpace(json))
+#endif
+                throw new NetJSONInvalidJSONException();
+
+            var endChar = chr == '[' ? ']' : '}';
+
+            if (!(json[0] == chr && json[json.Length - 1] == endChar))
+            {
+                throw new NetJSONInvalidJSONException();
+            }
+        }
+
 		public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
 			return (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r'));

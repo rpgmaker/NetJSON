@@ -502,6 +502,7 @@ namespace NetJSON {
             _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
+            _throwIfInvalidJSON = _internalJsonType.GetMethod("ThrowIfInvalidJSON", MethodBinding),
             _toCamelCase = _internalJsonType.GetMethod("ToCamelCase", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
@@ -838,9 +839,6 @@ namespace NetJSON {
                         throw new InvalidOperationException(string.Format("Unable to resolve {0} with value = {1}", TypeIdentifier, typeName));
 
                     var ctor = type.GetConstructor(Type.EmptyTypes);
-
-                    if (ctor == null)
-                        throw new InvalidOperationException(string.Format("{0} with value = {1} must have a default constructor", TypeIdentifier, typeName));
 
                     var meth = new DynamicMethod(Guid.NewGuid().ToString("N"), _objectType, null, restrictedSkipVisibility: true);
 
@@ -1871,6 +1869,11 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldloc, startsWith);
                 il.Emit(OpCodes.Brfalse, startsWithLabel);
 
+                //Fast fail when invalid json exists
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldc_I4, (int)'[');
+                il.Emit(OpCodes.Call, _throwIfInvalidJSON);
+
                 //IsArray
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
@@ -1883,7 +1886,10 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldloc, startsWith);
                 il.Emit(OpCodes.Brtrue, notStartsWithLabel);
 
-
+                //Fast fail when invalid json exists
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldc_I4, (int)'{');
+                il.Emit(OpCodes.Call, _throwIfInvalidJSON);
 
                 //IsDictionary
                 il.Emit(OpCodes.Ldloc, ptr);
@@ -1897,7 +1903,17 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldnull);
             } else {
-                var isArray = (type.IsListType() || type.IsArray) && !type.IsPrimitiveType();
+                var isPrimitive = type.IsPrimitiveType(); 
+                var isArray = (type.IsListType() || type.IsArray) && !isPrimitive;
+                var isComplex = isArray || type.IsDictionaryType() || !isPrimitive;
+
+                if (isComplex)
+                {
+                    //Fast fail when invalid json exists
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldc_I4, (int)(isArray ? '[' : '{'));
+                    il.Emit(OpCodes.Call, _throwIfInvalidJSON);
+                }
 
                 il.Emit(OpCodes.Ldloc, ptr);
                 il.Emit(OpCodes.Ldloca, index);
@@ -1905,7 +1921,7 @@ namespace NetJSON {
                 if (isArray)
                     il.Emit(OpCodes.Call, GenerateCreateListFor(typeBuilder, type));
                 else {
-                    if (type.IsPrimitiveType()) {
+                    if (isPrimitive) {
                         il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, type));
                     }else
                         il.Emit(OpCodes.Call, GenerateGetClassOrDictFor(typeBuilder, type));

@@ -843,6 +843,21 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void ShouldFailWithBadJSONException()
+        {
+            Exception ex = null;
+            try
+            {
+                var value = NetJSON.Deserialize<Person>("");
+            }
+            catch (Exception e) {
+                ex = e;
+            }
+
+            Assert.IsTrue(ex is NetJSONInvalidJSONException);
+        }
+
+        [TestMethod]
         public void CaseSensitiveGlossary() {
             var json = @"{
     ""glossary"": {
