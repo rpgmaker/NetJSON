@@ -548,6 +548,57 @@ namespace NetJSON.Tests {
             var obj = NetJSON.Deserialize<object>(value);
         }
 
+        [TestMethod]
+        public void TestNetJSONPropertyWithTrackerClassAndFailedJSON()
+        {
+            string text = "{\n\"Tracker_SortBy\":\"Relevance\",\n\"Tracker_Name\":\"Wind Power Org\",\n\"Profile_Tracker_ID\":1428,\n\"Tracker_ContentType\":\"1\",\n\"Tracker_SearchTerm\":\"Wind Power\",\n\"Tracker_Facets\":[\n{\"Tracker_Facet\":\"{fb8d09e1-5024-419e-9703-598945af8139}\"},\n{\"Tracker_Facet\":\"{90ec93d4-e1bd-4215-acf0-eac1e2fd5f6d}\"}]\n}";
+            Tracker t = NetJSON.Deserialize<Tracker>(text);
+
+            Assert.IsTrue(t.FacetCollection.Count > 0);
+            Assert.IsTrue(t.ID > 0);
+            Assert.IsTrue(t.ContentType != null);
+            Assert.IsTrue(t.Name != null);
+            Assert.IsTrue(t.SearchTerm != null);
+            Assert.IsTrue(t.SortBy != null);
+        }
+
+        [TestMethod]
+        public void TestNetJSONPropertyTrackerClass()
+        {
+            var json = @"{  
+      ""Tracker_Name"":""xxxx x"",  
+      ""Tracker_SearchTerm"":""Wind Power"",    
+      ""Tracker_SortBy"":""Relevance""  
+    }";
+
+            var json2 = @"{
+""Tracker_Name"":""xxxx x x"",
+""Tracker_SearchTerm"":""Wind Power"",
+""Tracker_SortBy"":""Relevance""
+}";
+            
+            var tracker = NetJSON.Deserialize<Tracker>(json);
+            var tracker2 = NetJSON.Deserialize<Tracker>(json2);
+            Tracker tracker3 = null;
+
+            using (TextReader reader = new StreamReader(File.OpenRead(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "trackerjson.txt"))))
+            {
+                tracker3 = NetJSON.Deserialize<Tracker>(reader);
+            }
+
+            Assert.IsTrue(tracker.Name == "xxxx x", tracker.Name);
+            Assert.IsTrue(tracker.SearchTerm == "Wind Power", tracker.SearchTerm);
+            Assert.IsTrue(tracker.SortBy == "Relevance", tracker.SortBy);
+
+            Assert.IsTrue(tracker2.Name == "xxxx x x", tracker2.Name);
+            Assert.IsTrue(tracker2.SearchTerm == "Wind Power", tracker2.SearchTerm);
+            Assert.IsTrue(tracker2.SortBy == "Relevance", tracker2.SortBy);
+
+            Assert.IsTrue(tracker3.Name == "xxxx x", tracker3.Name);
+            Assert.IsTrue(tracker3.SearchTerm == "Wind Power", tracker3.SearchTerm);
+            Assert.IsTrue(tracker3.SortBy == "Relevance", tracker3.SortBy);
+        }
+
         public struct StructWithFields {
             public int x;
             public int y;
@@ -1388,5 +1439,45 @@ namespace NetJSON.Tests {
     public class Stat {
         public int? team1_value { get; set; }
         public int? team2_value { get; set; }
+    }
+
+    public class Tracker
+    {
+        [NetJSONProperty("Tracker_Name")]
+        public string Name { get; set; }
+
+        [NetJSONProperty("Profile_Tracker_ID")]
+        public int ID { get; set; }
+
+        [NetJSONProperty("Tracker_ContentType")]
+        public string ContentType { get; set; }
+
+        [NetJSONProperty("Tracker_SearchTerm")]
+        public string SearchTerm { get; set; }
+
+        [NetJSONProperty("Tracker_SortBy")]
+        public string SortBy { get; set; }
+
+        [NetJSONProperty("Tracker_Facets")]
+        public System.Collections.Generic.List<Facet> FacetCollection { get; set; }
+    }
+
+    public class Facet
+    {
+        public Facet() { }
+
+        public Facet(string _facet)
+        {
+            //Value = _facet;
+        }
+
+        [NetJSONProperty("Profile_Tracker_Facets_ID")]
+        public int ID { get; set; }
+
+        [NetJSONProperty("Profile_Tracker_ID")]
+        public int TrackerID { get; set; }
+
+        [NetJSONProperty("Tracker_Facet")]
+        public Guid Value { get; set; }
     }
 }

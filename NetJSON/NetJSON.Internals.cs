@@ -192,8 +192,14 @@ namespace NetJSON.Internals
 
 		public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
-			return (*(ptr + index) == settings._quoteChar && (inRangeChr == ':' || inRangeChr == ' ' || inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r'));
-		}
+            fixed (char* kPtr = key)
+            {
+                return (*(ptr + index) == settings._quoteChar && 
+                    (inRangeChr == ':' || inRangeChr == ' ' || 
+                    inRangeChr == '\t' || inRangeChr == '\n' || inRangeChr == '\r')) &&
+                    *(ptr + index + 1) == *kPtr;
+            }
+        }
 
 		public unsafe static bool FastStringToBool(string value) {
 			return value[0] == 't';

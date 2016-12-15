@@ -4919,7 +4919,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Stloc, startIndex);
 
 
-#region String Skipping Optimization
+            #region String Skipping Optimization
             var skipOptimizeLabel = il.DefineLabel();
             var skipOptimizeLocal = il.DeclareLocal(_boolType);
 
@@ -4962,7 +4962,7 @@ namespace NetJSON {
             }
 
             il.MarkLabel(skipOptimizeLabel);
-#endregion String Skipping Optimization
+            #endregion String Skipping Optimization
 
             il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
             il.MarkLabel(currentQuoteLabel);
