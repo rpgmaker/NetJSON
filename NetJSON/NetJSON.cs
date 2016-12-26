@@ -22,8 +22,7 @@ using System.Security;
 using System.Security.Permissions;
 #endif
 using System.Text;
-using System.Threading;
-using System.Runtime.Serialization;
+
 
 #if NET_CORE
 using Microsoft.Extensions.DependencyModel;
@@ -69,7 +68,7 @@ namespace NetJSON {
                 {
                     return
 #if NET_CORE
-    Assembly.GetEntryAssembly().ManifestModule
+    ObjType.GetTypeInfo().Assembly.ManifestModule
 #else
     Assembly.GetExecutingAssembly().ManifestModule
 #endif
