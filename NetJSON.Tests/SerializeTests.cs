@@ -607,6 +607,7 @@ namespace NetJSON.Tests {
         public struct StructWithProperties {
             public int x { get; set; }
             public int y { get; set; }
+            public string Value { get; set; }
         }
 
         [TestMethod]
@@ -742,7 +743,7 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void PrettifyString() {
 
-            var data = new StructWithProperties { x = 10, y = 2 };
+            var data = new StructWithProperties { x = 10, y = 2, Value = "Data Source=[DataSource,];Initial Catalog=[Database,];User ID=[User,];Password=[Password,];Trusted_Connection=[TrustedConnection,False]" };
             var json = NetJSON.Serialize(data, new NetJSONSettings { Format = NetJSONFormat.Prettify });
             var count = json.Split('\n').Length;
 
