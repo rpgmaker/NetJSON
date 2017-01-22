@@ -945,6 +945,23 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void DeserializeStubbornClass()
+        {
+            var one = "{\"FileName\":\"973c6d92-819f-4aa1-a0b4-7a645cfea189\",\"Lat\":0,\"Long\":0}";
+            var two = "{\"FileName\":\"973c6d92-819f-4aa1-a0b4-7a645cfea189\",\"Lat\":0,\"Long\":0}\n";
+
+            var stubbornOne = NetJSON.Deserialize(typeof(StubbornClass), one);
+            var stubbornTwo = NetJSON.Deserialize(typeof(StubbornClass), two);
+        }
+
+        private class StubbornClass
+        {
+            public string FileName { get; set; }
+            public double Lat { get; set; }
+            public double Long { get; set; }
+        }
+
+        [TestMethod]
         public void TestSkipDefaultValueWithSetting() {
             var model = new Computer {
                 Timestamp = 12345,

@@ -184,13 +184,33 @@ namespace NetJSON.Internals
 
             var endChar = chr == '[' ? ']' : '}';
 
-            if (!(json[0] == chr && json[json.Length - 1] == endChar))
+            if(json[0] != chr)
+            {
+                throw new NetJSONInvalidJSONException();
+            }
+
+            var length = json.Length - 1;
+            var lastChr = '\0';
+            fixed (char* ptr = json)
+            {
+                do
+                {
+                    lastChr = *(ptr + length);
+                    if (lastChr != '\n' && lastChr != '\r' && lastChr != '\t' && lastChr != ' ')
+                    {
+                        break;
+                    }
+                    length--;
+                } while (lastChr != '\0');
+            }
+
+            if (!(json[0] == chr && lastChr == endChar))
             {
                 throw new NetJSONInvalidJSONException();
             }
         }
 
-		public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
+        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
             fixed (char* kPtr = key)
             {
