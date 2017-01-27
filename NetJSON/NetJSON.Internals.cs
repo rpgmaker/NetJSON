@@ -184,13 +184,33 @@ namespace NetJSON.Internals
 
             var endChar = chr == '[' ? ']' : '}';
 
-            if (!(json[0] == chr && json[json.Length - 1] == endChar))
+            if(json[0] != chr)
+            {
+                throw new NetJSONInvalidJSONException();
+            }
+
+            var length = json.Length - 1;
+            var lastChr = '\0';
+            fixed (char* ptr = json)
+            {
+                do
+                {
+                    lastChr = *(ptr + length);
+                    if (lastChr != '\n' && lastChr != '\r' && lastChr != '\t' && lastChr != ' ')
+                    {
+                        break;
+                    }
+                    length--;
+                } while (lastChr != '\0');
+            }
+
+            if (!(json[0] == chr && lastChr == endChar))
             {
                 throw new NetJSONInvalidJSONException();
             }
         }
 
-		public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
+        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
             fixed (char* kPtr = key)
             {
@@ -314,6 +334,12 @@ namespace NetJSON.Internals
 
 		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
+
+            if (settings._hasDateStringFormat)
+            {
+                return DateTime.ParseExact(value, settings.DateStringFormat, CultureInfo.CurrentCulture);
+            }
+
 			if (settings.DateFormat == NetJSONDateFormat.EpochTime) {
 				var unixTimeStamp = FastStringToLong(value);
 				var date = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
@@ -957,7 +983,9 @@ namespace NetJSON.Internals
         }
 
         private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
-			return settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
+			return 
+                settings._hasDateStringFormat ? date.ToString(settings._dateStringFormat) :
+                settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
 				settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
 				DateToISOFormat(date, settings, offset);
 		}

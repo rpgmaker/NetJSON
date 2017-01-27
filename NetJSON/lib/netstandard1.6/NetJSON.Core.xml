@@ -25,6 +25,11 @@
             Determine date format: Default: Default
             </summary>
         </member>
+        <member name="P:NetJSON.NetJSONSettings.DateStringFormat">
+            <summary>
+            String Format to use for formatting date when provided
+            </summary>
+        </member>
         <member name="P:NetJSON.NetJSONSettings.TimeZoneFormat">
             <summary>
             Determine time zone format: Default : Unspecified

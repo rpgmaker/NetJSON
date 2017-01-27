@@ -607,6 +607,7 @@ namespace NetJSON.Tests {
         public struct StructWithProperties {
             public int x { get; set; }
             public int y { get; set; }
+            public string Value { get; set; }
         }
 
         [TestMethod]
@@ -742,7 +743,7 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void PrettifyString() {
 
-            var data = new StructWithProperties { x = 10, y = 2 };
+            var data = new StructWithProperties { x = 10, y = 2, Value = "Data Source=[DataSource,];Initial Catalog=[Database,];User ID=[User,];Password=[Password,];Trusted_Connection=[TrustedConnection,False]" };
             var json = NetJSON.Serialize(data, new NetJSONSettings { Format = NetJSONFormat.Prettify });
             var count = json.Split('\n').Length;
 
@@ -941,6 +942,23 @@ namespace NetJSON.Tests {
             var json = "{ \"name\": \"boss\", \"age\": 2, \"reasonForUnknownAge\": \"he is the boss\" }";
             var data = NetJSON.Deserialize<PersonTest>(json, new NetJSONSettings { CaseSensitive = false });
             Assert.IsTrue(data.Age == 2);
+        }
+
+        [TestMethod]
+        public void DeserializeStubbornClass()
+        {
+            var one = "{\"FileName\":\"973c6d92-819f-4aa1-a0b4-7a645cfea189\",\"Lat\":0,\"Long\":0}";
+            var two = "{\"FileName\":\"973c6d92-819f-4aa1-a0b4-7a645cfea189\",\"Lat\":0,\"Long\":0}\n";
+
+            var stubbornOne = NetJSON.Deserialize(typeof(StubbornClass), one);
+            var stubbornTwo = NetJSON.Deserialize(typeof(StubbornClass), two);
+        }
+
+        private class StubbornClass
+        {
+            public string FileName { get; set; }
+            public double Lat { get; set; }
+            public double Long { get; set; }
         }
 
         [TestMethod]

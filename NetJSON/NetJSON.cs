@@ -22,8 +22,7 @@ using System.Security;
 using System.Security.Permissions;
 #endif
 using System.Text;
-using System.Threading;
-using System.Runtime.Serialization;
+
 
 #if NET_CORE
 using Microsoft.Extensions.DependencyModel;
@@ -69,7 +68,7 @@ namespace NetJSON {
                 {
                     return
 #if NET_CORE
-    Assembly.GetEntryAssembly().ManifestModule
+    ObjType.GetTypeInfo().Assembly.ManifestModule
 #else
     Assembly.GetExecutingAssembly().ManifestModule
 #endif
@@ -1386,7 +1385,9 @@ namespace NetJSON {
             var horizontal = 0;
             var horizontals = new int[10000];
             var hrIndex = -1;
-            bool @return = false;
+            var @return = false;
+            var quote = 0;
+
             char c;
 
             fixed (char* chr = str) {
@@ -1396,24 +1397,34 @@ namespace NetJSON {
                         case '{':
                         case '[':
                             sb.Append(c);
-                            hrIndex++;
-                            horizontals[hrIndex] = horizontal;
-                            @return = true;
+                            if (quote == 0)
+                            {
+                                hrIndex++;
+                                horizontals[hrIndex] = horizontal;
+                                @return = true;
+                            }
                             break;
                         case '}':
                         case ']':
-                            @return = false;
-                            sb.Append('\n');
-                            horizontal = horizontals[hrIndex];
-                            hrIndex--;
-                            for (var i = 0; i < horizontal; i++) {
-                                sb.Append(' ');
+                            if (quote == 0)
+                            {
+                                @return = false;
+                                sb.Append('\n');
+                                horizontal = horizontals[hrIndex];
+                                hrIndex--;
+                                for (var i = 0; i < horizontal; i++)
+                                {
+                                    sb.Append(' ');
+                                }
                             }
                             sb.Append(c);
                             break;
                         case ',':
                             sb.Append(c);
-                            @return = true;
+                            if (quote == 0)
+                            {
+                                @return = true;
+                            }
                             break;
                         default:
                             if (@return) {
@@ -1423,6 +1434,12 @@ namespace NetJSON {
                                 for (var i = 0; i < horizontal; i++) {
                                     sb.Append(' ');
                                 }
+                            }
+                            var escaped = *(ptr - 2) == '\\';
+                            if (c == '"' && !escaped)
+                            {
+                                quote++;
+                                quote %= 2;
                             }
                             sb.Append(c);
                             break;

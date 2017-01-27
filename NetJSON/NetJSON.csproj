@@ -66,18 +66,6 @@ copy "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net40\$(TargetFileName)"
 copy "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net40\$(TargetName).xml"
 
 
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\dnx\NetJSON.Core.dll"
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\dnx\NetJSON.Core.xml"
-
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\dnxcore\NetJSON.Core.dll"
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\dnxcore\NetJSON.Core.xml"
-
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\netcore\NetJSON.Core.dll"
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\netcore\NetJSON.Core.xml"
-
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\netcore45\NetJSON.Core.dll"
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\netcore45\NetJSON.Core.xml"
-
 copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\netstandard1.6\NetJSON.Core.dll"
 copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\netstandard1.6\NetJSON.Core.xml"
 

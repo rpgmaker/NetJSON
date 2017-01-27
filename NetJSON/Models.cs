@@ -24,14 +24,30 @@ namespace NetJSON
 
 	public class NetJSONSettings
 	{
+        internal bool _hasDateStringFormat = false;
 		/// <summary>
 		/// Determine date format: Default: Default
 		/// </summary>
 		public NetJSONDateFormat DateFormat { get; set; }
-		/// <summary>
-		/// Determine time zone format: Default : Unspecified
-		/// </summary>
-		public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
+        internal string _dateStringFormat;
+        /// <summary>
+        /// String Format to use for formatting date when provided
+        /// </summary>
+        public string DateStringFormat {
+            get
+            {
+                return _dateStringFormat;
+            }
+            set
+            {
+                _dateStringFormat = value;
+                _hasDateStringFormat = !string.IsNullOrEmpty(value);
+            }
+        }
+        /// <summary>
+        /// Determine time zone format: Default : Unspecified
+        /// </summary>
+        public NetJSONTimeZoneFormat TimeZoneFormat { get; set; }
 		/// <summary>
 		/// Determine formatting for output json: Default: Default
 		/// </summary>
