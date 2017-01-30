@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using DeepEqual.Syntax;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1009,8 +1010,94 @@ namespace NetJSON.Tests {
             var d2 = NetJSON.Deserialize<TestEnumerableClass>(json);
             Assert.IsTrue(d2.Data.Count() == d.Data.Count());
         }
+
+        [TestMethod]
+        public void TestComplexObjectWithByteArray()
+        {
+            var obj = new ComplexObject();
+            var json = NetJSON.Serialize(obj);
+            var obj2 = NetJSON.Deserialize<ComplexObject>(json);
+
+            Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));
+        }
     }
 
+    [Serializable]
+    public class ComplexObject
+    {
+        static RandomBufferGenerator generator = new RandomBufferGenerator(65000);
+
+        public ComplexObject()
+        {
+            Thing1 = true;
+            Thing2 = int.MaxValue;
+            Thing3 = 'q';
+            Thing4 = "asdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasasdfasdfasas";
+            Thing5 = new Dictionary<string, string>()
+        {
+            { "1", RandomBufferGenerator.RandomString(4) },
+            { "2", RandomBufferGenerator.RandomString(4) },
+        };
+            Thing6 = generator.GenerateBufferFromSeed(32000);
+            Thing7 = uint.MaxValue;
+        }
+
+        public bool Thing1 { get; set; }
+
+        public int Thing2 { get; set; }
+
+        public char Thing3 { get; set; }
+
+        public string Thing4 { get; set; }
+
+        public Dictionary<string, string> Thing5 { get; set; }
+
+        public byte[] Thing6 { get; set; }
+
+        public uint Thing7 { get; set; }
+    }
+
+    [System.Diagnostics.DebuggerStepThrough]
+    public class RandomBufferGenerator
+    {
+        private readonly Random _random = new Random();
+        private readonly byte[] _seedBuffer;
+
+        public RandomBufferGenerator(int maxBufferSize)
+        {
+            _seedBuffer = new byte[maxBufferSize];
+
+            _random.NextBytes(_seedBuffer);
+        }
+
+        public byte[] GenerateBufferFromSeed(int size)
+        {
+            int randomWindow = _random.Next(0, size);
+
+            byte[] buffer = new byte[size];
+
+            Buffer.BlockCopy(_seedBuffer, randomWindow, buffer, 0, size - randomWindow);
+            Buffer.BlockCopy(_seedBuffer, 0, buffer, size - randomWindow, randomWindow);
+
+            return buffer;
+        }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public static string RandomString(int length)
+        {
+            string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            char[] stringChars = new char[length];
+            Random random = new Random();
+
+            for (int i = 0; i < stringChars.Length; i++)
+            {
+                stringChars[i] = chars[random.Next(chars.Length)];
+            }
+
+            return new String(stringChars);
+        }
+    }
+    
     public struct LogEvent
     {
         public DateTime Timestamp { get; set; }

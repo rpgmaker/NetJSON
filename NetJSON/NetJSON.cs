@@ -4054,7 +4054,7 @@ namespace NetJSON {
 
                 il.MarkLabel(conditionLabel);
             }
-
+            
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg, 4);
@@ -5164,7 +5164,7 @@ namespace NetJSON {
         static bool IsStringBasedType(this Type type) {
             var nullableType = type.GetNullableType() ?? type;
             type = nullableType;
-            return type == _stringType || type == _typeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
+            return type == _stringType || type == _charType || type == _typeType || type == _timeSpanType || type == _byteArrayType || type == _guidType;
         }
 
     }
