@@ -2819,8 +2819,7 @@ namespace NetJSON {
                 var attr = mem.Attribute;
                 var isProp = prop != null;
                 var getMethod = isProp ? prop.GetGetMethod() : null;
-                if (!isProp || getMethod != null)
-                {
+                if (!isProp || getMethod != null) {
                     if (attr != null)
                         name = attr.Name ?? name;
 
@@ -2853,32 +2852,27 @@ namespace NetJSON {
 
                     il.MarkLabel(camelCaseLabel);
 
-                    if (isClass)
-                    {
+                    if (isClass) {
                         il.Emit(OpCodes.Ldarg_0);
                         if (isProp)
                             il.Emit(OpCodes.Callvirt, getMethod);
                         else
                             il.Emit(OpCodes.Ldfld, field);
-                    }
-                    else
-                    {
+                    } else {
                         il.Emit(OpCodes.Ldarga, 0);
                         if (isProp)
                             il.Emit(OpCodes.Call, getMethod);
                         else il.Emit(OpCodes.Ldfld, field);
                     }
 
-                    if (isNullable)
-                    {
+                    if (isNullable) {
                         il.Emit(OpCodes.Stloc, nullablePropValue);
 
                         il.Emit(OpCodes.Ldloca, nullablePropValue);
                         il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
 
                         il.Emit(OpCodes.Stloc, propValue);
-                    }
-                    else
+                    } else
                         il.Emit(OpCodes.Stloc, propValue);
 
 
@@ -2896,8 +2890,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldloc, skipDefaultValue);
                     il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
 
-                    if (isNullable)
-                    {
+                    if (isNullable) {
                         il.Emit(OpCodes.Ldloca, nullablePropValue);
                         il.Emit(OpCodes.Call, hasValueMethod);
                         il.Emit(OpCodes.Brfalse, propNullLabel);
@@ -2907,25 +2900,18 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldloca, propValue);
                     else
                         il.Emit(OpCodes.Ldloc, propValue);
-                    if (isValueType && isPrimitive)
-                    {
+                    if (isValueType && isPrimitive) {
                         LoadDefaultValueByType(il, propType);
-                    }
-                    else
-                    {
+                    } else {
                         if (!isValueType)
                             il.Emit(OpCodes.Ldnull);
                     }
 
-                    if (equalityMethod != null)
-                    {
+                    if (equalityMethod != null) {
                         il.Emit(OpCodes.Call, equalityMethod);
                         il.Emit(OpCodes.Brtrue, propNullLabel);
-                    }
-                    else
-                    {
-                        if (isStruct)
-                        {
+                    } else {
+                        if (isStruct) {
 
                             var tempValue = il.DeclareLocal(propType);
 
@@ -2939,9 +2925,7 @@ namespace NetJSON {
 
                             il.Emit(OpCodes.Brtrue, propNullLabel);
 
-                        }
-                        else
-                            il.Emit(OpCodes.Beq, propNullLabel);
+                        } else il.Emit(OpCodes.Beq, propNullLabel);
                     }
 
                     WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
@@ -2966,8 +2950,7 @@ namespace NetJSON {
 
                     il.MarkLabel(skipDefaultValueFalseLabel);
 
-                    if (isNullable)
-                    {
+                    if (isNullable) {
                         il.Emit(OpCodes.Ldloc, skipDefaultValue);
                         il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
                         il.Emit(OpCodes.Ldloca, nullablePropValue);
