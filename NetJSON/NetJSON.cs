@@ -2810,209 +2810,211 @@ namespace NetJSON {
                 il.Emit(OpCodes.Stloc, hasValue);
             }
 
-            foreach (var mem in props) {
+            foreach (var mem in props)
+            {
                 var member = mem.Member;
                 var name = member.Name;
                 var prop = member.MemberType == MemberTypes.Property ? member as PropertyInfo : null;
                 var field = member.MemberType == MemberTypes.Field ? member as FieldInfo : null;
                 var attr = mem.Attribute;
                 var isProp = prop != null;
+                var getMethod = isProp ? prop.GetGetMethod() : null;
+                if (!isProp || getMethod != null) {
+                    if (attr != null)
+                        name = attr.Name ?? name;
 
-                if (attr != null)
-                    name = attr.Name ?? name;
+                    var memberType = isProp ? prop.PropertyType : field.FieldType;
+                    var propType = memberType;
+                    var originPropType = memberType;
+                    var isPrimitive = propType.IsPrimitiveType();
+                    var nullableType = propType.GetNullableType();
+                    var isNullable = nullableType != null && !originPropType.IsArray;
 
-                var memberType = isProp ? prop.PropertyType : field.FieldType;
-                var propType = memberType;
-                var originPropType = memberType;
-                var isPrimitive = propType.IsPrimitiveType();
-                var nullableType = propType.GetNullableType();
-                var isNullable = nullableType != null && !originPropType.IsArray;
+                    propType = isNullable ? nullableType : propType;
+                    var isValueType = propType.GetTypeInfo().IsValueType;
+                    //var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
+                    var equalityMethod = propType.GetMethod("op_Equality");
+                    var propValue = il.DeclareLocal(propType);
+                    var isStruct = isValueType && !isPrimitive;
+                    var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
+                    var nameLocal = il.DeclareLocal(_stringType);
+                    var camelCaseLabel = il.DefineLabel();
 
-                propType = isNullable ? nullableType : propType;
-                var isValueType = propType.GetTypeInfo().IsValueType;
-                //var propNullLabel = _skipDefaultValue ? il.DefineLabel() : default(Label);
-                var equalityMethod = propType.GetMethod("op_Equality");
-                var propValue = il.DeclareLocal(propType);
-                var isStruct = isValueType && !isPrimitive;
-                var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
-                var nameLocal = il.DeclareLocal(_stringType);
-                var camelCaseLabel = il.DefineLabel();
+                    il.Emit(OpCodes.Ldstr, name);
+                    il.Emit(OpCodes.Stloc, nameLocal);
 
-                il.Emit(OpCodes.Ldstr, name);
-                il.Emit(OpCodes.Stloc, nameLocal);
+                    il.Emit(OpCodes.Ldloc, camelCasing);
+                    il.Emit(OpCodes.Brfalse, camelCaseLabel);
 
-                il.Emit(OpCodes.Ldloc, camelCasing);
-                il.Emit(OpCodes.Brfalse, camelCaseLabel);
+                    il.Emit(OpCodes.Ldloc, nameLocal);
+                    il.Emit(OpCodes.Call, _toCamelCase);
+                    il.Emit(OpCodes.Stloc, nameLocal);
 
-                il.Emit(OpCodes.Ldloc, nameLocal);
-                il.Emit(OpCodes.Call, _toCamelCase);
-                il.Emit(OpCodes.Stloc, nameLocal);
+                    il.MarkLabel(camelCaseLabel);
 
-                il.MarkLabel(camelCaseLabel);
+                    if (isClass) {
+                        il.Emit(OpCodes.Ldarg_0);
+                        if (isProp)
+                            il.Emit(OpCodes.Callvirt, getMethod);
+                        else
+                            il.Emit(OpCodes.Ldfld, field);
+                    } else {
+                        il.Emit(OpCodes.Ldarga, 0);
+                        if (isProp)
+                            il.Emit(OpCodes.Call, getMethod);
+                        else il.Emit(OpCodes.Ldfld, field);
+                    }
 
-                if (isClass) {
-                    il.Emit(OpCodes.Ldarg_0);
-                    if (isProp)
-                        il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-                    else
-                        il.Emit(OpCodes.Ldfld, field);
-                } else {
-                    il.Emit(OpCodes.Ldarga, 0);
-                    if (isProp)
-                        il.Emit(OpCodes.Call, prop.GetGetMethod());
-                    else il.Emit(OpCodes.Ldfld, field);
-                }
+                    if (isNullable) {
+                        il.Emit(OpCodes.Stloc, nullablePropValue);
 
-                if (isNullable) {
-                    il.Emit(OpCodes.Stloc, nullablePropValue);
-                    
-                    il.Emit(OpCodes.Ldloca, nullablePropValue);
-                    il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
+                        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                        il.Emit(OpCodes.Call, originPropType.GetMethod("GetValueOrDefault", Type.EmptyTypes));
 
-                    il.Emit(OpCodes.Stloc, propValue);
-                } else
-                    il.Emit(OpCodes.Stloc, propValue);
-
-
-                var propNullLabel = il.DefineLabel();
-                var skipDefaultValueTrueLabel = il.DefineLabel();
-                var skipDefaultValueFalseLabel = il.DefineLabel();
-                var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
-                var successLocal = il.DeclareLocal(_boolType);
-
-                var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
-
-                il.Emit(OpCodes.Ldc_I4, 0);
-                il.Emit(OpCodes.Stloc, successLocal);
-
-                il.Emit(OpCodes.Ldloc, skipDefaultValue);
-                il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
-
-                if (isNullable) {
-                    il.Emit(OpCodes.Ldloca, nullablePropValue);
-                    il.Emit(OpCodes.Call, hasValueMethod);
-                    il.Emit(OpCodes.Brfalse, propNullLabel);
-                }
-
-                if (isStruct)
-                    il.Emit(OpCodes.Ldloca, propValue);
-                else
-                    il.Emit(OpCodes.Ldloc, propValue);
-                if (isValueType && isPrimitive) {
-                    LoadDefaultValueByType(il, propType);
-                } else {
-                    if (!isValueType)
-                        il.Emit(OpCodes.Ldnull);
-                }
-
-                if (equalityMethod != null) {
-                    il.Emit(OpCodes.Call, equalityMethod);
-                    il.Emit(OpCodes.Brtrue, propNullLabel);
-                } else {
-                    if (isStruct) {
-
-                        var tempValue = il.DeclareLocal(propType);
-
-                        il.Emit(OpCodes.Ldloca, tempValue);
-                        il.Emit(OpCodes.Initobj, propType);
-                        il.Emit(OpCodes.Ldloc, tempValue);
-                        il.Emit(OpCodes.Box, propType);
-                        il.Emit(OpCodes.Constrained, propType);
-
-                        il.Emit(OpCodes.Callvirt, _objectEquals);
-
-                        il.Emit(OpCodes.Brtrue, propNullLabel);
-
+                        il.Emit(OpCodes.Stloc, propValue);
                     } else
-                        il.Emit(OpCodes.Beq, propNullLabel);
-                }
-
-                WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
-
-                il.Emit(OpCodes.Ldc_I4, 1);
-                il.Emit(OpCodes.Stloc, successLocal);
-
-                il.MarkLabel(propNullLabel);
-
-                il.MarkLabel(skipDefaultValueTrueLabel);
+                        il.Emit(OpCodes.Stloc, propValue);
 
 
-                il.Emit(OpCodes.Ldloc, skipDefaultValue);
-                il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
-                il.Emit(OpCodes.Ldloc, successLocal);
-                il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+                    var propNullLabel = il.DefineLabel();
+                    var skipDefaultValueTrueLabel = il.DefineLabel();
+                    var skipDefaultValueFalseLabel = il.DefineLabel();
+                    var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
+                    var successLocal = il.DeclareLocal(_boolType);
 
-                WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+                    var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
 
-                il.Emit(OpCodes.Ldc_I4, 1);
-                il.Emit(OpCodes.Stloc, successLocal);
+                    il.Emit(OpCodes.Ldc_I4, 0);
+                    il.Emit(OpCodes.Stloc, successLocal);
 
-                il.MarkLabel(skipDefaultValueFalseLabel);
-
-                if (isNullable)
-                {
                     il.Emit(OpCodes.Ldloc, skipDefaultValue);
-                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
-                    il.Emit(OpCodes.Ldloca, nullablePropValue);
-                    il.Emit(OpCodes.Call, hasValueMethod);
-                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
-                    il.Emit(OpCodes.Ldloc, successLocal);
-                    il.Emit(OpCodes.Brtrue, skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
+
+                    if (isNullable) {
+                        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                        il.Emit(OpCodes.Call, hasValueMethod);
+                        il.Emit(OpCodes.Brfalse, propNullLabel);
+                    }
+
+                    if (isStruct)
+                        il.Emit(OpCodes.Ldloca, propValue);
+                    else
+                        il.Emit(OpCodes.Ldloc, propValue);
+                    if (isValueType && isPrimitive) {
+                        LoadDefaultValueByType(il, propType);
+                    } else {
+                        if (!isValueType)
+                            il.Emit(OpCodes.Ldnull);
+                    }
+
+                    if (equalityMethod != null) {
+                        il.Emit(OpCodes.Call, equalityMethod);
+                        il.Emit(OpCodes.Brtrue, propNullLabel);
+                    } else {
+                        if (isStruct) {
+
+                            var tempValue = il.DeclareLocal(propType);
+
+                            il.Emit(OpCodes.Ldloca, tempValue);
+                            il.Emit(OpCodes.Initobj, propType);
+                            il.Emit(OpCodes.Ldloc, tempValue);
+                            il.Emit(OpCodes.Box, propType);
+                            il.Emit(OpCodes.Constrained, propType);
+
+                            il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                            il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                        } else il.Emit(OpCodes.Beq, propNullLabel);
+                    }
 
                     WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
 
-                    il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
+                    il.Emit(OpCodes.Ldc_I4, 1);
+                    il.Emit(OpCodes.Stloc, successLocal);
+
+                    il.MarkLabel(propNullLabel);
+
+                    il.MarkLabel(skipDefaultValueTrueLabel);
+
+
+                    il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                    il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+                    il.Emit(OpCodes.Ldloc, successLocal);
+                    il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
+
+                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+
+                    il.Emit(OpCodes.Ldc_I4, 1);
+                    il.Emit(OpCodes.Stloc, successLocal);
+
+                    il.MarkLabel(skipDefaultValueFalseLabel);
+
+                    if (isNullable) {
+                        il.Emit(OpCodes.Ldloc, skipDefaultValue);
+                        il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                        il.Emit(OpCodes.Call, hasValueMethod);
+                        il.Emit(OpCodes.Brfalse, skipDefaultValueTrueAndHasValueLabel);
+                        il.Emit(OpCodes.Ldloc, successLocal);
+                        il.Emit(OpCodes.Brtrue, skipDefaultValueTrueAndHasValueLabel);
+
+                        WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+
+                        il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
+                    }
+
+                    #region
+
+                    //if (_skipDefaultValue) {
+
+                    //    if (isNullable) {
+                    //        var hasValueMethod = originPropType.GetMethod("get_HasValue");
+                    //        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                    //        il.Emit(OpCodes.Call, hasValueMethod);
+                    //        il.Emit(OpCodes.Brfalse, propNullLabel);
+                    //    }
+
+                    //    if (isStruct)
+                    //        il.Emit(OpCodes.Ldloca, propValue);
+                    //    else
+                    //        il.Emit(OpCodes.Ldloc, propValue);
+                    //    if (isValueType && isPrimitive) {
+                    //        LoadDefaultValueByType(il, propType);
+                    //    } else {
+                    //        if (!isValueType)
+                    //            il.Emit(OpCodes.Ldnull);
+                    //    }
+
+                    //    if (equalityMethod != null) {
+                    //        il.Emit(OpCodes.Call, equalityMethod);
+                    //        il.Emit(OpCodes.Brtrue, propNullLabel);
+                    //    } else {
+                    //        if (isStruct) {
+
+                    //            var tempValue = il.DeclareLocal(propType);
+
+                    //            il.Emit(OpCodes.Ldloca, tempValue);
+                    //            il.Emit(OpCodes.Initobj, propType);
+                    //            il.Emit(OpCodes.Ldloc, tempValue);
+                    //            il.Emit(OpCodes.Box, propType);
+                    //            il.Emit(OpCodes.Constrained, propType);
+
+                    //            il.Emit(OpCodes.Callvirt, _objectEquals);
+
+                    //            il.Emit(OpCodes.Brtrue, propNullLabel);
+
+                    //        } else
+                    //            il.Emit(OpCodes.Beq, propNullLabel);
+                    //    }
+                    //}
+
+                    #endregion
+
+                    //if (_skipDefaultValue) {
+                    //    il.MarkLabel(propNullLabel);
+                    //}
                 }
-
-                #region
-                //if (_skipDefaultValue) {
-
-                //    if (isNullable) {
-                //        var hasValueMethod = originPropType.GetMethod("get_HasValue");
-                //        il.Emit(OpCodes.Ldloca, nullablePropValue);
-                //        il.Emit(OpCodes.Call, hasValueMethod);
-                //        il.Emit(OpCodes.Brfalse, propNullLabel);
-                //    }
-
-                //    if (isStruct)
-                //        il.Emit(OpCodes.Ldloca, propValue);
-                //    else
-                //        il.Emit(OpCodes.Ldloc, propValue);
-                //    if (isValueType && isPrimitive) {
-                //        LoadDefaultValueByType(il, propType);
-                //    } else {
-                //        if (!isValueType)
-                //            il.Emit(OpCodes.Ldnull);
-                //    }
-
-                //    if (equalityMethod != null) {
-                //        il.Emit(OpCodes.Call, equalityMethod);
-                //        il.Emit(OpCodes.Brtrue, propNullLabel);
-                //    } else {
-                //        if (isStruct) {
-
-                //            var tempValue = il.DeclareLocal(propType);
-
-                //            il.Emit(OpCodes.Ldloca, tempValue);
-                //            il.Emit(OpCodes.Initobj, propType);
-                //            il.Emit(OpCodes.Ldloc, tempValue);
-                //            il.Emit(OpCodes.Box, propType);
-                //            il.Emit(OpCodes.Constrained, propType);
-
-                //            il.Emit(OpCodes.Callvirt, _objectEquals);
-
-                //            il.Emit(OpCodes.Brtrue, propNullLabel);
-
-                //        } else
-                //            il.Emit(OpCodes.Beq, propNullLabel);
-                //    }
-                //}
-                #endregion
-
-                //if (_skipDefaultValue) {
-                //    il.MarkLabel(propNullLabel);
-                //}
-
                 counter++;
             }
 
