@@ -955,6 +955,30 @@ namespace NetJSON.Tests {
             var stubbornTwo = NetJSON.Deserialize(typeof(StubbornClass), two);
         }
 
+        [TestMethod]
+        public void DeserializeJsonWithMissingQuote()
+        {
+            var json = @"{
+	""document"": ""base64string,
+	""documentName"": ""test.pdf"",
+	""label1"": ""someLabel"",
+	""packageId"": ""7db3eacf-1d2b-4142-9eab-b1bce4630570"",
+	""initiator"": ""somerandom @email.com""
+}";
+            var ex = default(Exception);
+
+            try
+            {
+                NetJSON.Deserialize<Dictionary<string, string>>(json);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+
+            Assert.IsNotNull(ex);
+        }
+
         private class StubbornClass
         {
             public string FileName { get; set; }

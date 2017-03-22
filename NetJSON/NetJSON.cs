@@ -3553,20 +3553,26 @@ namespace NetJSON {
         static StringBuilder _decodeJSONStringBuilder;
 
         public unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
-            char current = '\0', next = '\0';
+            char current = '\0', next = '\0', prev = '\0';
             bool hasQuote = false;
-            //char currentQuote = settings._quoteChar;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
 
             while (true) {
                 current = ptr[index];
 
                 if (hasQuote) {
-                    //if (current == '\0') break;
+                    if (current == settings._quoteChar) {
+                        if (prev != '\\')
+                        {
+                            next = ptr[index + 1];
+                            if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
+                            {
+                                throw new NetJSONInvalidJSONException();
+                            }
 
-                    if (current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
-                        ++index;
-                        break;
+                            ++index;
+                            break;
+                        }
                     } else {
                         if (current != '\\') {
                             sb.Append(current);
@@ -3595,23 +3601,21 @@ namespace NetJSON {
                                     index += 4;
                                     break;
                                 default:
-                                    if (next == settings._quoteChar/*IsCurrentAQuot(next, settings)*/)
+                                    if (next == settings._quoteChar)
                                         sb.Append(next);
-
                                     break;
                             }
-
                         }
                     }
                 } else {
-                    if (current == settings._quoteChar/*IsCurrentAQuot(current, settings)*/) {
+                    if (current == settings._quoteChar) {
                         hasQuote = true;
                     } else if (current == 'n') {
                         index += 3;
                         return null;
                     }
                 }
-
+                prev = current;
                 ++index;
             }
 
