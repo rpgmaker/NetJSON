@@ -1020,7 +1020,7 @@ namespace NetJSON {
             });
         }
 
-        internal static void GenerateTypesInto(string asmName, params Type[] types) {
+        public static void GenerateTypesInto(string asmName, params Type[] types) {
             if (!types.Any())
                 throw new NetJSONInvalidAssemblyGeneration(asmName);
 
