@@ -26,3 +26,4 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.2.1.9")]
 [assembly: AssemblyFileVersion("1.2.1.9")]
+[assembly: InternalsVisibleTo(NetJSON.NetJSON.NET_JSON_GENERATED_ASSEMBLY_NAME)]

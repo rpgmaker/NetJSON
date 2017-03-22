@@ -38,3 +38,4 @@ using System.Security;
 #if !NET_35
 [assembly: SecurityRules(SecurityRuleSet.Level2, SkipVerificationInFullTrust = true)]
 #endif
+[assembly: InternalsVisibleTo(NetJSON.NetJSON.NET_JSON_GENERATED_ASSEMBLY_NAME)]

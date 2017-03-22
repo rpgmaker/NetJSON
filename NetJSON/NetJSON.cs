@@ -1275,7 +1275,7 @@ namespace NetJSON {
         private readonly static object _lockAsmObject = new object();
         private static AssemblyBuilder _assembly = null;
         private static ModuleBuilder _module = null;
-        private const string NET_JSON_GENERATED_ASSEMBLY_NAME = "NetJSONGeneratedAssembly";
+        internal const string NET_JSON_GENERATED_ASSEMBLY_NAME = "NetJSONGeneratedAssembly";
 
         private static AssemblyBuilder GenerateAssemblyBuilder() {
             if (_assembly == null) {
