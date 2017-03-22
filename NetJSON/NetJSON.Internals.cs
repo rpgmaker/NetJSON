@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 namespace NetJSON.Internals
 {
-	public class TupleContainer
+	public sealed class TupleContainer
 	{
 		private int _size;
 		private int _index;
@@ -85,21 +85,21 @@ namespace NetJSON.Internals
 		}
 	}
 
-	class NetJSONMemberInfo
+	sealed class NetJSONMemberInfo
 	{
-		public MemberInfo Member { get; set; }
-		public NetJSONPropertyAttribute Attribute { get; set; }
+		internal MemberInfo Member { get; set; }
+		internal NetJSONPropertyAttribute Attribute { get; set; }
 	}
 
 	static partial class CompatibleExtensions
 	{
 #if !NET_CORE && !NET_PCL
-		public static Type GetTypeInfo(this Type type) {
+		internal static Type GetTypeInfo(this Type type) {
 			return type;
 		}
 #endif
 
-		public static void EmitClearStringBuilder(this ILGenerator il) {
+		internal static void EmitClearStringBuilder(this ILGenerator il) {
 #if !NET_35
 			il.Emit(OpCodes.Callvirt, typeof(StringBuilder).GetMethod("Clear"));
 #else
@@ -107,7 +107,7 @@ namespace NetJSON.Internals
 #endif
 		}
 	}
-	public static class SerializerUtilities
+	internal static class SerializerUtilities
 	{
 		const char QuotDoubleChar = '"',
 				   QuotSingleChar = '\'';
@@ -127,18 +127,18 @@ namespace NetJSON.Internals
 		[ThreadStatic]
 		private static StringBuilder _cachedObjectStringBuilder;
 
-		public static StringBuilder CachedObjectStringBuilder() {
+		internal static StringBuilder CachedObjectStringBuilder() {
 			return (_cachedObjectStringBuilder ?? (_cachedObjectStringBuilder = new StringBuilder(25))).Clear();
 		}
 
 		[ThreadStatic]
 		private static StringBuilder _cachedStringBuilder;
-		public static StringBuilder GetStringBuilder() {
+		internal static StringBuilder GetStringBuilder() {
 			return _cachedStringBuilder ?? (_cachedStringBuilder = new StringBuilder(DefaultStringBuilderCapacity));
 		}
 
 
-		public unsafe static string CreateString(string str, int startIndex, int length) {
+		internal unsafe static string CreateString(string str, int startIndex, int length) {
 			fixed (char* ptr = str)
 				return new string(ptr, startIndex, length);
 		}
@@ -150,7 +150,7 @@ namespace NetJSON.Internals
             ?.GetMethod("GetUninitializedObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
             ?.CreateDelegate(typeof(Func<Type, object>));
 
-        public static object GetUninitializedObject(Type type)
+        internal static object GetUninitializedObject(Type type)
         {
             if (type == null)
             {
@@ -161,7 +161,7 @@ namespace NetJSON.Internals
         }
 #endif
 
-        public static T GetUninitializedInstance<T>() {
+        internal static T GetUninitializedInstance<T>() {
 #if NET_CORE
             return (T)GetUninitializedObject(typeof(T));
 #else
@@ -169,11 +169,11 @@ namespace NetJSON.Internals
 #endif
 		}
 
-		public static object GetTypeIdentifierInstance(string typeName) {
+		internal static object GetTypeIdentifierInstance(string typeName) {
 			return NetJSON.GetTypeIdentifierInstance(typeName);
 		}
 
-        public unsafe static void ThrowIfInvalidJSON(string json, char chr)
+        internal unsafe static void ThrowIfInvalidJSON(string json, char chr)
         {
 #if NET_35
             if(json.IsNullOrWhiteSpace())
@@ -210,7 +210,7 @@ namespace NetJSON.Internals
             }
         }
 
-        public unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
+        internal unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
             fixed (char* kPtr = key)
             {
@@ -221,11 +221,11 @@ namespace NetJSON.Internals
             }
         }
 
-		public unsafe static bool FastStringToBool(string value) {
+		internal unsafe static bool FastStringToBool(string value) {
 			return value[0] == 't';
 		}
 
-		public static byte[] FastStringToByteArray(string value) {
+		internal static byte[] FastStringToByteArray(string value) {
 
 #if NET_35
             if (value.IsNullOrWhiteSpace())
@@ -237,22 +237,22 @@ namespace NetJSON.Internals
 			return Convert.FromBase64String(value);
 		}
 
-		public static char FastStringToChar(string value) {
+		internal static char FastStringToChar(string value) {
 			return value[0];
 		}
 
-		public static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
+		internal static DateTimeOffset FastStringToDateTimeoffset(string value, NetJSONSettings settings) {
 			TimeSpan offset;
 			var date = StringToDate(value, settings, out offset, isDateTimeOffset: true);
 			return new DateTimeOffset(date.Ticks, offset);
 		}
 
-		public static DateTime FastStringToDate(string value, NetJSONSettings settings) {
+		internal static DateTime FastStringToDate(string value, NetJSONSettings settings) {
 			TimeSpan offset;
 			return StringToDate(value, settings, out offset, isDateTimeOffset: false);
 		}
 
-		public unsafe static string ToCamelCase(string str) {
+		internal unsafe static string ToCamelCase(string str) {
 			fixed (char* p = str) {
 				char* buffer = stackalloc char[str.Length];
 				int c = 0;
@@ -280,34 +280,34 @@ namespace NetJSON.Internals
 			}
 		}
 
-		public static string GuidToStr(Guid value) {
+		internal static string GuidToStr(Guid value) {
 			//TODO: Optimize
 			return value.ToString();
 		}
 
-		public static string ByteArrayToStr(byte[] value) {
+		internal static string ByteArrayToStr(byte[] value) {
 			//TODO: Optimize
 			return Convert.ToBase64String(value);
 		}
 
-		public static bool IsListType(Type type) {
+		internal static bool IsListType(Type type) {
 			return type.IsListType();
 		}
 
-		public static bool IsDictionaryType(Type type) {
+		internal static bool IsDictionaryType(Type type) {
 			return type.IsDictionaryType();
 		}
 
-		public static bool IsCollectionType(this Type type) {
+		internal static bool IsCollectionType(this Type type) {
 			return type.IsListType() || type.IsDictionaryType();
 		}
 
-		public static bool IsRawPrimitive(string value) {
+		internal static bool IsRawPrimitive(string value) {
 			value = value.Trim();
 			return !value.StartsWith("{") && !value.StartsWith("[");
 		}
 
-		public static bool IsCurrentAQuot(char current, NetJSONSettings settings) {
+		internal static bool IsCurrentAQuot(char current, NetJSONSettings settings) {
 			if (settings.HasOverrideQuoteChar)
 				return current == settings._quoteChar;
 			var quote = settings._quoteChar;
@@ -320,15 +320,15 @@ namespace NetJSON.Internals
 			return isQuote;
 		}
 
-		public static List<object> ListToListObject(IList list) {
+		internal static List<object> ListToListObject(IList list) {
 			return list.Cast<object>().ToList();
 		}
 
-		public static bool NeedQuotes(Type type, NetJSONSettings settings) {
+		internal static bool NeedQuotes(Type type, NetJSONSettings settings) {
 			return NetJSON.NeedQuotes(type, settings);
 		}
 
-		public static bool IsValueDate(string value) {
+		internal static bool IsValueDate(string value) {
 			return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
 		}
 
@@ -441,34 +441,34 @@ namespace NetJSON.Internals
 			return dt;
 		}
 
-		public static Guid FastStringToGuid(string value) {
+		internal static Guid FastStringToGuid(string value) {
 			//TODO: Optimize
 			return new Guid(value);
 		}
 
-		public static Type FastStringToType(string value) {
+		internal static Type FastStringToType(string value) {
 			return Type.GetType(value, false);
 		}
 
-		public static unsafe byte FastStringToByte(string str) {
+		internal static unsafe byte FastStringToByte(string str) {
 			unchecked {
 				return (byte)FastStringToInt(str);
 			}
 		}
 
-		public static unsafe short FastStringToShort(string str) {
+		internal static unsafe short FastStringToShort(string str) {
 			unchecked {
 				return (short)FastStringToInt(str);
 			}
 		}
 
-		public static unsafe ushort FastStringToUShort(string str) {
+		internal static unsafe ushort FastStringToUShort(string str) {
 			unchecked {
 				return (ushort)FastStringToInt(str);
 			}
 		}
 
-		public static unsafe int FastStringToInt(string strNum) {
+		internal static unsafe int FastStringToInt(string strNum) {
 			int val = 0;
 			int neg = 1;
 			fixed (char* ptr = strNum) {
@@ -484,7 +484,7 @@ namespace NetJSON.Internals
 			return val * neg;
 		}
 
-		public static unsafe uint FastStringToUInt(string strNum) {
+		internal static unsafe uint FastStringToUInt(string strNum) {
 			uint val = 0;
 			fixed (char* ptr = strNum) {
 				char* str = ptr;
@@ -499,7 +499,7 @@ namespace NetJSON.Internals
 			return val;
 		}
 
-		public static unsafe long FastStringToLong(string strNum) {
+		internal static unsafe long FastStringToLong(string strNum) {
 			long val = 0;
 			long neg = 1;
 			fixed (char* ptr = strNum) {
@@ -515,7 +515,7 @@ namespace NetJSON.Internals
 			return val * neg;
 		}
 
-		public static unsafe ulong FastStringToULong(string strNum) {
+		internal static unsafe ulong FastStringToULong(string strNum) {
 			ulong val = 0;
 			fixed (char* ptr = strNum) {
 				char* str = ptr;
@@ -526,7 +526,7 @@ namespace NetJSON.Internals
 			return val;
 		}
 
-		public static unsafe double FastStringToDouble(string numStr) {
+		internal static unsafe double FastStringToDouble(string numStr) {
 			double val = 0.0;
 			double neg = 1;
 			fixed (char* ptr = numStr) {
@@ -573,31 +573,31 @@ namespace NetJSON.Internals
 			return ((double)(decimal)val) * neg;
 		}
 
-		public static unsafe float FastStringToFloat(string numStr) {
+		internal static unsafe float FastStringToFloat(string numStr) {
 			return (float)FastStringToDouble(numStr);
 		}
 
-		public static decimal FastStringToDecimal(string numStr) {
+		internal static decimal FastStringToDecimal(string numStr) {
 			return new Decimal(FastStringToDouble(numStr));
 		}
 
-		public static string FloatToStr(float value) {
+		internal static string FloatToStr(float value) {
 			return value.ToString(CultureInfo.InvariantCulture);
 		}
 
-		public static string DoubleToStr(double value) {
+		internal static string DoubleToStr(double value) {
 			return value.ToString(CultureInfo.InvariantCulture);
 		}
 
-		public static string SByteToStr(sbyte value) {
+		internal static string SByteToStr(sbyte value) {
 			return value.ToString(CultureInfo.InvariantCulture);
 		}
 
-		public static string DecimalToStr(decimal value) {
+		internal static string DecimalToStr(decimal value) {
 			return value.ToString(CultureInfo.InvariantCulture);
 		}
 
-		public static unsafe void SkipProperty(char* ptr, ref int index, NetJSONSettings settings) {
+		internal static unsafe void SkipProperty(char* ptr, ref int index, NetJSONSettings settings) {
 			var currentIndex = index;
 			char current = '\0';
 			char bchar = '\0';
@@ -644,7 +644,7 @@ namespace NetJSON.Internals
 			}
 		}
 
-		public unsafe static string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
+		internal unsafe static string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
 			char current = '\0', prev = '\0';
 			int count = 0, startIndex = 0;
 			string value = string.Empty;
@@ -672,7 +672,7 @@ namespace NetJSON.Internals
 			return value;
 		}
 
-		public unsafe static string GetNonStringValue(char* ptr, ref int index) {
+		internal unsafe static string GetNonStringValue(char* ptr, ref int index) {
 			char current = '\0';
 			int startIndex = -1;
 			string value = string.Empty;
@@ -718,7 +718,7 @@ namespace NetJSON.Internals
 			return value;
 		}
 
-		public unsafe static int MoveToArrayBlock(char* str, ref int index) {
+		internal unsafe static int MoveToArrayBlock(char* str, ref int index) {
 			char* ptr = str + index;
 
 			if (*ptr == '[')
@@ -736,19 +736,19 @@ namespace NetJSON.Internals
 			return 1;
 		}
 
-		public static bool IsEndChar(char current) {
+		internal static bool IsEndChar(char current) {
 			return current == ':' || current == '{' || current == ' ';
 		}
 
-		public static bool IsArrayEndChar(char current) {
+		internal static bool IsArrayEndChar(char current) {
 			return current == ',' || current == ']' || current == ' ';
 		}
 
-		public static bool IsCharTag(char current) {
+		internal static bool IsCharTag(char current) {
 			return current == '{' || current == '}';
 		}
 
-		public static bool CustomTypeEquality(Type type1, Type type2) {
+		internal static bool CustomTypeEquality(Type type1, Type type2) {
 			if (type1
 #if NET_CORE
     .GetTypeInfo()
@@ -764,17 +764,17 @@ namespace NetJSON.Internals
 			return type1 == type2;
 		}
 
-		public static string CustomEnumToStr(Enum @enum, NetJSONSettings settings) {
+		internal static string CustomEnumToStr(Enum @enum, NetJSONSettings settings) {
 			if (settings.UseEnumString)
 				return @enum.ToString();
 			return IntToStr((int)((object)@enum));
 		}
 
-		public static string CharToStr(char chr) {
+		internal static string CharToStr(char chr) {
 			return chr.ToString();
 		}
 
-		public unsafe static string IntToStr(int snum) {
+		internal unsafe static string IntToStr(int snum) {
 			char* s = stackalloc char[12];
 			char* ps = s;
 			int num1 = snum, num2, num3, div;
@@ -832,7 +832,7 @@ namespace NetJSON.Internals
 			return new string(s);
 		}
 
-		public unsafe static string LongToStr(long snum) {
+		internal unsafe static string LongToStr(long snum) {
 			char* s = stackalloc char[21];
 			char* ps = s;
 			long num1 = snum, num2, num3, num4, num5, div;
@@ -934,7 +934,7 @@ namespace NetJSON.Internals
 			return new string(s);
 		}
 
-		public static string AllDateToString(DateTime date, NetJSONSettings settings) {
+		internal static string AllDateToString(DateTime date, NetJSONSettings settings) {
 			var offset =
 #if NET_CORE
                     TimeZoneInfo.Local.GetUtcOffset(date);
@@ -944,11 +944,11 @@ namespace NetJSON.Internals
 			return DateToStringWithOffset(date, settings, offset);
 		}
 
-		public static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
+		internal static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
 			return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
 		}
 
-        public static string FlagEnumToString(object value, NetJSONSettings settings)
+        internal static string FlagEnumToString(object value, NetJSONSettings settings)
         {
             if ((int)value == 0)
             {
@@ -1054,7 +1054,7 @@ namespace NetJSON.Internals
 			return LongToStr(epochTime);// IntUtility.ltoa(epochTime);
 		}
 
-		public static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
+		internal static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
 			NetJSON.SetterPropertyValue(instance, value, methodInfo);
 		}
 	}

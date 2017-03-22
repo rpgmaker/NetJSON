@@ -34,7 +34,7 @@ namespace NetJSON {
 
     public static partial class NetJSON {
 
-        class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
+        sealed class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
         {
 			readonly Func<TextReader, T> _DeserializeTextReader;
 			readonly Func<string, T> _Deserialize;
@@ -1020,7 +1020,7 @@ namespace NetJSON {
             });
         }
 
-        public static void GenerateTypesInto(string asmName, params Type[] types) {
+        internal static void GenerateTypesInto(string asmName, params Type[] types) {
             if (!types.Any())
                 throw new NetJSONInvalidAssemblyGeneration(asmName);
 
@@ -1374,13 +1374,13 @@ namespace NetJSON {
             return assembly;
         }
 
-        public static string PrettifyJSONIfNeeded(string str, NetJSONSettings settings) {
+        internal static string PrettifyJSONIfNeeded(string str, NetJSONSettings settings) {
             if (settings.Format == NetJSONFormat.Prettify)
                 return PrettifyJSON(str);
             return str;
         }
 
-        public static unsafe string PrettifyJSON(string str) {
+        internal static unsafe string PrettifyJSON(string str) {
             var sb = new StringBuilder();
             
             var horizontal = 0;
@@ -1453,7 +1453,7 @@ namespace NetJSON {
             return sb.ToString();
         }
 
-        public static unsafe void EncodedJSONString(StringBuilder sb, string str, NetJSONSettings settings) {
+        internal static unsafe void EncodedJSONString(StringBuilder sb, string str, NetJSONSettings settings) {
             var quote = settings._quoteChar;
             char c;
             fixed (char* chr = str) {
@@ -3552,7 +3552,7 @@ namespace NetJSON {
         [ThreadStatic]
         static StringBuilder _decodeJSONStringBuilder;
 
-        public unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
+        internal unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
             char current = '\0', next = '\0', prev = '\0';
             bool hasQuote = false;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();

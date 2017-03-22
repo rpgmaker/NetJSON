@@ -7,7 +7,7 @@ namespace NetJSON
 	/// Attribute for renaming field/property name to use for serialization and deserialization
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Enum)]
-	public class NetJSONPropertyAttribute : Attribute
+	public sealed class NetJSONPropertyAttribute : Attribute
 	{
 		/// <summary>
 		/// Name of property/field
@@ -22,7 +22,7 @@ namespace NetJSON
 		}
 	}
 
-	public class NetJSONSettings
+	public sealed class NetJSONSettings
 	{
         internal bool _hasDateStringFormat = false;
 		/// <summary>
@@ -164,7 +164,7 @@ namespace NetJSON
 	/// Attribute for configuration of Class that requires type information for serialization and deserialization
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-	public class NetJSONKnownTypeAttribute : Attribute
+	public sealed class NetJSONKnownTypeAttribute : Attribute
 	{
 		/// <summary>
 		/// Type
@@ -182,7 +182,7 @@ namespace NetJSON
 	/// <summary>
 	/// Exception thrown for invalid json string
 	/// </summary>
-	public class NetJSONInvalidJSONException : Exception
+	public sealed class NetJSONInvalidJSONException : Exception
 	{
 		public NetJSONInvalidJSONException()
 			: base("Input is not a valid JSON.") {
@@ -192,7 +192,7 @@ namespace NetJSON
 	/// <summary>
 	/// Exception thrown for invalid json property attribute
 	/// </summary>
-	public class NetJSONInvalidJSONPropertyException : Exception
+	public sealed class NetJSONInvalidJSONPropertyException : Exception
 	{
 		/// <summary>
 		/// Default constructor
@@ -205,7 +205,7 @@ namespace NetJSON
 	/// <summary>
 	/// Exception thrown for invalid assembly generation when adding all assembly into a specified assembly file
 	/// </summary>
-	public class NetJSONInvalidAssemblyGeneration : Exception
+	public sealed class NetJSONInvalidAssemblyGeneration : Exception
 	{
 		/// <summary>
 		/// Default constructor
@@ -214,7 +214,7 @@ namespace NetJSON
 		public NetJSONInvalidAssemblyGeneration(string asmName) : base(String.Format("Could not generate assembly with name [{0}] due to empty list of types to include", asmName)) { }
 	}
 
-	public abstract class NetJSONSerializer<T>
+	internal abstract class NetJSONSerializer<T>
 	{
 
 		public abstract string Serialize(T value);

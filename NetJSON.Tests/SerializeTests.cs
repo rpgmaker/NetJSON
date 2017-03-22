@@ -72,18 +72,8 @@ namespace NetJSON.Tests {
 
         [TestMethod]
         public void TestSkippingProperty() {
-
-
             var ss = "{\"aaaaaaaaaa\":\"52\",\"aaaaaURL\":\"x\"}";
-
             var yy = NetJSON.Deserialize<Foo>(ss);
-        }
-
-        [TestMethod]
-        public void TestSNDouble() {
-            var value = "1.18909";
-
-            var dValue = Internals.SerializerUtilities.FastStringToDouble(value);
         }
 
         public class BaseApiResponse {

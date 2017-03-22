@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 namespace NetJSON {
-    public unsafe static class IntUtility {
+    internal unsafe static class IntUtility {
         const ulong ATOI_TAB_SZ = 10000UL;
         const ulong ATOI_TAB_SZ_LOG = 4UL;
 
