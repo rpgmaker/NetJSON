@@ -1014,8 +1014,20 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void TestComplexObjectWithByteArray()
         {
+            NetJSON.IncludeTypeInformation = true;
             var obj = new ComplexObject();
-            var json = NetJSON.Serialize(obj);
+            var json = NetJSON.Serialize(obj, new NetJSONSettings { UseEnumString = true });
+            var obj2 = NetJSON.Deserialize<ComplexObject>(json, new NetJSONSettings() { UseEnumString = true });
+
+            Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));
+        }
+
+        [TestMethod]
+        public void TestComplexObjectWithByteArrayWithSerializeType()
+        {
+            NetJSON.IncludeTypeInformation = true;
+            var obj = new ComplexObject();
+            var json = NetJSON.Serialize(typeof(ComplexObject), obj);
             var obj2 = NetJSON.Deserialize<ComplexObject>(json);
 
             Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));

@@ -778,9 +778,10 @@ namespace NetJSON {
 
         private static bool _includeFields = true;
 
+        [Obsolete("All fields will be included by default. This property will be removed in future release")]
         public static bool IncludeFields {
             set {
-                _includeFields = value;
+                _includeFields = true;
             }
             internal get {
                 return _includeFields;
@@ -2353,14 +2354,7 @@ namespace NetJSON {
             methodIL.Emit(OpCodes.Pop);
             methodIL.Emit(OpCodes.Ret);
             methodIL.MarkLabel(conditionLabel);
-
-//            if (type
-//#if NET_CORE
-//    .GetTypeInfo()
-//#endif
-//                .IsNotPublic) {
-//                throw new InvalidOperationException("Non-Public Types is not supported yet");
-//            } else 
+ 
             if (type.IsCollectionType()) WriteCollection(typeBuilder, type, methodIL);
             else {
                 if (!_includeTypeInformation) {
