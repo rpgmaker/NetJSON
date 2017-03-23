@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace NetJSON {
 
-    public static class AutomaticTypeConverter {
+    internal static class AutomaticTypeConverter {
         public static object ToExpectedType(string value) {
 #if NET_35
       if(value.IsNullOrWhiteSpace()) return value;      

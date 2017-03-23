@@ -33,8 +33,9 @@ using System.Security;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.2.1.8")]
-[assembly: AssemblyFileVersion("1.2.1.8")]
+[assembly: AssemblyVersion("1.2.1.9")]
+[assembly: AssemblyFileVersion("1.2.1.9")]
 #if !NET_35
 [assembly: SecurityRules(SecurityRuleSet.Level2, SkipVerificationInFullTrust = true)]
 #endif
+[assembly: InternalsVisibleTo(NetJSON.NetJSON.NET_JSON_GENERATED_ASSEMBLY_NAME)]
