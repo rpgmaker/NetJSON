@@ -1046,6 +1046,66 @@ namespace NetJSON.Tests {
 
             Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));
         }
+
+        [TestMethod]
+        public void TestEnumHolderWithByteAndShort()
+        {
+            var settings = new NetJSONSettings { UseEnumString = false };
+            var value = new EnumHolder { BEnum = ByteEnum.V2, SEnum = ShortEnum.V2 };
+            var json = NetJSON.Serialize(value, settings);
+
+            var bJson = NetJSON.Serialize(ByteEnum.V2, settings);
+            var sJson = NetJSON.Serialize(ShortEnum.V2, settings);
+
+            var bValue = NetJSON.Deserialize<ByteEnum>(bJson, settings);
+            var sValue = NetJSON.Deserialize<ShortEnum>(sJson, settings);
+
+            var value2 = NetJSON.Deserialize<EnumHolder>(json, settings);
+
+            Assert.IsTrue(value.BEnum == value2.BEnum);
+            Assert.IsTrue(value.SEnum == value2.SEnum);
+        }
+
+        [TestMethod]
+        public void TestSerializationForMicrosoftJavascriptSerializer()
+        {
+            var json = "{\"CreatorId\":35,\"udtCreationDate\":\"\\/Date(1490945333848)\\/\"}";
+            var data = NetJSON.Deserialize<MicrosoftJavascriptSerializerTestData>(json, 
+                new NetJSONSettings { DateFormat = NetJSONDateFormat.JavascriptSerializer,
+                    TimeZoneFormat = NetJSONTimeZoneFormat.Local });
+
+            Assert.AreEqual(data.CreatorId, 35);
+            Assert.AreEqual(data.udtCreationDate.Day, 31);
+            Assert.AreEqual(data.udtCreationDate.Month, 3);
+            Assert.AreEqual(data.udtCreationDate.Year, 2017);
+            Assert.AreEqual(data.udtCreationDate.Hour, 7);
+            Assert.AreEqual(data.udtCreationDate.Minute, 28);
+            Assert.AreEqual(data.udtCreationDate.Second, 53);
+        }
+    }
+
+    public class MicrosoftJavascriptSerializerTestData
+    {
+        public int CreatorId { get; set; }
+        public DateTime udtCreationDate { get; set; }
+    }
+
+    public class EnumHolder
+    {
+        public ByteEnum BEnum { get; set; }
+        public ShortEnum SEnum { get; set; }
+    }
+
+    public enum ByteEnum : byte
+    {
+        V1 = 1,
+        V2 = 2
+    }
+
+    public enum ShortEnum : short
+    {
+        V1 = 1,
+        V2 = 2
     }
 
     [Serializable]

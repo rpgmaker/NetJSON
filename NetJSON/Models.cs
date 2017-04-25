@@ -250,7 +250,11 @@ namespace NetJSON
 		/// <summary>
 		/// JSON.NET Format for backward compatibility
 		/// </summary>
-		JsonNetISO = 6
+		JsonNetISO = 6,
+        /// <summary>
+        /// .NET System.Web.Script.Serialization.JavaScriptSerializer backward compatibility
+        /// </summary>
+        JavascriptSerializer = 8
 	}
 
 

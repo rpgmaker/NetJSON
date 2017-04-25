@@ -366,9 +366,11 @@ namespace NetJSON.Internals
 				dateText = tokens[0];
 
 				var ticks = FastStringToLong(dateText);
+                var multiply = settings.DateFormat == NetJSONDateFormat.JavascriptSerializer ? TimeSpan.TicksPerMillisecond : 1;
 
 				dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-				dt = dt.AddTicks(ticks);
+
+				dt = dt.AddTicks(ticks * multiply);
 
 				if (timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || timeZoneFormat == NetJSONTimeZoneFormat.Utc)
 					dt = dt.ToLocalTime();

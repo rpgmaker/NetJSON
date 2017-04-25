@@ -153,6 +153,11 @@
             JSON.NET Format for backward compatibility
             </summary>
         </member>
+        <member name="F:NetJSON.NetJSONDateFormat.JavascriptSerializer">
+            <summary>
+            .NET System.Web.Script.Serialization.JavaScriptSerializer backward compatibility
+            </summary>
+        </member>
         <member name="T:NetJSON.NetJSONTimeZoneFormat">
             <summary>
             Option for determining timezone formatting
