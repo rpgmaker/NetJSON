@@ -1,16 +1,16 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
-using System.Text.RegularExpressions;
-
-namespace NetJSON.Internals
+﻿namespace NetJSON.Internals
 {
-	public sealed class TupleContainer
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Globalization;
+    using System.Linq;
+    using System.Reflection;
+    using System.Reflection.Emit;
+    using System.Text;
+    using System.Text.RegularExpressions;
+    
+    public sealed class TupleContainer
 	{
 		private int _size;
 		private int _index;
@@ -93,7 +93,7 @@ namespace NetJSON.Internals
 
 	static partial class CompatibleExtensions
 	{
-#if !NET_CORE && !NET_PCL
+#if !NET_STANDARD
 		internal static Type GetTypeInfo(this Type type) {
 			return type;
 		}
@@ -113,16 +113,17 @@ namespace NetJSON.Internals
 				   QuotSingleChar = '\'';
 		const int DefaultStringBuilderCapacity = 1024 * 2;
 
-		private static char[] _dateNegChars = new[] { '-' },
-			_datePosChars = new[] { '+' };
-		private static Regex //_dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled),
+	    private static readonly char[] _dateNegChars = { '-' };
+	    private static readonly char[] _datePosChars = { '+' };
+		private static readonly Regex //_dateRegex = new Regex(@"\\/Date\((?<ticks>-?\d+)\)\\/", RegexOptions.Compiled),
 			_dateISORegex = new Regex(@"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}.(\d){3}Z", RegexOptions.Compiled);
 
 		[ThreadStatic]
 		private static StringBuilder _cachedDateStringBuilder;
 
-		private static DateTime Epoch = new DateTime(1970, 1, 1),
-			UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
+	    private static DateTime _epoch = new DateTime(1970, 1, 1);
+
+	    private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
 
 		[ThreadStatic]
 		private static StringBuilder _cachedObjectStringBuilder;
@@ -138,12 +139,12 @@ namespace NetJSON.Internals
 		}
 
 
-		internal unsafe static string CreateString(string str, int startIndex, int length) {
+		internal static unsafe string CreateString(string str, int startIndex, int length) {
 			fixed (char* ptr = str)
 				return new string(ptr, startIndex, length);
 		}
 
-#if NET_CORE
+#if NET_STANDARD
         // Retrieved from https://github.com/dotnet/corefx/pull/10088
         private static readonly Func<Type, object> s_getUninitializedObjectDelegate = (Func<Type, object>)
  typeof(string).GetTypeInfo().Assembly.GetType("System.Runtime.Serialization.FormatterServices")
@@ -162,7 +163,7 @@ namespace NetJSON.Internals
 #endif
 
         internal static T GetUninitializedInstance<T>() {
-#if NET_CORE
+#if NET_STANDARD
             return (T)GetUninitializedObject(typeof(T));
 #else
 			return (T)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(T));
@@ -173,7 +174,7 @@ namespace NetJSON.Internals
 			return NetJSON.GetTypeIdentifierInstance(typeName);
 		}
 
-        internal unsafe static void ThrowIfInvalidJSON(string json, char chr)
+        internal static unsafe void ThrowIfInvalidJSON(string json, char chr)
         {
 #if NET_35
             if(json.IsNullOrWhiteSpace())
@@ -210,7 +211,7 @@ namespace NetJSON.Internals
             }
         }
 
-        internal unsafe static bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
+        internal static unsafe bool IsInRange(char* ptr, ref int index, int offset, string key, NetJSONSettings settings) {
 			var inRangeChr = *(ptr + index + offset + 2);
             fixed (char* kPtr = key)
             {
@@ -221,7 +222,7 @@ namespace NetJSON.Internals
             }
         }
 
-		internal unsafe static bool FastStringToBool(string value) {
+		internal static unsafe bool FastStringToBool(string value) {
 			return value[0] == 't';
 		}
 
@@ -252,7 +253,7 @@ namespace NetJSON.Internals
 			return StringToDate(value, settings, out offset, isDateTimeOffset: false);
 		}
 
-		internal unsafe static string ToCamelCase(string str) {
+		internal static unsafe string ToCamelCase(string str) {
 			fixed (char* p = str) {
 				char* buffer = stackalloc char[str.Length];
 				int c = 0;
@@ -335,7 +336,7 @@ namespace NetJSON.Internals
 		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
 
-            if (settings._hasDateStringFormat)
+            if (settings.HasDateStringFormat)
             {
                 return DateTime.ParseExact(value, settings.DateStringFormat, CultureInfo.CurrentCulture);
             }
@@ -646,7 +647,7 @@ namespace NetJSON.Internals
 			}
 		}
 
-		internal unsafe static string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
+		internal static unsafe string GetStringBasedValue(char* ptr, ref int index, NetJSONSettings settings) {
 			char current = '\0', prev = '\0';
 			int count = 0, startIndex = 0;
 			string value = string.Empty;
@@ -674,7 +675,7 @@ namespace NetJSON.Internals
 			return value;
 		}
 
-		internal unsafe static string GetNonStringValue(char* ptr, ref int index) {
+		internal static unsafe string GetNonStringValue(char* ptr, ref int index) {
 			char current = '\0';
 			int startIndex = -1;
 			string value = string.Empty;
@@ -720,7 +721,7 @@ namespace NetJSON.Internals
 			return value;
 		}
 
-		internal unsafe static int MoveToArrayBlock(char* str, ref int index) {
+		internal static unsafe int MoveToArrayBlock(char* str, ref int index) {
 			char* ptr = str + index;
 
 			if (*ptr == '[')
@@ -752,12 +753,12 @@ namespace NetJSON.Internals
 
 		internal static bool CustomTypeEquality(Type type1, Type type2) {
 			if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 				.IsEnum) {
 				if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 					.IsEnum && type2 == typeof(Enum))
@@ -776,7 +777,7 @@ namespace NetJSON.Internals
 			return chr.ToString();
 		}
 
-		internal unsafe static string IntToStr(int snum) {
+		internal static unsafe string IntToStr(int snum) {
 			char* s = stackalloc char[12];
 			char* ps = s;
 			int num1 = snum, num2, num3, div;
@@ -834,7 +835,7 @@ namespace NetJSON.Internals
 			return new string(s);
 		}
 
-		internal unsafe static string LongToStr(long snum) {
+		internal static unsafe string LongToStr(long snum) {
 			char* s = stackalloc char[21];
 			char* ps = s;
 			long num1 = snum, num2, num3, num4, num5, div;
@@ -938,7 +939,7 @@ namespace NetJSON.Internals
 
 		internal static string AllDateToString(DateTime date, NetJSONSettings settings) {
 			var offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(date);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(date);
@@ -986,7 +987,7 @@ namespace NetJSON.Internals
 
         private static string DateToStringWithOffset(DateTime date, NetJSONSettings settings, TimeSpan offset) {
 			return 
-                settings._hasDateStringFormat ? date.ToString(settings._dateStringFormat) :
+                settings.HasDateStringFormat ? date.ToString(settings._dateStringFormat) :
                 settings.DateFormat == NetJSONDateFormat.Default ? DateToString(date, settings, offset) :
 				settings.DateFormat == NetJSONDateFormat.EpochTime ? DateToEpochTime(date) :
 				DateToISOFormat(date, settings, offset);
@@ -1038,7 +1039,7 @@ namespace NetJSON.Internals
 
 			if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
 				offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);

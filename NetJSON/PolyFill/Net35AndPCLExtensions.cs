@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
-
+﻿#if NET_35
 namespace NetJSON
 {
-	public class ConcurrentDictionary<K, V> : Dictionary<K, V>
+    using System;
+    using System.Collections.Generic;
+    using System.Reflection;
+    using System.Text;
+    
+    public class ConcurrentDictionary<K, V> : Dictionary<K, V>
 	{
 		public V GetOrAdd(K key, Func<K, V> func) {
 			V value = default(V);
@@ -57,3 +57,4 @@ namespace NetJSON
 		}
 	}
 }
+#endif
