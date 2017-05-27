@@ -3,12 +3,9 @@ using System.Collections;
 
 #if !NET_35
 using System.Collections.Concurrent;
-#endif
-using System.Collections.Generic;
-
-#if !NET_35
 using System.Dynamic;
 #endif
+using System.Collections.Generic;
 
 using System.Globalization;
 using System.IO;
@@ -18,13 +15,13 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Security;
 
-#if !(NET_PCL || NET_CORE)
+#if !NET_STANDARD
 using System.Security.Permissions;
 #endif
 using System.Text;
 
 
-#if NET_CORE
+#if NET_STANDARD
 using Microsoft.Extensions.DependencyModel;
 #endif
 
@@ -32,7 +29,7 @@ using NetJSON.Internals;
 
 namespace NetJSON {
 
-    public static partial class NetJSON {
+    public static class NetJSON {
 
         sealed class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
         {
@@ -46,28 +43,16 @@ namespace NetJSON {
 			readonly Action<T, TextWriter, NetJSONSettings> _SerializeTextWriterWithSettings;
 
             private Type _objType;
-            public Type ObjType
-            {
-                get
-                {
-                    return _objType ?? (_objType = typeof(T));
-                }
-            }
+            public Type ObjType => _objType ?? (_objType = typeof(T));
 
-            public bool IsPrimitive
-            {
-                get
-                {
-                    return ObjType.IsPrimitiveType();
-                }
-            }
+            public bool IsPrimitive => ObjType.IsPrimitiveType();
 
             private Module ManifestModule
             {
                 get
                 {
                     return
-#if NET_CORE
+#if NET_STANDARD
     ObjType.GetTypeInfo().Assembly.ManifestModule
 #else
     Assembly.GetExecutingAssembly().ManifestModule
@@ -86,7 +71,8 @@ namespace NetJSON {
 				_SerializeTextWriterWithSettings = CreateSerializerWithTextWriterSettings();
 				_SerializeWithSettings = CreateSerializerWithSettings();
 			}
-			Func<TextReader, T> CreateDeserializerWithTextReader() {
+
+            private Func<TextReader, T> CreateDeserializerWithTextReader() {
 				var meth = new DynamicMethod("DeserializeValueTextReader", ObjType, new[] { _textReaderType }, ManifestModule, true);
 
 				var rdil = meth.GetILGenerator();
@@ -101,7 +87,8 @@ namespace NetJSON {
 
 				return meth.CreateDelegate(typeof(Func<TextReader, T>)) as Func<TextReader, T>;
 			}
-			Func<string, T> CreateDeserializer() {
+
+            private Func<string, T> CreateDeserializer() {
                 var meth = new DynamicMethod("DeserializeValue", ObjType, new[] { _stringType }, ManifestModule, true);
 
                 var dil = meth.GetILGenerator();
@@ -115,7 +102,8 @@ namespace NetJSON {
 
                 return meth.CreateDelegate(typeof(Func<string, T>)) as Func<string, T>;
 			}
-			Func<TextReader, NetJSONSettings, T> CreateDeserializerWithTextReaderSettings() {
+
+            private Func<TextReader, NetJSONSettings, T> CreateDeserializerWithTextReaderSettings() {
                 var meth = new DynamicMethod("DeserializeValueTextReaderSettings", ObjType, new[] { _textReaderType, _settingsType }, ManifestModule, true);
 
                 var rdilWithSettings = meth.GetILGenerator();
@@ -130,7 +118,8 @@ namespace NetJSON {
 
                 return meth.CreateDelegate(typeof(Func<TextReader, NetJSONSettings, T>)) as Func<TextReader, NetJSONSettings, T>;
 			}
-			Func<string, NetJSONSettings, T> CreateDeserializerWithSettings() {
+
+            private Func<string, NetJSONSettings, T> CreateDeserializerWithSettings() {
                 var meth = new DynamicMethod("DeserializeValueSettings", ObjType, new[] { _stringType, _settingsType }, ManifestModule, true);
 
                 var dilWithSettings = meth.GetILGenerator();
@@ -145,7 +134,8 @@ namespace NetJSON {
                 return meth.CreateDelegate(typeof(Func<string, NetJSONSettings, T>)) as Func<string, NetJSONSettings, T>;
 
 			}
-			Func<T, string> CreateSerializer() {
+
+            private Func<T, string> CreateSerializer() {
                 var meth = new DynamicMethod("SerializeValue", _stringType, new[] { ObjType }, ManifestModule, true);
 
                 var il = meth.GetILGenerator();
@@ -171,7 +161,8 @@ namespace NetJSON {
                 return meth.CreateDelegate(typeof(Func<T, string>)) as Func<T, string>;
 
 			}
-			Func<T, NetJSONSettings, string> CreateSerializerWithSettings() {
+
+            private Func<T, NetJSONSettings, string> CreateSerializerWithSettings() {
                 var meth = new DynamicMethod("SerializeValueSettings", _stringType, new[] { ObjType, _settingsType }, ManifestModule, true);
 
 
@@ -204,7 +195,8 @@ namespace NetJSON {
 
                 return meth.CreateDelegate(typeof(Func<T, NetJSONSettings, string>)) as Func<T, NetJSONSettings, string>;
 			}
-			Action<T, TextWriter> CreateSerializerWithTextWriter() {
+
+            private Action<T, TextWriter> CreateSerializerWithTextWriter() {
                 var meth = new DynamicMethod("SerializeValueTextWriter", _voidType, new[] { typeof(T), _textWriterType }, ManifestModule, true);
 
 
@@ -231,11 +223,11 @@ namespace NetJSON {
                 return meth.CreateDelegate(typeof(Action<T, TextWriter>)) as Action<T, TextWriter>;
 
 			}
-			Action<T, TextWriter, NetJSONSettings> CreateSerializerWithTextWriterSettings() {
+
+			private Action<T, TextWriter, NetJSONSettings> CreateSerializerWithTextWriterSettings() {
                 var meth = new DynamicMethod("SerializeValueTextWriterSettings", _voidType, new[] { ObjType, _textWriterType, _settingsType }, ManifestModule, true);
 
-
-				var wilWithSettings = meth.GetILGenerator();
+                var wilWithSettings = meth.GetILGenerator();
 
                 var writeMethod = WriteSerializeMethodFor(null, ObjType, needQuote: !IsPrimitive || ObjType == _stringType);
                     
@@ -262,6 +254,7 @@ namespace NetJSON {
 
                 return meth.CreateDelegate(typeof(Action<T, TextWriter, NetJSONSettings>)) as Action<T, TextWriter, NetJSONSettings>;
 			}
+
 			public override T Deserialize(TextReader reader)
             {
                 return _DeserializeTextReader(reader);
@@ -340,14 +333,14 @@ namespace NetJSON {
 
         const int BUFFER_SIZE_DIFF = BUFFER_SIZE - 2;
 
-        const TypeAttributes TypeAttribute =
+        private const TypeAttributes TypeAttribute =
            TypeAttributes.Public | TypeAttributes.Serializable | TypeAttributes.Sealed;
 
-        const BindingFlags PropertyBinding = BindingFlags.Instance | BindingFlags.Public;
+        private const BindingFlags PropertyBinding = BindingFlags.Instance | BindingFlags.Public;
 
         const BindingFlags MethodBinding = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
 
-        const MethodAttributes MethodAttribute =
+        private const MethodAttributes MethodAttribute =
             MethodAttributes.Public
             | MethodAttributes.Virtual
             | MethodAttributes.Final
@@ -355,7 +348,7 @@ namespace NetJSON {
             | MethodAttributes.NewSlot
             | MethodAttributes.SpecialName;
 
-        const MethodAttributes StaticMethodAttribute =
+        private const MethodAttributes StaticMethodAttribute =
             MethodAttributes.Public
             | MethodAttributes.Static
             | MethodAttributes.HideBySig
@@ -509,8 +502,8 @@ namespace NetJSON {
             _settingsCaseComparison = _settingsType.GetField("_caseComparison", MethodBinding),
             _settingQuoteCharString = _settingsType.GetField("_quoteCharString", MethodBinding);
 
-        const int Delimeter = (int)',', ColonChr = (int)':',
-            ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
+        const int Delimeter = ',', ColonChr = ':',
+            ArrayOpen = '[', ArrayClose = ']', ObjectOpen = '{', ObjectClose = '}';
 
         const string IsoFormat = "{0:yyyy-MM-ddTHH:mm:ss.fffZ}",
              TypeIdentifier = "$type",
@@ -559,9 +552,9 @@ namespace NetJSON {
                         {_objectType, null}
                     };
 
-
-        static ConcurrentDictionary<Type, Type> _types =
+        static ConcurrentDictionary<Type, Type> _types = 
             new ConcurrentDictionary<Type, Type>();
+
         static ConcurrentDictionary<string, MethodInfo> _writeMethodBuilders =
             new ConcurrentDictionary<string, MethodInfo>();
 
@@ -605,8 +598,6 @@ namespace NetJSON {
 
         static ConcurrentDictionary<string, string> _fixes =
             new ConcurrentDictionary<string, string>();
-
-        private static object _lockObject = new object();
 
         private static unsafe void memcpy(char* dmem, char* smem, int charCount) {
             if ((((int)dmem) & 2) != 0) {
@@ -812,15 +803,13 @@ namespace NetJSON {
             }
         }
 
-        private static bool _generateAssembly = false;
+        private static bool _generateAssembly;
         [Obsolete("Use NetJSONSettings.GenerateAssembly")]
         public static bool GenerateAssembly {
-            set {
-                _generateAssembly = value;
-            }
+            set => _generateAssembly = value;
         }
 
-        private static bool _includeTypeInformation = false;
+        private static bool _includeTypeInformation;
         public static bool IncludeTypeInformation {
             set {
                 _includeTypeInformation = value;
@@ -830,13 +819,12 @@ namespace NetJSON {
             }
         }
 
-
         internal static object GetTypeIdentifierInstance(string typeName) {
             return _typeIdentifierFuncs.GetOrAdd(typeName, _ => {
                 lock (GetDictLockObject("GetTypeIdentifier")) {
                     var type = Type.GetType(typeName, throwOnError: false);
                     if (type == null)
-                        throw new InvalidOperationException(string.Format("Unable to resolve {0} with value = {1}", TypeIdentifier, typeName));
+                        throw new InvalidOperationException($"Unable to resolve {TypeIdentifier} with value = {typeName}");
 
                     var ctor = type.GetConstructor(Type.EmptyTypes);
 
@@ -1029,7 +1017,7 @@ namespace NetJSON {
 
             foreach (var type in types) {
                 GenerateTypeBuilder(type, module)
-#if NET_CORE
+#if NET_STANDARD
     .CreateTypeInfo().AsType();
 #else
                     .CreateType();
@@ -1037,7 +1025,7 @@ namespace NetJSON {
 
             }
 
-#if !NET_CORE
+#if !NET_STANDARD
             assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
         }
@@ -1057,7 +1045,7 @@ namespace NetJSON {
             var type = GenerateTypeBuilder(objType, module);
 
             returnType = type
-#if NET_CORE
+#if NET_STANDARD
     .CreateTypeInfo().AsType();
 #else
     .CreateType();
@@ -1065,7 +1053,7 @@ namespace NetJSON {
                 
             _types[objType] = returnType;
 
-#if !NET_CORE
+#if !NET_STANDARD
             if (_generateAssembly)
                 assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
@@ -1272,7 +1260,7 @@ namespace NetJSON {
             return _module;
         }
 
-        private readonly static object _lockAsmObject = new object();
+        private static readonly object _lockAsmObject = new object();
         private static AssemblyBuilder _assembly = null;
         private static ModuleBuilder _module = null;
         internal const string NET_JSON_GENERATED_ASSEMBLY_NAME = "NetJSONGeneratedAssembly";
@@ -1282,7 +1270,7 @@ namespace NetJSON {
                 lock (_lockAsmObject) {
                     if (_assembly == null) {
                         _assembly =
-#if NET_CORE
+#if NET_STANDARD
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1291,7 +1279,7 @@ namespace NetJSON {
                             new AssemblyName(NET_JSON_GENERATED_ASSEMBLY_NAME) {
                                 Version = new Version(1, 0, 0, 0)
                             },
-#if NET_CORE
+#if NET_STANDARD
                             AssemblyBuilderAccess.Run
 #else
                             AssemblyBuilderAccess.RunAndSave
@@ -1310,7 +1298,7 @@ namespace NetJSON {
                 },
                             new object[] { true }));
 
-#if !NET_CORE
+#if !NET_STANDARD
                         //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
                         _assembly.SetCustomAttribute(new CustomAttributeBuilder(
                             typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
@@ -1334,7 +1322,7 @@ namespace NetJSON {
 
         private static AssemblyBuilder GenerateAssemblyBuilderNoShare(string asmName) {
             var assembly =
-#if NET_CORE
+#if NET_STANDARD
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1343,7 +1331,7 @@ namespace NetJSON {
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
                 },
-#if !NET_CORE
+#if !NET_STANDARD
                 AssemblyBuilderAccess.RunAndSave
 #else
                 AssemblyBuilderAccess.Run
@@ -1362,7 +1350,7 @@ namespace NetJSON {
                 },
                 new object[] { true }));
 
-#if !NET_CORE
+#if !NET_STANDARD
             //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
             assembly.SetCustomAttribute(new CustomAttributeBuilder(
                 typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
@@ -1799,7 +1787,7 @@ namespace NetJSON {
         {
             if (builder == null)
                 return new DynamicMethod(methodName, returnType, parameterTypes,
-#if NET_CORE
+#if NET_STANDARD
                     Assembly.GetEntryAssembly().ManifestModule
 #else
                     Assembly.GetExecutingAssembly().ManifestModule
@@ -2403,7 +2391,7 @@ namespace NetJSON {
                     //Expense call to auto-magically figure all subclass of current type
                     if (types == null) {
                         types = new List<Type>();
-#if NET_CORE
+#if NET_STANDARD
     var assemblies = DependencyContext.Default.GetDefaultAssemblyNames().Select(x => Assembly.Load(x));
 #else
     var assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -2412,7 +2400,7 @@ namespace NetJSON {
                             try {
                                 types.AddRange(asm.GetTypes().Where(x => x.GetTypeInfo().IsSubclassOf(type)));
                             } catch (ReflectionTypeLoadException ex) {
-                                var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.GetTypeInfo().IsSubclassOf(type)) : null;
+                                var exTypes = ex.Types?.Where(x => x != null && x.GetTypeInfo().IsSubclassOf(type));
                                 if (exTypes != null)
                                     types.AddRange(exTypes);
                             }
@@ -2458,11 +2446,12 @@ namespace NetJSON {
                 if (baseType == _objectType) {
                     baseType = type.GetTypeInfo().GetInterface(IEnumerableStr);
                     if (baseType == null) {
-                        throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
+                        throw new InvalidOperationException(
+                            $"Type {type.FullName} must be a validate dictionary type such as IDictionary<Key,Value>");
                     }
                 }
                 if (baseType.Name != IEnumerableStr && !baseType.IsDictionaryType())
-                    throw new InvalidOperationException(String.Format("Type {0} must be a validate dictionary type such as IDictionary<Key,Value>", type.FullName));
+                    throw new InvalidOperationException($"Type {type.FullName} must be a validate dictionary type such as IDictionary<Key,Value>");
                 arguments = baseType.GetGenericArguments();
                 keyType = arguments[0];
                 valueType = arguments.Length > 1 ? arguments[1] : null;
@@ -3209,7 +3198,7 @@ namespace NetJSON {
                 throw new InvalidOperationException("serializeFunc cannot be null");
 
             var method =
-#if !NET_CORE
+#if !NET_STANDARD
                 serializeFunc.Method
 #else
                 serializeFunc.GetMethodInfo()
@@ -3286,7 +3275,7 @@ namespace NetJSON {
         }
 
         /// <summary>
-        /// Deserialize json to <typeparamref name="T"/> using specified settings
+        /// De-serialize JSON to <typeparamref name="T"/> using specified settings
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="json"></param>
@@ -3297,7 +3286,7 @@ namespace NetJSON {
         }
 
         /// <summary>
-        /// Deserialize content of reader to <typeparamref name="T"/> using specified settings
+        /// De-serialize content of reader to <typeparamref name="T"/> using specified settings
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="reader"></param>
@@ -3308,7 +3297,7 @@ namespace NetJSON {
         }
 
         /// <summary>
-        /// Deserialize json into Dictionary[string, object]
+        /// De-serialize JSON into Dictionary[string, object]
         /// </summary>
         /// <param name="json"></param>
         /// <returns></returns>
@@ -3316,7 +3305,7 @@ namespace NetJSON {
             return GetSerializer<object>().Deserialize(json);
         }
 
-        private unsafe static void MoveToNextKey(char* str, ref int index) {
+        private static unsafe void MoveToNextKey(char* str, ref int index) {
             var current = *(str + index);
             while (current != ':') {
                 index++;

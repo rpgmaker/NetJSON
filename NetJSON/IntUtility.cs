@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-
-namespace NetJSON {
-    internal unsafe static class IntUtility {
+﻿namespace NetJSON {
+    using System;
+    using System.Runtime.InteropServices;
+    
+    internal static unsafe class IntUtility {
         const ulong ATOI_TAB_SZ = 10000UL;
         const ulong ATOI_TAB_SZ_LOG = 4UL;
 
-        static string[] digits_string = new string[]{
+        static readonly string[] digits_string = {
             "0000000100020003000400050006000700080009",
         "0010001100120013001400150016001700180019",
         "0020002100220023002400250026002700280029",
@@ -1012,9 +1009,9 @@ namespace NetJSON {
         "9990999199929993999499959996999799989999"
         };
 
-        static char* cstItoa = (char*)Marshal.StringToHGlobalUni(String.Join(string.Empty, digits_string)).ToPointer();
+        static readonly char* cstItoa = (char*)Marshal.StringToHGlobalUni(String.Join(string.Empty, digits_string)).ToPointer();
 
-        private static unsafe void memcpy(char* dmem, char* smem, int charCount) {
+        private static void memcpy(char* dmem, char* smem, int charCount) {
             if ((((int)dmem) & 2) != 0) {
                 dmem[0] = smem[0];
                 dmem++;

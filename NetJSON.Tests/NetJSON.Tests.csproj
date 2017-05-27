@@ -38,7 +38,6 @@
   <ItemGroup>
     <Reference Include="DeepEqual, Version=1.6.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DeepEqual.1.6.0.0\lib\net40\DeepEqual.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Runtime.Serialization" />
