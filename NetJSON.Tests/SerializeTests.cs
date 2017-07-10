@@ -1082,6 +1082,43 @@ namespace NetJSON.Tests {
             Assert.AreEqual(data.udtCreationDate.Minute, 28);
             Assert.AreEqual(data.udtCreationDate.Second, 53);
         }
+
+        [TestMethod]
+        public void TestEnumFlags()
+        {
+            var foob = new FooA
+            {
+                IntVal = 1,
+                EnumVal = TestFlags.A | TestFlags.B,
+                Type = 2
+            };
+
+            var settings = new NetJSONSettings { UseEnumString = true };
+            var json = NetJSON.Serialize((FooA)foob, settings);
+            var obj = NetJSON.Deserialize<FooA>(json, settings);
+
+            Assert.AreEqual(obj.EnumVal, foob.EnumVal);
+        }
+    }
+
+    [Flags]
+    public enum TestFlags
+    {
+        A = 1,
+        B = 2,
+        C = 4
+    }
+
+    public class FooA
+    {
+        public int Type
+        { get; set; }
+
+        public int IntVal
+        { get; set; }
+
+        public TestFlags EnumVal
+        { get; set; }
     }
 
     public class MicrosoftJavascriptSerializerTestData

@@ -950,6 +950,11 @@ namespace NetJSON.Internals
 			return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
 		}
 
+        internal static T FlagStringToEnum<T>(string value)
+        {
+            return (T)Enum.Parse(typeof(T), value);
+        }
+
         internal static string FlagEnumToString(object value, NetJSONSettings settings)
         {
             if ((int)value == 0)

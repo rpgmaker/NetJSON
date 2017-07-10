@@ -498,6 +498,7 @@ namespace NetJSON {
             _settingsSkipDefaultValue = _settingsType.GetProperty("SkipDefaultValue", MethodBinding).GetGetMethod(),
             _getUninitializedInstance = _internalJsonType.GetMethod("GetUninitializedInstance", MethodBinding),
             _flagEnumToString = _internalJsonType.GetMethod("FlagEnumToString", MethodBinding),
+            _flagStringToEnum = _internalJsonType.GetMethod("FlagStringToEnum", MethodBinding),
             _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
@@ -1552,10 +1553,15 @@ namespace NetJSON {
             var il = method.GetILGenerator();
 
             var values = Enum.GetValues(type).Cast<object>()
-               .Select(x => new {
-                   Value = x,
-                   Attr = type.GetTypeInfo().GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute
-               }).ToArray();
+                .Select(x => new {
+                    Value = x,
+                    Attr = type.GetTypeInfo().GetMember(x.ToString()).FirstOrDefault()
+                })
+                    .Select(x => new {
+                        Value = x.Value,
+                        Attr = x.Attr != null ?
+                    (x.Attr.GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute) : null
+                    }).ToArray();
             var keys = Enum.GetNames(type);
 
             for (var i = 0; i < values.Length; i++) {
@@ -1644,9 +1650,10 @@ namespace NetJSON {
 
                 il.MarkLabel(label2);
             }
+            
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, _flagStringToEnum.MakeGenericMethod(type));
 
-            //Return default enum if no match is found
-            LoadDefaultValueByType(il, eType);
             il.Emit(OpCodes.Ret);
 
             return method;
@@ -1748,7 +1755,9 @@ namespace NetJSON {
         private static void WriteEnumToStringForWithString(Type type, Type eType, ILGenerator il) {
             var values = Enum.GetValues(type).Cast<object>()
                 .Select(x => new { Value = x,
-                    Attr = type.GetTypeInfo().GetMember(x.ToString()).First().GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute }).ToArray();
+                    Attr = type.GetTypeInfo().GetMember(x.ToString()).FirstOrDefault() })
+                    .Select(x => new { Value = x.Value, Attr = x.Attr != null ? 
+                    (x.Attr.GetCustomAttributes(typeof(NetJSONPropertyAttribute), true).FirstOrDefault() as NetJSONPropertyAttribute) : null  }).ToArray();
             var names = Enum.GetNames(type);
 
             var count = values.Length;
