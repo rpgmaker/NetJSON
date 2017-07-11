@@ -6,8 +6,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace NetJSON.Tests {
     class E
@@ -17,6 +19,12 @@ namespace NetJSON.Tests {
 
     [TestClass]
     public class SerializeTests {
+
+        static SerializeTests()
+        {
+            NetJSON.CanSerialize = CanSerialize;
+        }
+
         public enum MyEnumTest {
             Test1, Test2
         }
@@ -1099,6 +1107,81 @@ namespace NetJSON.Tests {
 
             Assert.AreEqual(obj.EnumVal, foob.EnumVal);
         }
+
+        [TestMethod]
+        public void TestResultGettingEmptyValueWhenUsingSettings()
+        {
+            var data = new Result<CustomerResult>
+            {
+                Data = new CustomerResult { Address = "Test", Id = 1, Name = "Test Name" },
+                Limit = 100,
+                Offset = 1000,
+                TotalResults = 100000
+            };
+
+            var json = NetJSON.Serialize(data, new NetJSONSettings {  });
+
+            Assert.IsTrue(!string.IsNullOrWhiteSpace(json));
+        }
+
+        [TestMethod]
+        public void TestUsingAttributeOfXmlForName()
+        {
+            var data = new XmlTestClass { Name = "Value" };
+            var json = NetJSON.Serialize(data);
+
+            Assert.IsTrue(json.Contains("XmlName"));
+        }
+
+        [TestMethod]
+        public void TestUsingCustomIgnoreAttribute()
+        {
+            var data = new TestClassWithIgnoreAttr { ID = 100 };
+            var json = NetJSON.Serialize(data);
+
+            Assert.IsTrue(!json.Contains("ID"));
+        }
+
+        private static bool CanSerialize(MemberInfo memberInfo)
+        {
+            var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
+            if(attr != null)
+            {
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    public class TestClassWithIgnoreAttr
+    {
+        [TestIgnore]
+        public int ID { get; set; }
+    }
+
+    public class TestIgnoreAttribute : Attribute
+    {
+    }
+
+    public class XmlTestClass {
+        [XmlElement(ElementName = "XmlName")]
+        public string Name { get; set; }
+    }
+
+    public class CustomerResult
+    {
+        public string Name { get; set; }
+        public string Address { get; set; }
+        public int Id { get; set; }
+    }
+
+    public class Result<T>
+    {
+        public int Offset { get; set; }
+        public int Limit { get; set; }
+        public int TotalResults { get; set; }
+        public T Data { get; set; }
     }
 
     [Flags]

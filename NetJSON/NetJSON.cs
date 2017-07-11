@@ -22,6 +22,7 @@ using System.Security;
 using System.Security.Permissions;
 #endif
 using System.Text;
+using System.Xml.Serialization;
 
 
 #if NET_CORE
@@ -666,14 +667,68 @@ namespace NetJSON {
             });
         }
 
+        private static void LookupAttribute<T>(ref NetJSONPropertyAttribute attr, MemberInfo memberInfo, Func<T, string> func) where T : Attribute
+        {
+            if (attr != null)
+                return;
+            var memberAttr = memberInfo.GetCustomAttributes(typeof(T), true).OfType<T>().FirstOrDefault();
+            if (memberAttr == null)
+                return;
+            attr = new NetJSONPropertyAttribute(func(memberAttr));
+        }
+
+        private static NetJSONPropertyAttribute GetSerializeAs(MemberInfo memberInfo)
+        {
+            NetJSONPropertyAttribute attr = null;
+            if (SerializeAs != null)
+            {
+                var name = SerializeAs(memberInfo);
+                if (!string.IsNullOrEmpty(name))
+                {
+                    attr = new NetJSONPropertyAttribute(name);
+                }
+            }
+
+#if !NET_CORE
+            LookupAttribute<XmlAttributeAttribute>(ref attr, memberInfo, it => it.AttributeName);
+            LookupAttribute<XmlElementAttribute>(ref attr, memberInfo, it => it.ElementName);
+            LookupAttribute<XmlArrayAttribute>(ref attr, memberInfo, it => it.ElementName);
+#endif
+            return attr;
+        }
+
+        private static bool GetCanSerialize(MemberInfo memberInfo)
+        {
+            if(CanSerialize != null)
+            {
+                return CanSerialize(memberInfo);
+            }
+
+            return true;
+        }
+
         internal static NetJSONMemberInfo[] GetTypeProperties(this Type type) {
             return _typeProperties.GetOrAdd(type, key => {
                 lock (GetDictLockObject("GetTypeProperties")) {
                     var props = key.GetProperties(PropertyBinding)
-                        .Where(x => x.GetIndexParameters().Length == 0)
-                        .Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() });
+                        .Where(x => x.GetIndexParameters().Length == 0 && GetCanSerialize(x))
+                        .Select(x =>
+                        {
+                            var attr = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault();
+
+                            if (attr == null)
+                            {
+                                attr = GetSerializeAs(x);
+                            }
+
+                            return new NetJSONMemberInfo
+                            {
+                                Member = x,
+                                Attribute = attr
+                            };
+                        });
                     if (_includeFields) {
-                        props = props.Union(key.GetFields(PropertyBinding).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() }));
+                        props = props.Union(key.GetFields(PropertyBinding).Where(x => GetCanSerialize(x)).Select(x => new NetJSONMemberInfo { Member = x, Attribute = x.GetCustomAttributes(_netjsonPropertyType, true).OfType<NetJSONPropertyAttribute>().FirstOrDefault() ?? GetSerializeAs(x) }));
                     }
                     var result = props.ToArray();
 
@@ -684,7 +739,6 @@ namespace NetJSON {
                     if (result.Where(x => x.Attribute != null).Any(x => string.IsNullOrWhiteSpace(x.Attribute.Name) || x.Attribute.Name.Contains(" ")))
                         throw new NetJSONInvalidJSONPropertyException();
 #endif
-
                     return result;
                 }
             });
@@ -720,6 +774,16 @@ namespace NetJSON {
                 _useSharedAssembly = value;
             }
         }
+
+        /// <summary>
+        /// Delegate to override what member can get serialized
+        /// </summary>
+        public static Func<MemberInfo, bool> CanSerialize { private get; set; }
+
+        /// <summary>
+        /// Delegate to override what name to use for members when serialized
+        /// </summary>
+        public static Func<MemberInfo, string> SerializeAs { private get; set; }
 
         [Obsolete("Use NetJSONSettings.DateFormat")]
         public static NetJSONDateFormat DateFormat {
@@ -2967,7 +3031,7 @@ namespace NetJSON {
                         il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
                     }
 
-                    #region
+#region
 
                     //if (_skipDefaultValue) {
 
@@ -3012,7 +3076,7 @@ namespace NetJSON {
                     //    }
                     //}
 
-                    #endregion
+#endregion
 
                     //if (_skipDefaultValue) {
                     //    il.MarkLabel(propNullLabel);
@@ -4945,7 +5009,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Stloc, startIndex);
 
 
-            #region String Skipping Optimization
+#region String Skipping Optimization
             var skipOptimizeLabel = il.DefineLabel();
             var skipOptimizeLocal = il.DeclareLocal(_boolType);
 
@@ -4988,7 +5052,7 @@ namespace NetJSON {
             }
 
             il.MarkLabel(skipOptimizeLabel);
-            #endregion String Skipping Optimization
+#endregion String Skipping Optimization
 
             il.Emit(OpCodes.Br, currentQuotePrevNotLabel);
             il.MarkLabel(currentQuoteLabel);

@@ -218,6 +218,16 @@
             Flag to determine whether to store all generate serializer for types in a single assembly
             </summary>
         </member>
+        <member name="P:NetJSON.NetJSON.CanSerialize">
+            <summary>
+            Delegate to override what member can get serialized
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSON.SerializeAs">
+            <summary>
+            Delegate to override what name to use for members when serialized
+            </summary>
+        </member>
         <member name="M:NetJSON.NetJSON.Serialize(System.Type,System.Object)">
             <summary>
             Serialize value using the specified type
