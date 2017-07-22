@@ -236,6 +236,15 @@
             <param name="value"></param>
             <returns></returns>
         </member>
+        <member name="M:NetJSON.NetJSON.Serialize(System.Type,System.Object,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize value using the specified type and settings
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
         <member name="M:NetJSON.NetJSON.Serialize(System.Object)">
             <summary>
             Serialize value using the underlying type of specified value
@@ -249,6 +258,15 @@
             </summary>
             <param name="type"></param>
             <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize(System.Type,System.String,NetJSON.NetJSONSettings)">
+            <summary>
+            Deserialize json to specified type and settings
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <param name="settings"></param>
             <returns></returns>
         </member>
         <member name="M:NetJSON.NetJSON.RegisterTypeSerializer``1(System.Func{``0,System.String})">

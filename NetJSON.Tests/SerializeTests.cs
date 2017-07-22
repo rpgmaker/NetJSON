@@ -1142,6 +1142,30 @@ namespace NetJSON.Tests {
             Assert.IsTrue(!json.Contains("ID"));
         }
 
+        [TestMethod]
+        public void TestUsingTypeAndSettings()
+        {
+            var userType = typeof(User);
+            var settings = new NetJSONSettings { CamelCase = true, CaseSensitive = false };
+            User user = new User
+            {
+                FirstName = "John",
+                Id = 23,
+                LastName = "Doe",
+                Status = UserStatus.Suspended,
+                AccountType = AccountType.External
+            };
+
+            var json = NetJSON.Serialize(userType, user, settings);
+            var user2 = (User)NetJSON.Deserialize(userType, json, settings);
+
+            Assert.AreEqual(user2.FirstName, user.FirstName);
+            Assert.AreEqual(user2.Id, user.Id);
+            Assert.AreEqual(user2.LastName, user.LastName);
+            Assert.AreEqual(user2.Status, user.Status);
+            Assert.AreEqual(user2.AccountType, user.AccountType);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1152,6 +1176,30 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    internal abstract class PersonEx
+    {
+        public string LastName { get; set; }
+        public string FirstName { get; set; }
+        public int Id { get; set; }
+    }
+
+    internal sealed class User : PersonEx
+    {
+        public UserStatus Status { get; set; }
+
+        public AccountType AccountType { get; set; }
+    }
+
+    internal enum AccountType
+    {
+        Internal, External, Demo
+    }
+
+    internal enum UserStatus
+    {
+        Active, Inactive, Suspended, Pending
     }
 
     public class TestClassWithIgnoreAttr

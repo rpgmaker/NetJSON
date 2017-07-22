@@ -3182,11 +3182,20 @@ namespace NetJSON {
         delegate object DeserializeWithTypeDelegate(string value);
         delegate string SerializeWithTypeDelegate(object value);
 
+        delegate object DeserializeWithTypeSettingsDelegate(string value, NetJSONSettings settings);
+        delegate string SerializeWithTypeSettingsDelegate(object value, NetJSONSettings settings);
+
         static ConcurrentDictionary<string, DeserializeWithTypeDelegate> _deserializeWithTypes =
             new ConcurrentDictionary<string, DeserializeWithTypeDelegate>();
 
         static ConcurrentDictionary<Type, SerializeWithTypeDelegate> _serializeWithTypes =
             new ConcurrentDictionary<Type, SerializeWithTypeDelegate>();
+
+        static ConcurrentDictionary<Type, SerializeWithTypeSettingsDelegate> _serializeWithTypesSettings =
+            new ConcurrentDictionary<Type, SerializeWithTypeSettingsDelegate>();
+
+        static ConcurrentDictionary<string, DeserializeWithTypeSettingsDelegate> _deserializeWithTypesSettings =
+            new ConcurrentDictionary<string, DeserializeWithTypeSettingsDelegate>();
 
         static MethodInfo _getSerializerMethod = _jsonType.GetMethod("GetSerializer", BindingFlags.NonPublic | BindingFlags.Static);
         static Type _netJSONSerializerType = typeof(NetJSONSerializer<>);
@@ -3223,6 +3232,43 @@ namespace NetJSON {
                     return method.CreateDelegate(typeof(SerializeWithTypeDelegate)) as SerializeWithTypeDelegate;
                 }
             })(value);
+        }
+
+        /// <summary>
+        /// Serialize value using the specified type and settings
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="value"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public static string Serialize(Type type, object value, NetJSONSettings settings)
+        {
+            return _serializeWithTypesSettings.GetOrAdd(type, _ => {
+                lock (GetDictLockObject("SerializeTypeSetting", type.Name))
+                {
+                    var name = String.Concat(SerializeStr + "Settings", type.FullName);
+                    var method = new DynamicMethod(name, _stringType, new[] { _objectType, _settingsType }, restrictedSkipVisibility: true);
+
+                    var il = method.GetILGenerator();
+                    var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                    var genericType = _netJSONSerializerType.MakeGenericType(type);
+
+                    var genericSerialize = genericType.GetMethod(SerializeStr, new[] { type, _settingsType });
+
+                    il.Emit(OpCodes.Call, genericMethod);
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    if (type.GetTypeInfo().IsClass)
+                        il.Emit(OpCodes.Isinst, type);
+                    else il.Emit(OpCodes.Unbox_Any, type);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Callvirt, genericSerialize);
+
+                    il.Emit(OpCodes.Ret);
+
+                    return method.CreateDelegate(typeof(SerializeWithTypeSettingsDelegate)) as SerializeWithTypeSettingsDelegate;
+                }
+            })(value, settings);
         }
 
         /// <summary>
@@ -3268,6 +3314,47 @@ namespace NetJSON {
                     return method.CreateDelegate(typeof(DeserializeWithTypeDelegate)) as DeserializeWithTypeDelegate;
                 }
             })(value);
+        }
+
+        /// <summary>
+        /// Deserialize json to specified type and settings
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="value"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public static object Deserialize(Type type, string value, NetJSONSettings settings)
+        {
+            return _deserializeWithTypesSettings.GetOrAdd(type.FullName, _ => {
+                lock (GetDictLockObject("DeserializeTypeSettings", type.Name))
+                {
+                    var name = String.Concat(DeserializeStr + "Settings", type.FullName);
+                    var method = new DynamicMethod(name, _objectType, new[] { _stringType, _settingsType }, restrictedSkipVisibility: true);
+
+                    var il = method.GetILGenerator();
+                    var genericMethod = _getSerializerMethod.MakeGenericMethod(type);
+                    var genericType = _netJSONSerializerType.MakeGenericType(type);
+
+                    var genericDeserialize = genericType.GetMethod(DeserializeStr, new[] { _stringType, _settingsType });
+
+                    il.Emit(OpCodes.Call, genericMethod);
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Callvirt, genericDeserialize);
+
+                    if (type.GetTypeInfo().IsClass)
+                        il.Emit(OpCodes.Isinst, type);
+                    else
+                    {
+                        il.Emit(OpCodes.Box, type);
+                    }
+
+                    il.Emit(OpCodes.Ret);
+
+                    return method.CreateDelegate(typeof(DeserializeWithTypeSettingsDelegate)) as DeserializeWithTypeSettingsDelegate;
+                }
+            })(value, settings);
         }
 
         /// <summary>
