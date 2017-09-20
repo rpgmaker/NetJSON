@@ -1166,6 +1166,15 @@ namespace NetJSON.Tests {
             Assert.AreEqual(user2.AccountType, user.AccountType);
         }
 
+        [TestMethod]
+        public void TestDictionaryWithEncodedStringParsingWithDictionaryStringObject()
+        {
+            const string testJsonString = "{\"foo\":\"bar \\\"xyzzy\\\" \"}";
+            var deserialisedDictionary = (Dictionary<string, object>)NetJSON.Deserialize<object>(testJsonString);
+            var fooValue = (string)deserialisedDictionary["foo"];
+            Assert.AreEqual("bar \"xyzzy\" ", fooValue);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();

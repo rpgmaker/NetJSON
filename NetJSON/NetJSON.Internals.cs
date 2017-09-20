@@ -332,6 +332,23 @@ namespace NetJSON.Internals
 			return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
 		}
 
+        internal unsafe static object ToStringIfString(object value, NetJSONSettings settings)
+        {
+            var str = value as string;
+            if(str != null)
+            {
+                str = string.Concat('"', str, '"');
+                fixed(char* p = str)
+                {
+                    char* ptr = p;
+                    int index = 0;
+                    return NetJSON.DecodeJSONString(ptr, ref index, settings);
+                }
+            }
+
+            return value;
+        }
+
 		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
 

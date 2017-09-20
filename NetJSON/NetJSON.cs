@@ -440,6 +440,7 @@ namespace NetJSON {
             _getStringBasedValue = _internalJsonType.GetMethod("GetStringBasedValue", MethodBinding),
             _getNonStringValue = _internalJsonType.GetMethod("GetNonStringValue", MethodBinding),
             _isDateValue = _internalJsonType.GetMethod("IsValueDate", MethodBinding),
+            _toStringIfString = _internalJsonType.GetMethod("ToStringIfString", MethodBinding),
             _iDisposableDispose = typeof(IDisposable).GetMethod("Dispose"),
             _toExpectedType = typeof(AutomaticTypeConverter).GetMethod("ToExpectedType"),
             _fastStringToInt = _internalJsonType.GetMethod("FastStringToInt", MethodBinding),
@@ -1019,6 +1020,8 @@ namespace NetJSON {
                         if (objType == _stringType) {
                             il.Emit(OpCodes.Ldarg_1);
                             il.Emit(OpCodes.Ldarg_0);
+                            il.Emit(OpCodes.Ldarg_2);
+                            il.Emit(OpCodes.Call, _toStringIfString);
                             il.Emit(OpCodes.Castclass, _stringType);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
@@ -3486,7 +3489,6 @@ namespace NetJSON {
         }
 
         private static MethodInfo GenerateExtractObject(TypeBuilder type) {
-
             MethodInfo method;
             var key = "ExtractObjectValue";
             if (_readMethodBuilders.TryGetValue(key, out method))
@@ -3619,7 +3621,7 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldloc, valueLocal);
                 il.Emit(OpCodes.Call, _toExpectedType);
-
+                
                 il.Emit(OpCodes.Stloc, obj);
 
                 il.Emit(OpCodes.Leave, @return);
@@ -3629,6 +3631,8 @@ namespace NetJSON {
             returnAction: msil => {
                 il.MarkLabel(@return);
                 il.Emit(OpCodes.Ldloc, obj);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Call, _toStringIfString);
             });
 
             return method;
