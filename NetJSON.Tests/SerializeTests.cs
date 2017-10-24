@@ -1175,6 +1175,23 @@ namespace NetJSON.Tests {
             Assert.AreEqual("bar \"xyzzy\" ", fooValue);
         }
 
+        [TestMethod]
+        public void TestSerializeAbstractClass()
+        {
+            PersonAbstract p1 = new PersonX2 { Name = "Bob" };
+            var json = NetJSON.Serialize(p1);
+            Assert.IsTrue(!string.IsNullOrEmpty(json));
+        }
+
+        [TestMethod]
+        public void TestSerializeInterfaceType()
+        {
+            NetJSON.IncludeTypeInformation = true;
+            IPerson p1 = new PersonX { Name = "Bob" };
+            var json = NetJSON.Serialize(p1);
+            Assert.IsTrue(!string.IsNullOrEmpty(json));
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1847,5 +1864,25 @@ namespace NetJSON.Tests {
 
         [NetJSONProperty("Tracker_Facet")]
         public Guid Value { get; set; }
+    }
+
+    public interface IPerson
+    {
+        string Name { get; set; }
+    }
+
+    public abstract class PersonAbstract
+    {
+        public abstract string Name { get; set; }
+    }
+
+    public class PersonX : IPerson
+    {
+        public string Name { get; set; }
+    }
+
+    public class PersonX2 : PersonAbstract
+    {
+        public override string Name { get; set; }
     }
 }

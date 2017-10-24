@@ -2486,7 +2486,7 @@ namespace NetJSON {
 #endif
                         foreach (var asm in assemblies) {
                             try {
-                                types.AddRange(asm.GetTypes().Where(x => x.GetTypeInfo().IsSubclassOf(type)));
+                                types.AddRange(asm.GetTypes().Where(x => x.GetTypeInfo().IsSubclassOf(type) || x.GetTypeInfo().GetInterfaces().Any(i => i == type)));
                             } catch (ReflectionTypeLoadException ex) {
                                 var exTypes = ex.Types != null ? ex.Types.Where(x => x != null && x.GetTypeInfo().IsSubclassOf(type)) : null;
                                 if (exTypes != null)
@@ -2838,7 +2838,7 @@ namespace NetJSON {
             var props = type.GetTypeProperties();
             var count = props.Length - 1;
             var counter = 0;
-            var isClass = type.GetTypeInfo().IsClass;
+            var isClass = type.IsClass();
 
             il.Emit(OpCodes.Ldc_I4_0);
             il.Emit(OpCodes.Stloc, hasValue);
@@ -3224,7 +3224,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Call, genericMethod);
 
                     il.Emit(OpCodes.Ldarg_0);
-                    if (type.GetTypeInfo().IsClass)
+                    if (type.IsClass())
                         il.Emit(OpCodes.Isinst, type);
                     else il.Emit(OpCodes.Unbox_Any, type);
 
@@ -3261,7 +3261,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Call, genericMethod);
 
                     il.Emit(OpCodes.Ldarg_0);
-                    if (type.GetTypeInfo().IsClass)
+                    if (type.IsClass())
                         il.Emit(OpCodes.Isinst, type);
                     else il.Emit(OpCodes.Unbox_Any, type);
                     il.Emit(OpCodes.Ldarg_1);
@@ -3306,7 +3306,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Callvirt, genericDeserialize);
 
-                    if (type.GetTypeInfo().IsClass)
+                    if (type.IsClass())
                         il.Emit(OpCodes.Isinst, type);
                     else {
                         il.Emit(OpCodes.Box, type);
@@ -3346,7 +3346,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldarg_1);
                     il.Emit(OpCodes.Callvirt, genericDeserialize);
 
-                    if (type.GetTypeInfo().IsClass)
+                    if (type.IsClass())
                         il.Emit(OpCodes.Isinst, type);
                     else
                     {
@@ -4650,8 +4650,14 @@ namespace NetJSON {
                 } else {
                     var ctor = type.GetConstructor(Type.EmptyTypes);
                     if (ctor == null) {
-                        selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
-                        il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                        if (type.GetTypeInfo().IsInterface)
+                        {
+                            il.Emit(OpCodes.Ldnull);
+                        }
+                        else {
+                            selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
+                            il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                        }
                     } else
                         il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
                     il.Emit(OpCodes.Stloc, obj);

@@ -106,6 +106,12 @@ namespace NetJSON.Internals
 			il.Emit(OpCodes.Call, typeof(StringBuilder35Extension).GetMethod("Clear"));
 #endif
 		}
+
+        internal static bool IsClass(this Type type)
+        {
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsClass || typeInfo.IsInterface;
+        }
 	}
 	internal static class SerializerUtilities
 	{

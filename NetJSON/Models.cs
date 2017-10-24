@@ -163,7 +163,7 @@ namespace NetJSON
 	/// <summary>
 	/// Attribute for configuration of Class that requires type information for serialization and deserialization
 	/// </summary>
-	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct, AllowMultiple = true)]
 	public sealed class NetJSONKnownTypeAttribute : Attribute
 	{
 		/// <summary>
