@@ -4248,7 +4248,7 @@ namespace NetJSON {
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
             var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
-            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr);
+            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
             

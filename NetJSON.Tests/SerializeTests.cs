@@ -1236,7 +1236,7 @@ namespace NetJSON.Tests {
 
         public bool success { get; set; }
         public string message { get; set; }
-        public IList<CoinResults> result { get; set; }
+        public ICollection<CoinResults> result { get; set; }
     }
 
     internal abstract class PersonEx
