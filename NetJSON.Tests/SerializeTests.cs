@@ -1202,6 +1202,22 @@ namespace NetJSON.Tests {
             Assert.IsTrue(result.result.Count > 0);
         }
 
+        [TestMethod]
+        public void TestDeserializeValueWithDoubleQuotes()
+        {
+            var settings = new NetJSONSettings
+            {
+                CaseSensitive = false
+            };
+
+            // Actual string { Val : "\"sampleValue\""} before escape characters
+            var stringToDeserialize = "{ \"Val\" : \"\\\"sampleValue\\\"\"}";
+            
+            var result = NetJSON.Deserialize<Test>(stringToDeserialize, settings);
+            Assert.IsNotNull(result);
+            Assert.IsNotNull(result.Val);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1213,6 +1229,12 @@ namespace NetJSON.Tests {
             return true;
         }
     }
+
+    public class Test
+    {
+        public string Val { get; set; }
+    }
+
 
     public class API_ImportResult
     {

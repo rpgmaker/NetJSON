@@ -3725,24 +3725,28 @@ namespace NetJSON {
                 current = ptr[index];
 
                 if (hasQuote) {
-                    if (current == settings._quoteChar) {
-                        if (prev != '\\')
+                    if (current == settings._quoteChar)
+                    {
+                        next = ptr[index + 1];
+                        if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
                         {
-                            next = ptr[index + 1];
-                            if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
-                            {
-                                throw new NetJSONInvalidJSONException();
-                            }
-
-                            ++index;
-                            break;
+                            throw new NetJSONInvalidJSONException();
                         }
-                    } else {
-                        if (current != '\\') {
+
+                        ++index;
+                        break;
+                    }
+                    else
+                    {
+                        if (current != '\\')
+                        {
                             sb.Append(current);
-                        } else {
+                        }
+                        else
+                        {
                             next = ptr[++index];
-                            switch (next) {
+                            switch (next)
+                            {
                                 case 'r': sb.Append('\r'); break;
                                 case 'n': sb.Append('\n'); break;
                                 case 't': sb.Append('\t'); break;
@@ -4693,6 +4697,10 @@ namespace NetJSON {
 
             ILFixedWhile(il, whileAction: (msil, current, ptr, startLoop, bLabel) => {
 
+                //il.Emit(OpCodes.Ldloc, current);
+                //il.Emit(OpCodes.Ldc_I4, (int)' ');
+                //il.Emit(OpCodes.Beq, countLabel);
+
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Stloc, isTag);
 
@@ -5177,6 +5185,8 @@ namespace NetJSON {
             il.Emit(OpCodes.Newobj, _strCtorWithPtr);
             //il.Emit(OpCodes.Call, _createString);
             il.Emit(OpCodes.Stloc, keyLocal);
+
+            il.EmitWriteLine(keyLocal);
 
             //il.EmitWriteLine(String.Format("{0}", type));
             //il.EmitWriteLine(keyLocal);

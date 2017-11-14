@@ -39,3 +39,4 @@ using System.Security;
 [assembly: SecurityRules(SecurityRuleSet.Level2, SkipVerificationInFullTrust = true)]
 #endif
 [assembly: InternalsVisibleTo(NetJSON.NetJSON.NET_JSON_GENERATED_ASSEMBLY_NAME)]
+[assembly: InternalsVisibleTo("NetJSON.Tests")]
