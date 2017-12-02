@@ -106,6 +106,12 @@ namespace NetJSON.Internals
 			il.Emit(OpCodes.Call, typeof(StringBuilder35Extension).GetMethod("Clear"));
 #endif
 		}
+
+        internal static bool IsClass(this Type type)
+        {
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsClass || typeInfo.IsInterface;
+        }
 	}
 	internal static class SerializerUtilities
 	{
@@ -332,6 +338,23 @@ namespace NetJSON.Internals
 			return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
 		}
 
+        internal unsafe static object ToStringIfString(object value, NetJSONSettings settings)
+        {
+            var str = value as string;
+            if(str != null)
+            {
+                str = string.Concat('"', str, '"');
+                fixed(char* p = str)
+                {
+                    char* ptr = p;
+                    int index = 0;
+                    return NetJSON.DecodeJSONString(ptr, ref index, settings);
+                }
+            }
+
+            return value;
+        }
+
 		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
 
@@ -366,9 +389,11 @@ namespace NetJSON.Internals
 				dateText = tokens[0];
 
 				var ticks = FastStringToLong(dateText);
+                var multiply = settings.DateFormat == NetJSONDateFormat.JavascriptSerializer ? TimeSpan.TicksPerMillisecond : 1;
 
 				dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-				dt = dt.AddTicks(ticks);
+
+				dt = dt.AddTicks(ticks * multiply);
 
 				if (timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || timeZoneFormat == NetJSONTimeZoneFormat.Utc)
 					dt = dt.ToLocalTime();
@@ -947,6 +972,11 @@ namespace NetJSON.Internals
 		internal static string AllDateOffsetToString(DateTimeOffset offset, NetJSONSettings settings) {
 			return DateToStringWithOffset(offset.DateTime, settings, offset.Offset);
 		}
+
+        internal static T FlagStringToEnum<T>(string value)
+        {
+            return (T)Enum.Parse(typeof(T), value);
+        }
 
         internal static string FlagEnumToString(object value, NetJSONSettings settings)
         {

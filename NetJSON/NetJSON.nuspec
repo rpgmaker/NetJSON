@@ -4,11 +4,14 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.1.9</version> 
+    <version>1.2.1.10</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Fixed issue with deserialization when char is used with a complex object
+      Fixed issue with deserialization of enum using flags
+      Added support for specifying customization delegate that allows developer to specify custom name 
+        and determine when serialization occurs for a given property/field using NetJSON.SerializeAs and NetJSON.CanSerialize
+      Added support for retrieving names of fields/properties using XmlAttribute and XmlElement
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>

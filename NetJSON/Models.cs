@@ -163,7 +163,7 @@ namespace NetJSON
 	/// <summary>
 	/// Attribute for configuration of Class that requires type information for serialization and deserialization
 	/// </summary>
-	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct, AllowMultiple = true)]
 	public sealed class NetJSONKnownTypeAttribute : Attribute
 	{
 		/// <summary>
@@ -250,7 +250,11 @@ namespace NetJSON
 		/// <summary>
 		/// JSON.NET Format for backward compatibility
 		/// </summary>
-		JsonNetISO = 6
+		JsonNetISO = 6,
+        /// <summary>
+        /// .NET System.Web.Script.Serialization.JavaScriptSerializer backward compatibility
+        /// </summary>
+        JavascriptSerializer = 8
 	}
 
 
