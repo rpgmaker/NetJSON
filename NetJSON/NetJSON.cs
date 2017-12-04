@@ -5186,11 +5186,6 @@ namespace NetJSON {
             //il.Emit(OpCodes.Call, _createString);
             il.Emit(OpCodes.Stloc, keyLocal);
 
-            il.EmitWriteLine(keyLocal);
-
-            //il.EmitWriteLine(String.Format("{0}", type));
-            //il.EmitWriteLine(keyLocal);
-
             //index++
             IncrementIndexRef(il);
 
