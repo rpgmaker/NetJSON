@@ -3769,14 +3769,17 @@ namespace NetJSON {
                                     const int offset = 0x10000;
                                     var str = new string(ptr, index + 1, 4);
                                     var uu = Int32.Parse(str, NumberStyles.HexNumber);
-                                    var u = uu < offset ? new string((char)uu, 1) :
-                                        new string(
-                                            new char[]{
-                                                (char)(((uu - offset) >> 10) + 0xD800),
-                                                (char)((uu - offset) % 0x0400 + 0xDC00)
-                                            }
-                                        );
-                                    sb.Append(u);
+                                    
+                                    if(uu < offset)
+                                    {
+                                        sb.Append((char)uu);
+                                    }
+                                    else
+                                    {
+                                        sb.Append((char)(((uu - offset) >> 10) + 0xD800))
+                                            .Append((char)((uu - offset) % 0x0400 + 0xDC00));
+                                    }
+
                                     index += 4;
                                     break;
                                 default:
