@@ -348,7 +348,7 @@ namespace NetJSON.Internals
                 {
                     char* ptr = p;
                     int index = 0;
-                    return NetJSON.DecodeJSONString(ptr, ref index, settings);
+                    return NetJSON.DecodeJSONString(ptr, ref index, settings, fromObject: true);
                 }
             }
 

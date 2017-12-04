@@ -3716,16 +3716,27 @@ namespace NetJSON {
         [ThreadStatic]
         static StringBuilder _decodeJSONStringBuilder;
 
-        internal unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
+        internal unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings, bool fromObject = false) {
             char current = '\0', next = '\0', prev = '\0';
             bool hasQuote = false;
+            bool isJustString = index == 0 && !fromObject;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
+
+            // Don't process null string
+            if((IntPtr)ptr == IntPtr.Zero)
+            {
+                return null;
+            }
 
             while (true) {
                 current = ptr[index];
+                if(current == '\0')
+                {
+                    break;
+                }
 
-                if (hasQuote) {
-                    if (current == settings._quoteChar)
+                if (isJustString || hasQuote) {
+                    if (!isJustString && current == settings._quoteChar)
                     {
                         next = ptr[index + 1];
                         if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
@@ -3844,8 +3855,9 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Ldarg_2);      
                 if (type == _stringType) {
+                    il.Emit(OpCodes.Ldc_I4_0);
                     il.Emit(OpCodes.Call, _decodeJSONString);
                 } else {
                     il.Emit(OpCodes.Call, _getStringBasedValue);
@@ -4487,6 +4499,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg_2);
             if (isStringType) {
+                il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Call, _decodeJSONString);
             } else {
                 il.Emit(OpCodes.Call, _getStringBasedValue);
