@@ -3716,16 +3716,27 @@ namespace NetJSON {
         [ThreadStatic]
         static StringBuilder _decodeJSONStringBuilder;
 
-        internal unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings) {
+        internal unsafe static string DecodeJSONString(char* ptr, ref int index, NetJSONSettings settings, bool fromObject = false) {
             char current = '\0', next = '\0', prev = '\0';
             bool hasQuote = false;
+            bool isJustString = index == 0 && !fromObject;
             var sb = (_decodeJSONStringBuilder ?? (_decodeJSONStringBuilder = new StringBuilder())).Clear();
+
+            // Don't process null string
+            if((IntPtr)ptr == IntPtr.Zero)
+            {
+                return null;
+            }
 
             while (true) {
                 current = ptr[index];
+                if(current == '\0')
+                {
+                    break;
+                }
 
-                if (hasQuote) {
-                    if (current == settings._quoteChar)
+                if (isJustString || hasQuote) {
+                    if (!isJustString && current == settings._quoteChar)
                     {
                         next = ptr[index + 1];
                         if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
@@ -3758,14 +3769,17 @@ namespace NetJSON {
                                     const int offset = 0x10000;
                                     var str = new string(ptr, index + 1, 4);
                                     var uu = Int32.Parse(str, NumberStyles.HexNumber);
-                                    var u = uu < offset ? new string((char)uu, 1) :
-                                        new string(
-                                            new char[]{
-                                                (char)(((uu - offset) >> 10) + 0xD800),
-                                                (char)((uu - offset) % 0x0400 + 0xDC00)
-                                            }
-                                        );
-                                    sb.Append(u);
+                                    
+                                    if(uu < offset)
+                                    {
+                                        sb.Append((char)uu);
+                                    }
+                                    else
+                                    {
+                                        sb.Append((char)(((uu - offset) >> 10) + 0xD800))
+                                            .Append((char)((uu - offset) % 0x0400 + 0xDC00));
+                                    }
+
                                     index += 4;
                                     break;
                                 default:
@@ -3844,8 +3858,9 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Ldarg_2);      
                 if (type == _stringType) {
+                    il.Emit(OpCodes.Ldc_I4_0);
                     il.Emit(OpCodes.Call, _decodeJSONString);
                 } else {
                     il.Emit(OpCodes.Call, _getStringBasedValue);
@@ -4487,6 +4502,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg_2);
             if (isStringType) {
+                il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Call, _decodeJSONString);
             } else {
                 il.Emit(OpCodes.Call, _getStringBasedValue);
@@ -5185,11 +5201,6 @@ namespace NetJSON {
             il.Emit(OpCodes.Newobj, _strCtorWithPtr);
             //il.Emit(OpCodes.Call, _createString);
             il.Emit(OpCodes.Stloc, keyLocal);
-
-            il.EmitWriteLine(keyLocal);
-
-            //il.EmitWriteLine(String.Format("{0}", type));
-            //il.EmitWriteLine(keyLocal);
 
             //index++
             IncrementIndexRef(il);

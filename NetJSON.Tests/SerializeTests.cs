@@ -1218,6 +1218,22 @@ namespace NetJSON.Tests {
             Assert.IsNotNull(result.Val);
         }
 
+        [TestMethod]
+        public void TestNotThrowingInvalidJSONForPrimitiveTypes()
+        {
+            var value = NetJSON.Deserialize<string>("\"abc");
+
+            Assert.AreEqual("\"abc", value);
+        }
+
+        [TestMethod]
+        public void TestNotThrowingInvalidJSONForNullPrimitiveTypes()
+        {
+            var value = NetJSON.Deserialize<string>(default(string));
+
+            Assert.AreEqual(null, value);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
