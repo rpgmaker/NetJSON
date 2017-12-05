@@ -3727,80 +3727,87 @@ namespace NetJSON {
             {
                 return null;
             }
+			ptr += index;
+			var startPtr = ptr;
 
-            while (true) {
-                current = ptr[index];
-                if(current == '\0')
-                {
-                    break;
-                }
+            while (*ptr != '\0') {
+                current = *ptr;
 
                 if (isJustString || hasQuote) {
                     if (!isJustString && current == settings._quoteChar)
                     {
-                        next = ptr[index + 1];
+                        next = *(++ptr);
                         if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
                         {
                             throw new NetJSONInvalidJSONException();
                         }
+						break;
+					}
 
-                        ++index;
-                        break;
-                    }
-                    else
-                    {
-                        if (current != '\\')
-                        {
-                            sb.Append(current);
-                        }
-                        else
-                        {
-                            next = ptr[++index];
-                            switch (next)
-                            {
-                                case 'r': sb.Append('\r'); break;
-                                case 'n': sb.Append('\n'); break;
-                                case 't': sb.Append('\t'); break;
-                                case 'f': sb.Append('\f'); break;
-                                case '\\': sb.Append('\\'); break;
-                                case '/': sb.Append('/'); break;
-                                case 'b': sb.Append('\b'); break;
-                                case 'u':
-                                    const int offset = 0x10000;
-                                    var str = new string(ptr, index + 1, 4);
-                                    var uu = Int32.Parse(str, NumberStyles.HexNumber);
-                                    
-                                    if(uu < offset)
-                                    {
-                                        sb.Append((char)uu);
-                                    }
-                                    else
-                                    {
-                                        sb.Append((char)(((uu - offset) >> 10) + 0xD800))
-                                            .Append((char)((uu - offset) % 0x0400 + 0xDC00));
-                                    }
+					if (current != '\\') {
+						sb.Append(current);
+						prev = current;
+						++ptr;
+						continue;
+					}
 
-                                    index += 4;
-                                    break;
-                                default:
-                                    if (next == settings._quoteChar)
-                                        sb.Append(next);
-                                    break;
-                            }
-                        }
-                    }
-                } else {
+					next = *(++ptr);
+					switch (next) {
+						case '\0': goto EXIT; // string ends with '\'
+						case 'r': sb.Append('\r'); break;
+						case 'n': sb.Append('\n'); break;
+						case 't': sb.Append('\t'); break;
+						case 'f': sb.Append('\f'); break;
+						case '\\': sb.Append('\\'); break;
+						case '/': sb.Append('/'); break;
+						case 'b': sb.Append('\b'); break;
+						case 'u':
+							const int offset = 0x10000;
+							int uu = 0;
+							for (int i = 0; i < 4; i++) {
+								;
+								var c = *(++ptr);
+								if (c >= '0' && c <= '9') {
+									uu = (uu <<= 4) + (c - '0');
+								}
+								else if (c >= 'a' && c <= 'f') {
+									uu = (uu <<= 4) + c - ('a' - 10);
+								}
+								else if (c >= 'A' && c <= 'F') {
+									uu = (uu <<= 4) + c - ('A' - 10);
+								}
+								else {
+									throw new ArgumentException("Invalid Unicode escape sequence");
+								}
+							}
+
+							if (uu < offset) {
+								sb.Append((char)uu);
+							}
+							else {
+								sb.Append((char)(((uu - offset) >> 10) + 0xD800))
+									.Append((char)((uu - offset) % 0x0400 + 0xDC00));
+							}
+							break;
+						default:
+							if (next == settings._quoteChar)
+								sb.Append(next);
+							break;
+					}
+				} else {
                     if (current == settings._quoteChar) {
                         hasQuote = true;
                     } else if (current == 'n') {
-                        index += 3;
-                        return null;
+						ptr += 3;
+						index += (int)(ptr - startPtr);
+						return null;
                     }
                 }
                 prev = current;
-                ++index;
+				++ptr;
             }
-
+			EXIT:
+			index += (int)(ptr - startPtr);
             return sb.ToString();
         }
 
