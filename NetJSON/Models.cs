@@ -184,8 +184,20 @@ namespace NetJSON
 	/// </summary>
 	public sealed class NetJSONInvalidJSONException : Exception
 	{
+		/// <summary>
+		/// Returns the index where invalid JSON syntax is detected.
+		/// </summary>
+		public int Index { get; private set; }
 		public NetJSONInvalidJSONException()
 			: base("Input is not a valid JSON.") {
+		}
+		public NetJSONInvalidJSONException(int index)
+		: this() {
+			Index = index;
+		}
+		public NetJSONInvalidJSONException(string message, int index)
+			: base(message) {
+			Index = index;
 		}
 	}
 

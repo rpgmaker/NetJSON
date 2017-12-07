@@ -3739,7 +3739,7 @@ namespace NetJSON {
                         next = *(++ptr);
                         if (next != ',' && next != ' ' && next != ':' && next != '\n' && next != '\r' && next != '\t' && next != ']' && next != '}' && next != '\0')
                         {
-                            throw new NetJSONInvalidJSONException();
+                            throw new NetJSONInvalidJSONException((int)(ptr - startPtr));
                         }
 						break;
 					}
@@ -3762,32 +3762,23 @@ namespace NetJSON {
 						case '/': sb.Append('/'); break;
 						case 'b': sb.Append('\b'); break;
 						case 'u':
-							const int offset = 0x10000;
-							int uu = 0;
+							int unicode = 0;
 							for (int i = 0; i < 4; i++) {
-								;
 								var c = *(++ptr);
 								if (c >= '0' && c <= '9') {
-									uu = (uu <<= 4) + (c - '0');
+									unicode = (unicode <<= 4) + (c - '0');
 								}
 								else if (c >= 'a' && c <= 'f') {
-									uu = (uu <<= 4) + c - ('a' - 10);
+									unicode = (unicode <<= 4) + c - ('a' - 10);
 								}
 								else if (c >= 'A' && c <= 'F') {
-									uu = (uu <<= 4) + c - ('A' - 10);
+									unicode = (unicode <<= 4) + c - ('A' - 10);
 								}
 								else {
-									throw new ArgumentException("Invalid Unicode escape sequence");
+									throw new NetJSONInvalidJSONException("Invalid Unicode escape sequence", (int)(ptr - startPtr));
 								}
 							}
-
-							if (uu < offset) {
-								sb.Append((char)uu);
-							}
-							else {
-								sb.Append((char)(((uu - offset) >> 10) + 0xD800))
-									.Append((char)((uu - offset) % 0x0400 + 0xDC00));
-							}
+							sb.Append((char)unicode);
 							break;
 						default:
 							if (next == settings._quoteChar)

@@ -210,9 +210,9 @@ namespace NetJSON.Internals
                 } while (lastChr != '\0');
             }
 
-            if (!(json[0] == chr && lastChr == endChar))
+            if (lastChr != endChar)
             {
-                throw new NetJSONInvalidJSONException();
+                throw new NetJSONInvalidJSONException(length);
             }
         }
 
