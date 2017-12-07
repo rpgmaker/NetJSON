@@ -1219,7 +1219,7 @@ namespace NetJSON.Tests {
         }
 
 		[TestMethod]
-		[ExpectedException(typeof(ArgumentException), "Invalid Unicode escape sequence", AllowDerivedTypes = false)]
+		[ExpectedException(typeof(NetJSONInvalidJSONException), "Invalid Unicode escape sequence", AllowDerivedTypes = false)]
 		public void TestInvalidUnicodeEscapingSequence()
 		{
             Assert.AreEqual("abc\u00a0", NetJSON.Deserialize<string>("abc\\u00A"));
