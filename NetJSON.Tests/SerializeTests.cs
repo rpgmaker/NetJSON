@@ -472,7 +472,7 @@ namespace NetJSON.Tests {
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.IsTrue(date == ddate.ToLocalTime());
         }
 
         [TestMethod]
@@ -482,7 +482,7 @@ namespace NetJSON.Tests {
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.IsTrue(date == ddate.ToLocalTime());
         }
 
         [TestMethod]
@@ -492,7 +492,7 @@ namespace NetJSON.Tests {
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.IsTrue(date == ddate.ToLocalTime());
         }
 
         [TestMethod]
@@ -502,7 +502,7 @@ namespace NetJSON.Tests {
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.IsTrue(date == ddate.ToLocalTime());
         }
 
         [TestMethod]
@@ -512,7 +512,7 @@ namespace NetJSON.Tests {
             var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.IsTrue(date == ddate.ToLocalTime());
         }
 
         [TestMethod]

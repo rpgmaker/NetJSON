@@ -407,10 +407,6 @@ namespace NetJSON.Internals
 				dt = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
 
 				dt = dt.AddTicks(ticks * multiply);
-
-				if (timeZoneFormat == NetJSONTimeZoneFormat.Unspecified || timeZoneFormat == NetJSONTimeZoneFormat.Utc)
-					dt = dt.ToLocalTime();
-
 				var kind = timeZoneFormat == NetJSONTimeZoneFormat.Local ? DateTimeKind.Local :
 					timeZoneFormat == NetJSONTimeZoneFormat.Utc ? DateTimeKind.Utc :
 					DateTimeKind.Unspecified;
@@ -1077,6 +1073,7 @@ namespace NetJSON.Internals
 			var offsetText = timeZoneFormat == NetJSONTimeZoneFormat.Local ? (string.Concat(offset.Ticks >= 0 ? "+" : "-", hours < 10 ? "0" : string.Empty,
 				hours, minutes < 10 ? "0" : string.Empty, minutes)) : string.Empty;
 
+/*            
 			if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
 				offset =
 #if NET_CORE
@@ -1088,7 +1085,7 @@ namespace NetJSON.Internals
 				minutes = Math.Abs(offset.Minutes);
 				date = date.AddHours(hours).AddMinutes(minutes);
 			}
-
+*/
 			return string.Concat("\\/Date(", DateToEpochTime(date), offsetText, ")\\/");
 		}
 
