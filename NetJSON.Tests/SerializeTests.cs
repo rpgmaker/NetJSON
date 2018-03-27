@@ -1234,6 +1234,19 @@ namespace NetJSON.Tests {
             Assert.AreEqual(null, value);
         }
 
+        [TestMethod]
+        public void TestSimpleStruct()
+        {
+            var settings = new NetJSONSettings();
+            var data = new SimpleObjectStruct() { ID = 10, Name = "Test", Value = "Tester" };
+            var json = NetJSON.Serialize(data, settings);
+            var data2 = NetJSON.Deserialize<SimpleObjectStruct>(json, settings);
+
+            Assert.AreEqual(data.ID, data2.ID);
+            Assert.AreEqual(data.Name, data2.Name);
+            Assert.AreEqual(data.Value, data2.Value);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1244,6 +1257,13 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    struct SimpleObjectStruct
+    {
+        public int ID;
+        public string Name;
+        public string Value;
     }
 
     public class Test
