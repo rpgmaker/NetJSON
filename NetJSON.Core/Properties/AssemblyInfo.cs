@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Phoenix Service Bus")]
 [assembly: AssemblyProduct("NetJSON")]
-[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2017")]
+[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

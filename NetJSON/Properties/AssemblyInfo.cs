@@ -11,7 +11,7 @@ using System.Security;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Phoenix Service Bus")]
 [assembly: AssemblyProduct("NetJSON")]
-[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2016")]
+[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
