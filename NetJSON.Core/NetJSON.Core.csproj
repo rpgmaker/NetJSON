@@ -35,4 +35,8 @@
     <PackageReference Include="System.Reflection.TypeExtensions" Version="4.1.0" />
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)NetJSON\lib\netstandard1.6\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).xml&quot; &quot;$(SolutionDir)NetJSON\lib\netstandard1.6\&quot;&#xD;&#xA;" />
+  </Target>
+
 </Project>
