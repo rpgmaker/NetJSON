@@ -1249,6 +1249,13 @@ namespace NetJSON.Tests {
             Assert.AreEqual(data.Value, data2.Value);
         }
 
+        [TestMethod]
+        public void CanDeserializeLargeNumbers()
+        {
+            var test = NetJSON.Deserialize<Dictionary<string, object>>("{\"test\":9999999999}");
+            Assert.AreEqual(test["test"], 9999999999);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();

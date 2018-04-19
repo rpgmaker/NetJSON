@@ -28,8 +28,8 @@ namespace NetJSON {
                 regexs["date"] = @"^\d{1,2}/\d{1,2}/\d{4}";
                 regexs["date2"] = @"\\/Date\((?<ticks>-?\d+)\)\\/";
                 regexs["date3"] = @"^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}.(\d){2,3}Z$";
+                regexs["long"] = @"^-?(\d{19}|\d{10,19})$";
                 regexs["int"] = @"^-?\d{1,10}$";
-                regexs["long"] = @"^-?\d{19}$";
                 regexs["double"] = @"^-?[0-9]{0,15}(\.[0-9]{1,15})?$|^-?(100)(\.[0]{1,15})?$";
                 return regexs;
             }
