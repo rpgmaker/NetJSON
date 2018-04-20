@@ -4,14 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.2</version> 
+    <version>1.2.3</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Add support for Deserialize(Type, string, NetJSONSettings)
-      Add support for serialization/deserialization of ICollection/IList/IEnumerable
-      Fixed encoding/decoding issue with string containing quotes
-      Improve performance for decoding strings with hexidecimal value (Ex. \u0000)
+      Fixed issue with Deserializing large integer in object type
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
