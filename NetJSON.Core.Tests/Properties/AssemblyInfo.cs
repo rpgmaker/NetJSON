@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Hewlett-Packard")]
+[assembly: AssemblyCompany("Phoenix Service Bus")]
 [assembly: AssemblyProduct("NetJSON.Core.Tests")]
 [assembly: AssemblyTrademark("")]
 

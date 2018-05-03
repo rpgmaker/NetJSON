@@ -1256,6 +1256,29 @@ namespace NetJSON.Tests {
             Assert.AreEqual(test["test"], 9999999999);
         }
 
+        [TestMethod]
+        public void CanDeserializeKeyAndValueProperly()
+        {
+            var xy = new A();
+            xy.Details.Add(666, null);
+
+            var json = NetJSON.Serialize(xy);
+            var obj = NetJSON.Deserialize<A>(json);
+
+            Assert.IsTrue(xy.Details.ContainsKey(666));
+        }
+
+        [TestMethod]
+        public void CanDeserilizeDictionaryKeyAndValue()
+        {
+            var dict = new Dictionary<int, B>();
+            dict.Add(666, new B());
+            var json = NetJSON.Serialize(dict);
+            var obj = NetJSON.Deserialize<Dictionary<int, B>>(json);
+
+            Assert.IsTrue(obj.ContainsKey(666));
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1266,6 +1289,20 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    public class A
+    {
+        public A()
+        {
+            Details = new Dictionary<int, B>();
+        }
+
+        public Dictionary<int, B> Details { get; set; }
+    }
+
+    public class B
+    {
     }
 
     struct SimpleObjectStruct
