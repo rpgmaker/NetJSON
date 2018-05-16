@@ -4,11 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.4</version> 
+    <version>1.2.5</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Fixed issue with not deserializing dictionary that uses integer as key properly
+      Fixed incorrect processing on string boxed in object type.
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
