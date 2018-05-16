@@ -1257,6 +1257,17 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void CanSerializeAndDeserializedEscapeStringInDictionary()
+        {
+            var testDictionary = new Dictionary<string, object>();
+            testDictionary["Path"] = @"\\fabcde\pabcde\abcde\abcde.txt";
+
+            var json = NetJSON.Serialize(testDictionary);
+            var data = NetJSON.Deserialize<Dictionary<string, object>>(json);
+            Assert.AreEqual(testDictionary["Path"], data["Path"]);
+        }
+
+        [TestMethod]
         public void CanDeserializeKeyAndValueProperly()
         {
             var xy = new A();
