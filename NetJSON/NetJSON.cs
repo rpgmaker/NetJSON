@@ -441,6 +441,7 @@ namespace NetJSON {
             _getNonStringValue = _internalJsonType.GetMethod("GetNonStringValue", MethodBinding),
             _isDateValue = _internalJsonType.GetMethod("IsValueDate", MethodBinding),
             _toStringIfString = _internalJsonType.GetMethod("ToStringIfString", MethodBinding),
+            _toStringIfStringObject = _internalJsonType.GetMethod("ToStringIfStringObject", MethodBinding),
             _iDisposableDispose = typeof(IDisposable).GetMethod("Dispose"),
             _toExpectedType = typeof(AutomaticTypeConverter).GetMethod("ToExpectedType"),
             _fastStringToInt = _internalJsonType.GetMethod("FastStringToInt", MethodBinding),
@@ -1022,7 +1023,6 @@ namespace NetJSON {
                             il.Emit(OpCodes.Ldarg_0);
                             il.Emit(OpCodes.Ldarg_2);
                             il.Emit(OpCodes.Call, _toStringIfString);
-                            il.Emit(OpCodes.Castclass, _stringType);
                             il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                             il.Emit(OpCodes.Pop);
                         } else if (objType == _enumType) {
@@ -3632,7 +3632,7 @@ namespace NetJSON {
                 il.MarkLabel(@return);
                 il.Emit(OpCodes.Ldloc, obj);
                 il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, _toStringIfString);
+                il.Emit(OpCodes.Call, _toStringIfStringObject);
             });
 
             return method;
@@ -5206,15 +5206,6 @@ namespace NetJSON {
             IncrementIndexRef(il);
 
             if (isDict) {
-
-
-                var isStringBasedLabel1 = il.DefineLabel();
-                var isStringBasedLabel2 = il.DefineLabel();
-
-                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
-                il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
-
-#region true
                 il.Emit(OpCodes.Ldloc, obj);
                 if (isExpandoObject)
                     il.Emit(OpCodes.Isinst, _idictStringObject);
@@ -5229,32 +5220,6 @@ namespace NetJSON {
                     il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
                 }
                 il.Emit(OpCodes.Callvirt, dictSetItem);
-#endregion
-
-                il.MarkLabel(isStringBasedLabel1);
-
-
-                il.Emit(OpCodes.Ldloc, isStringBasedLocal);
-                il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
-
-#region false
-                il.Emit(OpCodes.Ldloc, obj);
-                if (isExpandoObject)
-                    il.Emit(OpCodes.Isinst, _idictStringObject);
-
-                il.Emit(OpCodes.Ldloc, keyLocal);
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, GenerateExtractValueFor(typeBuilder, valueType));
-                if (isKeyValuePair && !isExpandoObject) {
-                    il.Emit(OpCodes.Newobj, _genericKeyValuePairType.MakeGenericType(keyType, valueType).GetConstructor(new[] { keyType, valueType }));
-                }
-                il.Emit(OpCodes.Callvirt, dictSetItem);
-#endregion
-
-                il.MarkLabel(isStringBasedLabel2);
             } else {
                 if (!isTuple) {
                     //Set property based on key

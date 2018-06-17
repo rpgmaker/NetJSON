@@ -1236,6 +1236,60 @@ namespace NetJSON.Tests {
             Assert.AreEqual(null, value);
         }
 
+        [TestMethod]
+        public void TestSimpleStruct()
+        {
+            var settings = new NetJSONSettings();
+            var data = new SimpleObjectStruct() { ID = 10, Name = "Test", Value = "Tester" };
+            var json = NetJSON.Serialize(data, settings);
+            var data2 = NetJSON.Deserialize<SimpleObjectStruct>(json, settings);
+
+            Assert.AreEqual(data.ID, data2.ID);
+            Assert.AreEqual(data.Name, data2.Name);
+            Assert.AreEqual(data.Value, data2.Value);
+        }
+
+        [TestMethod]
+        public void CanDeserializeLargeNumbers()
+        {
+            var test = NetJSON.Deserialize<Dictionary<string, object>>("{\"test\":9999999999}");
+            Assert.AreEqual(test["test"], 9999999999);
+        }
+
+        [TestMethod]
+        public void CanSerializeAndDeserializedEscapeStringInDictionary()
+        {
+            var testDictionary = new Dictionary<string, object>();
+            testDictionary["Path"] = @"\\fabcde\pabcde\abcde\abcde.txt";
+
+            var json = NetJSON.Serialize(testDictionary);
+            var data = NetJSON.Deserialize<Dictionary<string, object>>(json);
+            Assert.AreEqual(testDictionary["Path"], data["Path"]);
+        }
+
+        [TestMethod]
+        public void CanDeserializeKeyAndValueProperly()
+        {
+            var xy = new A();
+            xy.Details.Add(666, null);
+
+            var json = NetJSON.Serialize(xy);
+            var obj = NetJSON.Deserialize<A>(json);
+
+            Assert.IsTrue(xy.Details.ContainsKey(666));
+        }
+
+        [TestMethod]
+        public void CanDeserilizeDictionaryKeyAndValue()
+        {
+            var dict = new Dictionary<int, B>();
+            dict.Add(666, new B());
+            var json = NetJSON.Serialize(dict);
+            var obj = NetJSON.Deserialize<Dictionary<int, B>>(json);
+
+            Assert.IsTrue(obj.ContainsKey(666));
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1246,6 +1300,27 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    public class A
+    {
+        public A()
+        {
+            Details = new Dictionary<int, B>();
+        }
+
+        public Dictionary<int, B> Details { get; set; }
+    }
+
+    public class B
+    {
+    }
+
+    struct SimpleObjectStruct
+    {
+        public int ID;
+        public string Name;
+        public string Value;
     }
 
     public class Test

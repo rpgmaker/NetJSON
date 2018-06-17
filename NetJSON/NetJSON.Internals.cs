@@ -338,13 +338,26 @@ namespace NetJSON.Internals
 			return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
 		}
 
-        internal unsafe static object ToStringIfString(object value, NetJSONSettings settings)
+        internal unsafe static string ToStringIfString(object value, NetJSONSettings settings)
         {
             var str = value as string;
             if(str != null)
             {
+                StringBuilder sb = new StringBuilder();
+                NetJSON.EncodedJSONString(sb, str, settings);
+                return sb.ToString();
+            }
+
+            return str;
+        }
+
+        internal unsafe static object ToStringIfStringObject(object value, NetJSONSettings settings)
+        {
+            var str = value as string;
+            if (str != null)
+            {
                 str = string.Concat('"', str, '"');
-                fixed(char* p = str)
+                fixed (char* p = str)
                 {
                     char* ptr = p;
                     int index = 0;
@@ -355,7 +368,7 @@ namespace NetJSON.Internals
             return value;
         }
 
-		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
+        private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
 
             if (settings._hasDateStringFormat)

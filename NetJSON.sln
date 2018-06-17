@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27004.2005
+VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON", "NetJSON\NetJSON.csproj", "{1308D326-02BB-45BD-8549-18F78A81F204}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -17,8 +17,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Core", "NetJSON.Core\NetJSON.Core.csproj", "{02A93376-FF15-461A-8095-176FE1E8D8D5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Core.Tests", "NetJSON.Core.Tests\NetJSON.Core.Tests.csproj", "{E97AE000-A9EB-40A4-8A16-D7A048349D1B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.PCL", "NetJSON.PCL\NetJSON.PCL.csproj", "{8E99272A-D200-4755-BD65-20A794CF1791}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
