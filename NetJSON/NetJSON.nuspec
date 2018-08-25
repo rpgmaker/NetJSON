@@ -4,10 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.5</version> 
+    <version>1.2.6</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
+      Introduce support for netstandard2.0, .net framework 4.6.2, .net framework 4.7.2
       Fixed incorrect processing on string boxed in object type.
     </releaseNotes>
     <language>en-US</language>
@@ -23,6 +24,14 @@
         <dependency id="System.Reflection.Emit" version="4.0.1" />
         <dependency id="System.Reflection.Emit.Lightweight" version="4.0.1" />
         <dependency id="System.Reflection.TypeExtensions" version="4.1.0" />
+      </group>
+      <group targetFramework="netstandard2.0">
+        <dependency id="NETStandard.Library" version="2.0.3" />
+        <dependency id="System.Reflection" version="4.3.0" />
+        <dependency id="System.Reflection.Emit" version="4.3.0" />
+        <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
+        <dependency id="System.Reflection.Extensions" version="4.3.0" />
+        <dependency id="System.Reflection.Emit.ILGeneration" version="4.3.0" />
       </group>
     </dependencies>
   </metadata>

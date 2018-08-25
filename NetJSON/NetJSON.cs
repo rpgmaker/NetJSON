@@ -18,14 +18,14 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Security;
 
-#if !(NET_PCL || NET_CORE)
+#if !(NET_PCL || NET_STANDARD)
 using System.Security.Permissions;
 #endif
 using System.Text;
 using System.Xml.Serialization;
 
 
-#if NET_CORE
+#if NET_STANDARD && !NET_STANDARD_20
 using Microsoft.Extensions.DependencyModel;
 #endif
 
@@ -68,7 +68,7 @@ namespace NetJSON {
                 get
                 {
                     return
-#if NET_CORE
+#if NET_STANDARD
     ObjType.GetTypeInfo().Assembly.ManifestModule
 #else
     Assembly.GetExecutingAssembly().ManifestModule
@@ -691,7 +691,7 @@ namespace NetJSON {
                 }
             }
 
-#if !NET_CORE
+#if !NET_STANDARD
             LookupAttribute<XmlAttributeAttribute>(ref attr, memberInfo, it => it.AttributeName);
             LookupAttribute<XmlElementAttribute>(ref attr, memberInfo, it => it.ElementName);
             LookupAttribute<XmlArrayAttribute>(ref attr, memberInfo, it => it.ElementName);
@@ -1097,7 +1097,7 @@ namespace NetJSON {
 
             foreach (var type in types) {
                 GenerateTypeBuilder(type, module)
-#if NET_CORE
+#if NET_STANDARD
     .CreateTypeInfo().AsType();
 #else
                     .CreateType();
@@ -1105,7 +1105,7 @@ namespace NetJSON {
 
             }
 
-#if !NET_CORE
+#if !NET_STANDARD
             assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
         }
@@ -1125,7 +1125,7 @@ namespace NetJSON {
             var type = GenerateTypeBuilder(objType, module);
 
             returnType = type
-#if NET_CORE
+#if NET_STANDARD
     .CreateTypeInfo().AsType();
 #else
     .CreateType();
@@ -1133,7 +1133,7 @@ namespace NetJSON {
                 
             _types[objType] = returnType;
 
-#if !NET_CORE
+#if !NET_STANDARD
             if (_generateAssembly)
                 assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
@@ -1350,7 +1350,7 @@ namespace NetJSON {
                 lock (_lockAsmObject) {
                     if (_assembly == null) {
                         _assembly =
-#if NET_CORE
+#if NET_STANDARD
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1359,7 +1359,7 @@ namespace NetJSON {
                             new AssemblyName(NET_JSON_GENERATED_ASSEMBLY_NAME) {
                                 Version = new Version(1, 0, 0, 0)
                             },
-#if NET_CORE
+#if NET_STANDARD
                             AssemblyBuilderAccess.Run
 #else
                             AssemblyBuilderAccess.RunAndSave
@@ -1378,7 +1378,7 @@ namespace NetJSON {
                 },
                             new object[] { true }));
 
-#if !NET_CORE
+#if !NET_STANDARD
                         //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
                         _assembly.SetCustomAttribute(new CustomAttributeBuilder(
                             typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
@@ -1402,7 +1402,7 @@ namespace NetJSON {
 
         private static AssemblyBuilder GenerateAssemblyBuilderNoShare(string asmName) {
             var assembly =
-#if NET_CORE
+#if NET_STANDARD
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1411,7 +1411,7 @@ namespace NetJSON {
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
                 },
-#if !NET_CORE
+#if !NET_STANDARD
                 AssemblyBuilderAccess.RunAndSave
 #else
                 AssemblyBuilderAccess.Run
@@ -1430,7 +1430,7 @@ namespace NetJSON {
                 },
                 new object[] { true }));
 
-#if !NET_CORE
+#if !NET_STANDARD
             //[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification=true)]
             assembly.SetCustomAttribute(new CustomAttributeBuilder(
                 typeof(SecurityPermissionAttribute).GetConstructor(new[] { typeof(SecurityAction) }),
@@ -1875,8 +1875,12 @@ namespace NetJSON {
         {
             if (builder == null)
                 return new DynamicMethod(methodName, returnType, parameterTypes,
-#if NET_CORE
+#if NET_STANDARD
+#if NET_STANDARD_20
+                    Assembly.GetExecutingAssembly().ManifestModule
+#else
                     Assembly.GetEntryAssembly().ManifestModule
+#endif
 #else
                     Assembly.GetExecutingAssembly().ManifestModule
 #endif
@@ -2479,8 +2483,12 @@ namespace NetJSON {
                     //Expense call to auto-magically figure all subclass of current type
                     if (types == null) {
                         types = new List<Type>();
-#if NET_CORE
+#if NET_STANDARD
+#if NET_STANDARD_20
+    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+#else
     var assemblies = DependencyContext.Default.GetDefaultAssemblyNames().Select(x => Assembly.Load(x));
+#endif
 #else
     var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 #endif
@@ -3372,7 +3380,7 @@ namespace NetJSON {
                 throw new InvalidOperationException("serializeFunc cannot be null");
 
             var method =
-#if !NET_CORE
+#if !NET_STANDARD
                 serializeFunc.Method
 #else
                 serializeFunc.GetMethodInfo()

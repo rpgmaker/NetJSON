@@ -93,13 +93,13 @@ namespace NetJSON.Internals
 
 	static partial class CompatibleExtensions
 	{
-#if !NET_CORE && !NET_PCL
+#if !NET_STANDARD && !NET_PCL && !NET_46 && !NET_47
 		internal static Type GetTypeInfo(this Type type) {
 			return type;
 		}
 #endif
 
-		internal static void EmitClearStringBuilder(this ILGenerator il) {
+        internal static void EmitClearStringBuilder(this ILGenerator il) {
 #if !NET_35
 			il.Emit(OpCodes.Callvirt, typeof(StringBuilder).GetMethod("Clear"));
 #else
@@ -149,7 +149,7 @@ namespace NetJSON.Internals
 				return new string(ptr, startIndex, length);
 		}
 
-#if NET_CORE
+#if NET_STANDARD
         // Retrieved from https://github.com/dotnet/corefx/pull/10088
         private static readonly Func<Type, object> s_getUninitializedObjectDelegate = (Func<Type, object>)
  typeof(string).GetTypeInfo().Assembly.GetType("System.Runtime.Serialization.FormatterServices")
@@ -168,7 +168,7 @@ namespace NetJSON.Internals
 #endif
 
         internal static T GetUninitializedInstance<T>() {
-#if NET_CORE
+#if NET_STANDARD
             return (T)GetUninitializedObject(typeof(T));
 #else
 			return (T)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(T));
@@ -788,12 +788,12 @@ namespace NetJSON.Internals
 
 		internal static bool CustomTypeEquality(Type type1, Type type2) {
 			if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 				.IsEnum) {
 				if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 					.IsEnum && type2 == typeof(Enum))
@@ -974,7 +974,7 @@ namespace NetJSON.Internals
 
 		internal static string AllDateToString(DateTime date, NetJSONSettings settings) {
 			var offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(date);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(date);
@@ -1079,7 +1079,7 @@ namespace NetJSON.Internals
 
 			if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
 				offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
