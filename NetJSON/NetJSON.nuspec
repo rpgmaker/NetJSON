@@ -4,12 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.2.6</version> 
+    <version>1.2.7</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      Introduce support for netstandard2.0, .net framework 4.6.2, .net framework 4.7.2
-      Fixed incorrect processing on string boxed in object type.
+      Fixed issue with serialization in .net standard 2.x
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>

@@ -6,14 +6,44 @@ using Xunit;
 
 namespace NetJSON.Standard2_0.Tests
 {
-    class Query
+    public class Query
     {
         public string query;
         public dynamic variables;
     }
 
+    public class Person
+    {
+        public int PersonId { get; set; }
+        public string Firstname { get; set; }
+        public string Lastname { get; set; }
+        public DateTime DateOfBirth { get; set; }
+        public byte[] HashValue { get; set; }
+    }
+
     public class NetJSONTest
     {
+        [Fact]
+        public void TestPersonObject()
+        {
+            var items = new List<Person>
+            {
+                new Person
+                {
+                    PersonId = 1,
+                    Firstname = "Test",
+                    Lastname = "Test2",
+                    DateOfBirth = DateTime.Now,
+                    HashValue = new byte[0]
+                }
+            };
+
+            var json = NetJSON.Serialize(items);
+            Assert.NotNull(json);
+        }
+
+
+        [Fact]
         public void TestQueryObject()
         {
             var graphqltest = new Query

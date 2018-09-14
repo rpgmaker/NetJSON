@@ -308,7 +308,10 @@ namespace NetJSON {
             public static readonly NetJSONSerializer<T> Serializer = GetSerializer();
 
             private static NetJSONSerializer<T> GetSerializer()
-            {
+            {     
+#if NET_STANDARD_20
+                return new DynamicNetJSONSerializer<T>();
+#else
                 NetJSONSerializer<T> serializer = null;
                 var type = typeof(T);
                 if (type.GetTypeInfo().IsGenericType)
@@ -327,6 +330,7 @@ namespace NetJSON {
                 else serializer = (NetJSONSerializer<T>)Activator.CreateInstance(Generate(typeof(T)));
                 
                 return serializer;
+#endif
             }
 
             private static bool IsPrivate(Type type)
