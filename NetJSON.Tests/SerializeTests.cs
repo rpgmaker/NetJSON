@@ -1290,6 +1290,50 @@ namespace NetJSON.Tests {
             Assert.IsTrue(obj.ContainsKey(666));
         }
 
+        [TestMethod]
+        public void CanDeserializeObjectWithDefaultValueForBoolean()
+        {
+            var usr = NetJSON.Deserialize<YadroUser>(File.ReadAllText("netjsonObj.txt"), new NetJSONSettings { SkipDefaultValue = false });
+            Assert.IsFalse(usr.Enabled);
+        }
+
+        [TestMethod]
+        public void CanDeserializeObjectWithDefaultValueOfFalseBoolean()
+        {
+            var json = "{\"Enabled\": false}";
+            var data = NetJSON.Deserialize<EnabledClass>(json);
+            Assert.IsFalse(data.Enabled);
+        }
+
+        private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
+
+        //[TestMethod]
+        public void HandlesNullable()
+        {
+            var nullable = new NullableEntity { Id = Guid.NewGuid(), Value = new ValueObject { Value = "Test" } };
+            var serialised = NetJSON.Serialize(nullable, Settings);
+            var deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
+            Assert.AreEqual(nullable.Id, deserialised.Id);
+            Assert.AreEqual(nullable.Value.Value, deserialised.Value.Value);
+
+            nullable = new NullableEntity();
+            serialised = NetJSON.Serialize(nullable, Settings);
+            deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
+            Assert.IsFalse(deserialised.Id.HasValue);
+        }
+
+        [TestMethod]
+        public void HandlesReadOnlyCollection()
+        {
+            var entity = new Entity { Items = new[] { "One", "Two", "Three" } };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<Entity>(serialised, Settings);
+
+            Assert.AreEqual(entity.Items.Count(), deserialised.Items.Count());
+            foreach (var item in entity.Items)
+                Assert.IsTrue(deserialised.Items.Contains(item));
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1300,6 +1344,148 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    public class Entity
+    {
+        public IReadOnlyCollection<string> Items { get; set; }
+    }
+
+    public class NullableEntity
+    {
+        public Guid? Id { get; set; }
+        public ValueObject? Value { get; set; }
+    }
+
+    public struct ValueObject
+    {
+        public string Value { get; set; }
+    }
+
+
+    public class EnabledClass
+    {
+        public EnabledClass()
+        {
+            Enabled = true;
+        }
+
+        public bool Enabled { get; set; }
+    }
+
+    public class YadroUser
+    {
+        public YadroUser()
+        {
+            Id = -1;
+            CompanyId = -1;
+            Email = String.Empty;
+            Login = String.Empty;
+            Password = String.Empty;
+            Name = String.Empty;
+            Surname = String.Empty;
+            IsServerAdministrator = false;
+            Enabled = true;
+            HasWebAuthorisationAccess = true;
+            UltimateUser = false;
+            ToCreateOnCluster = true;
+            UserTokenType = "GccObjects.Net.UserManagement.GccUserRemoteView";
+            CultureId = 2057;
+            DefaultTimeZone = 0;
+            UseDaylightSaving = true;
+        }
+
+        /// <summary>
+        /// Free to store your own data
+        /// </summary>
+        public string UserToken { get; set; }
+
+        /// <summary>
+        /// User's Id
+        /// </summary>
+        public long Id { get; set; }
+
+        /// <summary>
+        /// Id of the company where user belongs to
+        /// </summary>
+        public long CompanyId { get; set; }
+
+        /// <summary>
+        /// User's email address
+        /// </summary>
+        public string Email { get; set; }
+
+        /// <summary>
+        /// User's login
+        /// </summary>
+        public string Login { get; set; }
+
+        /// <summary>
+        /// User's password
+        /// </summary>
+        public string Password { get; set; }
+
+        /// <summary>
+        /// User's name
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// User's Surname
+        /// </summary>
+        public string Surname { get; set; }
+
+        /// <summary>
+        /// If the user is server administrator
+        /// </summary>
+        public bool IsServerAdministrator { get; set; }
+
+        /// <summary>
+        /// Has ability to be authorized via web
+        /// </summary>
+        public bool HasWebAuthorisationAccess { get; set; }
+
+        /// <summary>
+        /// If user is enabled
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>
+        /// Tells that this user .... Default is false.
+        /// </summary>
+        public bool UltimateUser { get; set; }
+
+        /// <summary>
+        /// 12 digits firma identificator
+        /// </summary>
+        public string FirmaIdentificator { get; set; }
+
+        /// <summary>
+        /// If user must be skipped to be created on the cluster
+        /// </summary>
+        public bool ToCreateOnCluster { get; set; }
+
+        /// <summary>
+        /// By default it contains UserRemoteView, but can be changed
+        /// </summary>
+        public string UserTokenType { get; set; }
+
+        /// <summary>
+        /// 2057 en-GB; 1049 ru-RU; 1031 de-DE; 1062 lv-LV; 1033 en-US etc...
+        /// Default 2057
+        /// </summary>       
+        public int CultureId { get; set; }
+
+        /// <summary>
+        /// -12 0 +12 hours from GMT.
+        /// Default 0
+        /// </summary>       
+        public int DefaultTimeZone { get; set; }
+        /// <summary>
+        /// If selected time zone uses daylight saving
+        /// Default true
+        /// </summary>
+        public bool UseDaylightSaving { get; set; }
     }
 
     public class A

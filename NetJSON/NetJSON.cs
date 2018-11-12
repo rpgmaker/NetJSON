@@ -528,7 +528,8 @@ namespace NetJSON {
 			  IDictStr = "IDictionary`2",
 			  KeyValueStr = "KeyValuePair`2",
 			  ICollectionStr = "ICollection`1",
-			 IEnumerableStr = "IEnumerable`1",
+			  IEnumerableStr = "IEnumerable`1",
+              IReadOnlyCollectionStr = "IReadOnlyCollection`1",
               CreateListStr = "CreateList",
               CreateClassOrDictStr = "CreateClassOrDict",
               Dynamic = "Dynamic",
@@ -4168,7 +4169,9 @@ namespace NetJSON {
                     var isValueType = propType.GetTypeInfo().IsValueType;
                     var isPrimitiveType = propType.IsPrimitiveType();
                     var isStruct = isValueType && !isPrimitiveType;
-                    var propNullLabel = !isNullable ? il.DefineLabel() : default(Label);
+                    var isBool = propType == _boolType;
+                    var propNullLabel = !isNullable && !isBool ? il.DefineLabel() : default(Label);
+                    var hasPropLabel = propNullLabel != default(Label);
                     var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
                     var equalityMethod = propType.GetMethod("op_Equality");
 
@@ -4180,7 +4183,7 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Stloc, propValue);
 
-                    if (!isNullable) {
+                    if (hasPropLabel) {
                         if (isStruct)
                             il.Emit(OpCodes.Ldloca, propValue);
                         else
@@ -4241,7 +4244,7 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Ret);
 
-                    if (!isNullable)
+                    if (hasPropLabel)
                         il.MarkLabel(propNullLabel);
                 }
 
@@ -4279,7 +4282,7 @@ namespace NetJSON {
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
             var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
-            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr);
+            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr) && !(type.Name == IReadOnlyCollectionStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
             
@@ -4549,7 +4552,8 @@ namespace NetJSON {
 			return type != _stringType && (_listType.IsAssignableFrom(type) || type.Name == IListStr ||
 				(type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
 				(type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
-				((interfaceType = type.GetTypeInfo().GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
+                (type.Name == IReadOnlyCollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+                ((interfaceType = type.GetTypeInfo().GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
 				((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr));
 		}
 
@@ -4573,6 +4577,10 @@ namespace NetJSON {
 
             
             var il = method.GetILGenerator();
+
+            var nullableType = type.GetNullableType();
+            var isNullable = nullableType != null;
+            type = isNullable ? nullableType : type;
 
             var settings = il.DeclareLocal(_settingsType);
             var foundQuote = il.DeclareLocal(_boolType);

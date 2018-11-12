@@ -71,6 +71,9 @@
     <Content Include="json.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="netjsonObj.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="netjson_test.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
