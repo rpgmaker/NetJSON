@@ -1350,6 +1350,18 @@ namespace NetJSON.Tests {
                 Assert.IsTrue(deserialised.Items.Contains(item));
         }
 
+        [TestMethod]
+        public void HandlesReadOnlyList()
+        {
+            var entity = new EntityWithReadOnlyList { Strings = new List<string> { "Test", "Test2" }  };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<EntityWithReadOnlyList>(serialised, Settings);
+
+            Assert.AreEqual(2, deserialised.Strings.Count);
+            Assert.AreEqual("Test", deserialised.Strings[0]);
+            Assert.AreEqual("Test2", deserialised.Strings[1]);
+        }
+
         private static bool CanSerialize(MemberInfo memberInfo)
         {
             var attr = memberInfo.GetCustomAttribute<TestIgnoreAttribute>();
@@ -1365,6 +1377,11 @@ namespace NetJSON.Tests {
     public class EntityWithReadOnlyDictionary
     {
         public IReadOnlyDictionary<string, string> Map { get; set; }
+    }
+
+    public class EntityWithReadOnlyList
+    {
+        public IReadOnlyList<string> Strings { get; set; }
     }
 
     public class Entity
