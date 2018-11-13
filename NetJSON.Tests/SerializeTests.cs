@@ -1323,6 +1323,22 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        public void HandlesReadOnlyDictionary()
+        {
+            var entity = new EntityWithReadOnlyDictionary { Map = new Dictionary<string, string> { { "One", "Eno" }, { "Two", "Owt" }, { "Three", "Eerht" } } };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<EntityWithReadOnlyDictionary>(serialised, Settings);
+
+            Assert.AreNotSame(entity.Map, deserialised.Map);
+            Assert.AreEqual(entity.Map.Count, deserialised.Map.Count);
+            foreach (var item in entity.Map)
+            {
+                Assert.IsTrue(deserialised.Map.ContainsKey(item.Key));
+                Assert.AreEqual(item.Value, deserialised.Map[item.Key]);
+            }
+        }
+
+        [TestMethod]
         public void HandlesReadOnlyCollection()
         {
             var entity = new Entity { Items = new[] { "One", "Two", "Three" } };
@@ -1344,6 +1360,11 @@ namespace NetJSON.Tests {
 
             return true;
         }
+    }
+
+    public class EntityWithReadOnlyDictionary
+    {
+        public IReadOnlyDictionary<string, string> Map { get; set; }
     }
 
     public class Entity

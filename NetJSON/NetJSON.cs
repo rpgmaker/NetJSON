@@ -521,15 +521,17 @@ namespace NetJSON {
             ArrayOpen = (int)'[', ArrayClose = (int)']', ObjectOpen = (int)'{', ObjectClose = (int)'}';
 
         const string IsoFormat = "{0:yyyy-MM-ddTHH:mm:ss.fffZ}",
-             TypeIdentifier = "$type",
-             ClassStr = "Class", _dllStr = ".dll",
-             NullStr = "null",
-		     IListStr = "IList`1",
+              TypeIdentifier = "$type",
+              ClassStr = "Class", _dllStr = ".dll",
+              NullStr = "null",
+		      IListStr = "IList`1",
 			  IDictStr = "IDictionary`2",
+              IReadOnlyDictionaryStr = "IReadOnlyDictionary`2",
 			  KeyValueStr = "KeyValuePair`2",
 			  ICollectionStr = "ICollection`1",
 			  IEnumerableStr = "IEnumerable`1",
               IReadOnlyCollectionStr = "IReadOnlyCollection`1",
+              IReadOnlyListStr = "IReadOnlyList`1",
               CreateListStr = "CreateList",
               CreateClassOrDictStr = "CreateClassOrDict",
               Dynamic = "Dynamic",
@@ -4282,7 +4284,7 @@ namespace NetJSON {
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
             var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
-            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr) && !(type.Name == IReadOnlyCollectionStr);
+            var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr) && !(type.Name == IReadOnlyCollectionStr) && !(type.Name == IReadOnlyListStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
             
@@ -4553,14 +4555,15 @@ namespace NetJSON {
 				(type.Name == ICollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
 				(type.Name == IEnumerableStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
                 (type.Name == IReadOnlyCollectionStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
+                (type.Name == IReadOnlyListStr && type.GetGenericArguments()[0].Name != KeyValueStr) ||
                 ((interfaceType = type.GetTypeInfo().GetInterface(ICollectionStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr) ||
 				((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name != KeyValueStr));
 		}
 
 		internal static bool IsDictionaryType(this Type type) {
 			Type interfaceType = null;
-			return _dictType.IsAssignableFrom(type) || type.Name == IDictStr
-				|| ((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
+			return _dictType.IsAssignableFrom(type) || type.Name == IDictStr || type.Name == IReadOnlyDictionaryStr
+                || ((interfaceType = type.GetTypeInfo().GetInterface(IEnumerableStr)) != null && interfaceType.GetGenericArguments()[0].Name == KeyValueStr);
 		}
 
 		private static MethodInfo GenerateGetClassOrDictFor(TypeBuilder typeBuilder, Type type) {
@@ -4646,7 +4649,12 @@ namespace NetJSON {
             MethodInfo addMethod = null;
 
             var isNotTagLabel = il.DefineLabel();
-
+            
+            if(isDict && type.Name == IReadOnlyDictionaryStr)
+            {
+                // Map readonly dictionary to regular dictionary to allow operations for adding items to it
+                type = _genericDictType.MakeGenericType(keyType, valueType);
+            }
             
             var dictSetItem = isDict ? (isKeyValuePair ? 
                 ((addMethod = type.GetMethod("Add")) != null ? addMethod :
@@ -4658,7 +4666,7 @@ namespace NetJSON {
                 dictSetItem = _idictStringObject.GetMethod("Add");
 
             if (isDict) {
-                if (type.Name == IDictStr) {
+                if (type.Name == IDictStr || type.Name == IReadOnlyDictionaryStr) {
                     type = _genericDictType.MakeGenericType(keyType, valueType);
                 }
             }
