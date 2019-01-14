@@ -480,9 +480,9 @@ namespace NetJSON.Internals
 		}
 
 		internal static Guid FastStringToGuid(string value) {
-			//TODO: Optimize
-			return new Guid(value);
-		}
+            //TODO: Optimize
+            return new Guid(value);
+        }
 
 		internal static Type FastStringToType(string value) {
 			return Type.GetType(value, false);

@@ -1453,6 +1453,18 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Version, d.Version);
             Assert.AreEqual(e.Created, d.Created);
         }
+
+        [TestMethod]
+        public void HandlesGuids()
+        {
+            var value = Guid.NewGuid();
+            var serialised = NetJSON.Serialize(value, Settings);
+            var deserialised = NetJSON.Deserialize<Guid>(serialised, Settings);
+            Assert.AreEqual(value, deserialised);
+            var values = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+            serialised = NetJSON.Serialize(values, Settings);
+            var deserialisedArray = NetJSON.Deserialize<List<Guid>>(serialised, Settings); // Fails
+        }
     }
 
     public class EntityWithReadOnlyDictionary

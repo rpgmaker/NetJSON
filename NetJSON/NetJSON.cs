@@ -4352,7 +4352,7 @@ namespace NetJSON {
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray;
+            var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray || elementType == _guidType;
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr) && !(type.Name == IReadOnlyCollectionStr) && !(type.Name == IReadOnlyListStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
@@ -4710,7 +4710,7 @@ namespace NetJSON {
             }
 
             var obj = il.DeclareLocal(type);
-            var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType;
+            var isStringType = isTuple || isDict || keyType == _stringType || keyType == _objectType || keyType == _guidType;
             var isTypeValueType = type.GetTypeInfo().IsValueType;
             var tupleCountLocal = isTuple ? il.DeclareLocal(_intType) : null;
             var isStringTypeLocal = il.DeclareLocal(_boolType);
