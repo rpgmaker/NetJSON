@@ -1372,6 +1372,87 @@ namespace NetJSON.Tests {
 
             return true;
         }
+
+        //private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
+        private static readonly Random Random = new Random();
+
+        [TestMethod]  // Fails: not deserialised
+        public void EventStructTest()
+        {
+            var e = new EventStruct(Guid.NewGuid(), new PayloadStruct(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStruct>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod] // Fails: System.AccessViolationException at NetJSON.SetterPropertyValue<EventStructWithPrivateSetters>(EventStructWithPrivateSetters instance, object value, System.Reflection.MethodInfo methodInfo)
+        public void EventStructWithPrivateSettersTest()
+        {
+            var e = new EventStructWithPrivateSetters(Guid.NewGuid(), new PayloadStructWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStructWithPrivateSetters>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod] // Fails: not deserialised
+        public void EventStructWithReadOnlyBackingFieldsTest()
+        {
+            var e = new EventStructWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadStructWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStructWithReadOnlyBackingFields>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]  // Fails: not deserialised
+        public void EventClassTest()
+        {
+            var e = new EventClass(Guid.NewGuid(), new PayloadClass(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClass>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod] // Passes
+        public void EventClassWithPrivateSettersTest()
+        {
+            var e = new EventClassWithPrivateSetters(Guid.NewGuid(), new PayloadClassWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClassWithPrivateSetters>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod] // Fails: not deserialised
+        public void EventClassWithReadOnlyBackingFieldsTest()
+        {
+            var e = new EventClassWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadClassWithWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClassWithReadOnlyBackingFields>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
     }
 
     public class EntityWithReadOnlyDictionary
@@ -2258,5 +2339,123 @@ namespace NetJSON.Tests {
     public class PersonX2 : PersonAbstract
     {
         public override string Name { get; set; }
+    }
+
+    public struct EventStruct
+    {
+        public EventStruct(Guid id, PayloadStruct payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; }
+        public PayloadStruct Payload { get; }
+        public int Version { get; }
+        public DateTimeOffset Created { get; }
+    }
+
+    public struct PayloadStruct
+    {
+        public PayloadStruct(string value) { Value = value; }
+
+        public string Value { get; }
+    }
+
+    public struct EventStructWithPrivateSetters
+    {
+        public EventStructWithPrivateSetters(Guid id, PayloadStructWithPrivateSetter payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; private set; }
+        public PayloadStructWithPrivateSetter Payload { get; private set; }
+        public int Version { get; private set; }
+        public DateTimeOffset Created { get; private set; }
+    }
+
+    public struct PayloadStructWithPrivateSetter
+    {
+        public PayloadStructWithPrivateSetter(string value) { Value = value; }
+
+        public string Value { get; private set; }
+    }
+
+    public struct EventStructWithReadOnlyBackingFields
+    {
+        private readonly Guid _id;
+        private readonly PayloadStructWithReadOnlyBackingField _payload;
+        private readonly int _version;
+        private readonly DateTimeOffset _created;
+
+        public EventStructWithReadOnlyBackingFields(Guid id, PayloadStructWithReadOnlyBackingField payload, int version, DateTimeOffset created) { _id = id; _payload = payload; _version = version; _created = created; }
+
+        public Guid Id => _id;
+        public PayloadStructWithReadOnlyBackingField Payload => _payload;
+        public int Version => _version;
+        public DateTimeOffset Created => _created;
+    }
+
+    public struct PayloadStructWithReadOnlyBackingField
+    {
+        private readonly string _value;
+
+        public PayloadStructWithReadOnlyBackingField(string value) { _value = value; }
+
+        public string Value => _value;
+    }
+
+    public class EventClass
+    {
+        public EventClass(Guid id, PayloadClass payload, int version, DateTimeOffset created) {
+            Id = id; Payload = payload; Version = version; Created = created;
+        }
+
+        public Guid Id { get; }
+        public PayloadClass Payload { get; }
+        public int Version { get; }
+        public DateTimeOffset Created { get; }
+    }
+
+    public class PayloadClass
+    {
+        public PayloadClass(string value) { Value = value; }
+
+        public string Value { get; }
+    }
+
+    public class EventClassWithPrivateSetters
+    {
+        public EventClassWithPrivateSetters(Guid id, PayloadClassWithPrivateSetter payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; private set; }
+        public PayloadClassWithPrivateSetter Payload { get; private set; }
+        public int Version { get; private set; }
+        public DateTimeOffset Created { get; private set; }
+    }
+
+    public class PayloadClassWithPrivateSetter
+    {
+        public PayloadClassWithPrivateSetter(string value) { Value = value; }
+
+        public string Value { get; private set; }
+    }
+
+    public class EventClassWithReadOnlyBackingFields
+    {
+        private readonly Guid _id;
+        private readonly PayloadClassWithWithReadOnlyBackingField _payload;
+        private readonly int _version;
+        private readonly DateTimeOffset _created;
+
+        public EventClassWithReadOnlyBackingFields(Guid id, PayloadClassWithWithReadOnlyBackingField payload, int version, DateTimeOffset created) { _id = id; _payload = payload; _version = version; _created = created; }
+
+        public Guid Id => _id;
+        public PayloadClassWithWithReadOnlyBackingField Payload => _payload;
+        public int Version => _version;
+        public DateTimeOffset Created => _created;
+    }
+
+    public class PayloadClassWithWithReadOnlyBackingField
+    {
+        private readonly string _value;
+
+        public PayloadClassWithWithReadOnlyBackingField(string value) { _value = value; }
+
+        public string Value => _value;
     }
 }

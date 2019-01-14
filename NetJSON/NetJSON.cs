@@ -410,6 +410,7 @@ namespace NetJSON {
             _jsonType = typeof(NetJSON),
 			_internalJsonType = typeof(SerializerUtilities),
             _methodInfoType = typeof(MethodBase),
+            _fieldInfoType = typeof(FieldInfo),
             _textWriterType = typeof(TextWriter),
             _tupleContainerType = typeof(TupleContainer),
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
@@ -493,6 +494,7 @@ namespace NetJSON {
             _needQuote = _internalJsonType.GetMethod("NeedQuotes", MethodBinding),
             _typeGetTypeFromHandle = _typeType.GetMethod("GetTypeFromHandle", MethodBinding),
             _methodGetMethodFromHandle = _methodInfoType.GetMethod("GetMethodFromHandle", new Type[] { typeof(RuntimeMethodHandle) }),
+            _methodGetFieldFromHandle = _fieldInfoType.GetMethod("GetFieldFromHandle", new Type[] { typeof(RuntimeFieldHandle) }),
             _objectEquals = _objectType.GetMethod("Equals", new[] { _objectType }),
             _stringEqualCompare = _stringType.GetMethod("Equals", new[] { _stringType, _stringType, typeof(StringComparison) }),
             _stringConcat = _stringType.GetMethod("Concat", new[] { _objectType, _objectType, _objectType, _objectType }),
@@ -507,6 +509,7 @@ namespace NetJSON {
             _flagEnumToString = _internalJsonType.GetMethod("FlagEnumToString", MethodBinding),
             _flagStringToEnum = _internalJsonType.GetMethod("FlagStringToEnum", MethodBinding),
             _setterPropertyValueMethod = _internalJsonType.GetMethod("SetterPropertyValue", MethodBinding),
+            _setterFieldValueMethod = _internalJsonType.GetMethod("SetterFieldValue", MethodBinding),
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
             _throwIfInvalidJSON = _internalJsonType.GetMethod("ThrowIfInvalidJSON", MethodBinding),
@@ -598,6 +601,8 @@ namespace NetJSON {
             new ConcurrentDictionary<string, MethodInfo>();
 
         static readonly ConcurrentDictionary<MethodInfo, Delegate> _setMemberValues = new ConcurrentDictionary<MethodInfo, Delegate>();
+
+        static readonly ConcurrentDictionary<FieldInfo, Delegate> _setMemberFieldValues = new ConcurrentDictionary<FieldInfo, Delegate>();
 
         static ConcurrentDictionary<string, Func<object>> _typeIdentifierFuncs = new ConcurrentDictionary<string, Func<object>>();
 
@@ -4069,23 +4074,24 @@ namespace NetJSON {
             return method;
         }
 
-        delegate void SetterPropertyDelegate<T>(T instance, object value, MethodInfo methodInfo);
+        delegate void SetterPropertyDelegate<T>(ref T instance, object value, MethodInfo methodInfo);
+        delegate void SetterFieldDelegate<T>(ref T instance, object value, FieldInfo fieldInfo);
 
-        internal static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
+        internal static void SetterPropertyValue<T>(ref T instance, object value, MethodInfo methodInfo) {
             (_setMemberValues.GetOrAdd(methodInfo, key => {
                 lock (GetDictLockObject("SetDynamicMemberValue")) {
                     var propType = key.GetParameters()[0].ParameterType;
 
                     var type = key.DeclaringType;
 
+                    var isClass = type.IsClass();
                     var name = String.Concat(type.Name, "_", key.Name);
-                    var meth = new DynamicMethod(name + "_setPropertyValue", _voidType, new[] { type, 
-                    _objectType, _methodInfoType }, restrictedSkipVisibility: true);
+                    var meth = new DynamicMethod(name + "_setPropertyValue", _voidType, new[] { type.MakeByRefType(), 
+                    _objectType, _methodInfoType }, GetManifestModule(type), true);
 
                     var il = meth.GetILGenerator();
 
                     il.Emit(OpCodes.Ldarg_0);
-
                     il.Emit(OpCodes.Ldarg_1);
 
                     if (propType.GetTypeInfo().IsValueType)
@@ -4093,18 +4099,63 @@ namespace NetJSON {
                     else
                         il.Emit(OpCodes.Isinst, propType);
 
-                    il.Emit(OpCodes.Callvirt, key);
+                    il.Emit(isClass ? OpCodes.Callvirt : OpCodes.Call, key);
 
                     il.Emit(OpCodes.Ret);
 
                     return meth.CreateDelegate(typeof(SetterPropertyDelegate<T>));
                 }
-            }) as SetterPropertyDelegate<T>)(instance, value, methodInfo);
+            }) as SetterPropertyDelegate<T>)(ref instance, value, methodInfo);
+        }
+
+        private static Module GetManifestModule(Type objType = null)
+        {
+                return
+#if NET_STANDARD
+    objType.GetTypeInfo().Assembly.ManifestModule
+#else
+    Assembly.GetExecutingAssembly().ManifestModule
+#endif
+                        ;
+        }
+
+        internal static void SetterFieldValue<T>(ref T instance, object value, FieldInfo fieldInfo)
+        {
+            (_setMemberFieldValues.GetOrAdd(fieldInfo, key => {
+                lock (GetDictLockObject("SetDynamicFieldMemberValue"))
+                {
+                    var propType = key.FieldType;
+
+                    var type = key.DeclaringType;
+
+                    var isClass = type.IsClass();
+                    var name = String.Concat(type.Name, "_", key.Name);
+                    var meth = new DynamicMethod(name + "_setFieldValue", _voidType, new[] { type.MakeByRefType(),
+                    _objectType, _fieldInfoType }, GetManifestModule(type), true);
+
+                    var il = meth.GetILGenerator();
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldarg_1);
+
+                    if (propType.GetTypeInfo().IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, propType);
+                    else
+                        il.Emit(OpCodes.Isinst, propType);
+
+                    il.Emit(OpCodes.Stfld, key);
+
+                    il.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(SetterFieldDelegate<T>));
+                }
+            }) as SetterFieldDelegate<T>)(ref instance, value, fieldInfo);
         }
 
         private static void GenerateTypeSetValueFor(TypeBuilder typeBuilder, Type type, bool isTypeValueType, bool Optimized, ILGenerator il) {
 
             var props = type.GetTypeProperties();
+            var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
             var caseLocal = il.DeclareLocal(_stringComparison);
 
             il.Emit(OpCodes.Ldarg, 4);
@@ -4238,8 +4289,26 @@ namespace NetJSON {
                             } else
                                 il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
                         } else {
-                            il.Emit(OpCodes.Pop);
-                            il.Emit(OpCodes.Pop);
+                            var setField = type.GetField($"<{propName}>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (setField == null)
+                            {
+                                //TODO: Use IL body and field token from prop.GetGetMethod().GetMethodBody()
+                                setField = fields.FirstOrDefault(x => x.Name.EndsWith(propName, StringComparison.OrdinalIgnoreCase));
+                            }
+
+                            if (setField != null)
+                            {
+                                if (propType.GetTypeInfo().IsValueType)
+                                    il.Emit(OpCodes.Box, propType);
+                                il.Emit(OpCodes.Ldtoken, setField);
+                                il.Emit(OpCodes.Call, _methodGetFieldFromHandle);
+                                il.Emit(OpCodes.Call, _setterFieldValueMethod.MakeGenericMethod(type));
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Pop);
+                                il.Emit(OpCodes.Pop);
+                            }
                         }
 
                     } else il.Emit(OpCodes.Stfld, field);
@@ -4685,30 +4754,49 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Stloc, tupleCountLocal);
             }
-
             
-            if (isTypeValueType) {
-                il.Emit(OpCodes.Ldloca, obj);
-                il.Emit(OpCodes.Initobj, type);
-            } else {
-                if (isTuple) {
-                    il.Emit(OpCodes.Ldc_I4, tupleCount);
-                    il.Emit(OpCodes.Newobj, type.GetConstructor(new []{ _intType}));
-                    il.Emit(OpCodes.Stloc, obj);
-                } else {
-                    var ctor = type.GetConstructor(Type.EmptyTypes);
-                    if (ctor == null) {
-                        if (type.GetTypeInfo().IsInterface)
+            if (isTuple)
+            {
+                il.Emit(OpCodes.Ldc_I4, tupleCount);
+                il.Emit(OpCodes.Newobj, type.GetConstructor(new[] { _intType }));
+                il.Emit(OpCodes.Stloc, obj);
+            }
+            else
+            {
+                var ctor = type.GetConstructor(Type.EmptyTypes);
+                if (ctor == null)
+                {
+                    if (type.GetTypeInfo().IsInterface)
+                    {
+                        il.Emit(OpCodes.Ldnull);
+                    }
+                    else
+                    {
+                        selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
+                        if (isTypeValueType)
                         {
-                            il.Emit(OpCodes.Ldnull);
+                            il.Emit(OpCodes.Ldloca, obj);
+                            il.Emit(OpCodes.Initobj, type);
                         }
-                        else {
-                            selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
+                        else
+                        {
                             il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                            il.Emit(OpCodes.Stloc, obj);
                         }
-                    } else
+                    }
+                }
+                else
+                {
+                    if (isTypeValueType)
+                    {
+                        il.Emit(OpCodes.Ldloca, obj);
+                        il.Emit(OpCodes.Initobj, type);
+                    }
+                    else
+                    {
                         il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
-                    il.Emit(OpCodes.Stloc, obj);
+                        il.Emit(OpCodes.Stloc, obj);
+                    }
                 }
             }
 
@@ -4891,17 +4979,31 @@ namespace NetJSON {
                         var sObj = il.DeclareLocal(type);
                         var parameters = selectedCtor.GetParameters();
                         var props = type.GetTypeProperties();
+                        var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
                         var paramProps = props.Where(x => parameters.Any(y => y.Name.Equals(x.Member.Name, StringComparison.OrdinalIgnoreCase)));
                         var excludedParams = props.Where(x => !parameters.Any(y => y.Name.Equals(x.Member.Name, StringComparison.OrdinalIgnoreCase)));
 
                         if (paramProps.Any()) {
-                            foreach (var parameter in paramProps) {
-                                il.Emit(OpCodes.Ldloc, obj);
-                                GetMemberInfoValue(il, parameter);
+                            if (isTypeValueType)
+                            {
+                                il.Emit(OpCodes.Ldloca, sObj);
                             }
 
-                            il.Emit(OpCodes.Newobj, selectedCtor);
-                            il.Emit(OpCodes.Stloc, sObj);
+                            foreach (var parameter in paramProps)
+                            {
+                                il.Emit(isTypeValueType ? OpCodes.Ldloca : OpCodes.Ldloc, obj);
+                                GetMemberInfoValue(il, parameter);
+                            }
+                            if (isTypeValueType)
+                            {
+                                il.Emit(OpCodes.Call, selectedCtor);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Newobj, selectedCtor);
+                                il.Emit(OpCodes.Stloc, sObj);
+                            }
+                            
 
                             //Set field/prop not accounted for in constructor parameters
                             foreach (var param in excludedParams) {
@@ -4910,20 +5012,48 @@ namespace NetJSON {
                                 GetMemberInfoValue(il, param);
                                 var prop = param.Member.MemberType == MemberTypes.Property ? param.Member as PropertyInfo : null;
                                 if (prop != null) {
+                                    var propName = prop.Name;
                                     var setter = prop.GetSetMethod();
                                     if (setter == null) {
                                         setter = type.GetMethod(string.Concat("set_", prop.Name), MethodBinding);
                                     }
                                     var propType = prop.PropertyType;
 
-                                    if (!setter.IsPublic) {
-                                        if (propType.GetTypeInfo().IsValueType)
-                                            il.Emit(OpCodes.Box, propType);
-                                        il.Emit(OpCodes.Ldtoken, setter);
-                                        il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
-                                        il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
-                                    } else
-                                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                                    if (setter == null)
+                                    {
+                                        var setField = type.GetField($"<{propName}>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (setField == null)
+                                        {
+                                            setField = fields.FirstOrDefault(x => x.Name.EndsWith(propName, StringComparison.OrdinalIgnoreCase));
+                                        }
+
+                                        if (setField != null)
+                                        {
+                                            if (propType.GetTypeInfo().IsValueType)
+                                                il.Emit(OpCodes.Box, propType);
+                                            il.Emit(OpCodes.Ldtoken, setField);
+                                            il.Emit(OpCodes.Call, _methodGetFieldFromHandle);
+                                            il.Emit(OpCodes.Call, _setterFieldValueMethod.MakeGenericMethod(type));
+                                        }
+                                        else
+                                        {
+                                            il.Emit(OpCodes.Pop);
+                                            il.Emit(OpCodes.Pop);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (!setter.IsPublic)
+                                        {
+                                            if (propType.GetTypeInfo().IsValueType)
+                                                il.Emit(OpCodes.Box, propType);
+                                            il.Emit(OpCodes.Ldtoken, setter);
+                                            il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
+                                            il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
+                                        }
+                                        else
+                                            il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                                    }
                                 } else
                                     il.Emit(OpCodes.Stfld, (FieldInfo)param.Member);
                             }
@@ -4950,8 +5080,11 @@ namespace NetJSON {
 
         private static void GetMemberInfoValue(ILGenerator il, NetJSONMemberInfo parameter) {
             var prop = parameter.Member.MemberType == MemberTypes.Property ? parameter.Member as PropertyInfo : null;
+            var isClass = prop.DeclaringType.IsClass();
             if (prop != null)
-                il.Emit(OpCodes.Callvirt, prop.GetGetMethod());
+            {
+                il.Emit(isClass ? OpCodes.Callvirt : OpCodes.Call, prop.GetGetMethod());
+            }
             else il.Emit(OpCodes.Ldfld, (FieldInfo)parameter.Member);
         }
 

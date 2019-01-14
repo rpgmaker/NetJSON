@@ -1097,8 +1097,13 @@ namespace NetJSON.Internals
 			return LongToStr(epochTime);// IntUtility.ltoa(epochTime);
 		}
 
-		internal static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
-			NetJSON.SetterPropertyValue(instance, value, methodInfo);
+		internal static void SetterPropertyValue<T>(ref T instance, object value, MethodInfo methodInfo) {
+			NetJSON.SetterPropertyValue(ref instance, value, methodInfo);
 		}
-	}
+
+        internal static void SetterFieldValue<T>(ref T instance, object value, FieldInfo fieldInfo)
+        {
+            NetJSON.SetterFieldValue(ref instance, value, fieldInfo);
+        }
+    }
 }
