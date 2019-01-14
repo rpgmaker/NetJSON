@@ -1465,6 +1465,35 @@ namespace NetJSON.Tests {
             serialised = NetJSON.Serialize(values, Settings);
             var deserialisedArray = NetJSON.Deserialize<List<Guid>>(serialised, Settings); // Fails
         }
+
+        [TestMethod]
+        public void HandlesDateTimeOffsetDictionaryKey()
+        {
+            var value = DateTimeOffset.UtcNow;
+            var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:41:03.987489Z"
+            Assert.AreEqual(value, NetJSON.Deserialize<DateTimeOffset>(s));
+            var map = new Dictionary<DateTimeOffset, int> { { value, Random.Next() } };
+            var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:41:29 +00:00":266037427}
+            var deserialised = NetJSON.Deserialize<Dictionary<DateTimeOffset, int>>(serialised, Settings);
+
+            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
+            Assert.AreEqual(map[value], deserialised[value]);
+        }
+
+        [TestMethod]
+        public void HandlesDateTimeDictionaryKey()
+        {
+            var value = DateTime.UtcNow;
+            var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:35:50.9314230Z"
+            Assert.AreEqual(value, NetJSON.Deserialize<DateTime>(s));
+
+            var map = new Dictionary<DateTime, int> { { value, Random.Next() } };
+            var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:37:26":871282158}
+            var deserialised = NetJSON.Deserialize<Dictionary<DateTime, int>>(serialised, Settings);
+
+            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
+            Assert.AreEqual(map[value], deserialised[value]);
+        }
     }
 
     public class EntityWithReadOnlyDictionary

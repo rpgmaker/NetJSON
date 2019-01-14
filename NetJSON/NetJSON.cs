@@ -2623,9 +2623,24 @@ namespace NetJSON {
                 il.Emit(OpCodes.Call, keyType == _intType ? _generatorIntToStr : _generatorLongToStr);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
             } else {
-                if (keyType.GetTypeInfo().IsValueType)
-                    il.Emit(OpCodes.Box, keyType);
-                il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
+                if(keyType == _dateTimeType)
+                {
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Call, _generatorDateToString);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                }
+                else if (keyType == _dateTimeOffsetType)
+                {
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Call, _generatorDateOffsetToString);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                }
+                else
+                {
+                    if (keyType.GetTypeInfo().IsValueType)
+                        il.Emit(OpCodes.Box, keyType);
+                    il.Emit(OpCodes.Callvirt, _stringBuilderAppendObject);
+                }
             }
 
 
