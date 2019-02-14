@@ -5,7 +5,6 @@ Faster than Any Binary?
 
 Build Status
 ============
-Build is successful. Failure is due .net core not available for 1.6 in appveyor
 
 ![alt tag](https://ci.appveyor.com/api/projects/status/github/rpgmaker/netjson?svg=true)
 
