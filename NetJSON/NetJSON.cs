@@ -4876,6 +4876,11 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldnull);
                 }
 
+                if (isNullable)
+                {
+                    il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(type).GetConstructor(new[] { type }));
+                }
+
                 il.Emit(OpCodes.Ret);
 
                 il.MarkLabel(isNullObjectLabel);
@@ -5078,6 +5083,11 @@ namespace NetJSON {
                             il.Emit(OpCodes.Ldloc, obj);
                     }else
                         il.Emit(OpCodes.Ldloc, obj);
+                }
+
+                if (isNullable)
+                {
+                    il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(type).GetConstructor(new[] { type }));
                 }
             },
             beginIndexIf: (msil, current) => {

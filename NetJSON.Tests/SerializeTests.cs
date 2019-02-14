@@ -1307,7 +1307,7 @@ namespace NetJSON.Tests {
 
         private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
 
-        //[TestMethod]
+        [TestMethod]
         public void HandlesNullable()
         {
             var nullable = new NullableEntity { Id = Guid.NewGuid(), Value = new ValueObject { Value = "Test" } };
@@ -1373,10 +1373,9 @@ namespace NetJSON.Tests {
             return true;
         }
 
-        //private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
         private static readonly Random Random = new Random();
 
-        [TestMethod]  // Fails: not deserialised
+        [TestMethod]
         public void EventStructTest()
         {
             var e = new EventStruct(Guid.NewGuid(), new PayloadStruct(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
@@ -1389,7 +1388,7 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Created, d.Created);
         }
 
-        [TestMethod] // Fails: System.AccessViolationException at NetJSON.SetterPropertyValue<EventStructWithPrivateSetters>(EventStructWithPrivateSetters instance, object value, System.Reflection.MethodInfo methodInfo)
+        [TestMethod]
         public void EventStructWithPrivateSettersTest()
         {
             var e = new EventStructWithPrivateSetters(Guid.NewGuid(), new PayloadStructWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
@@ -1402,7 +1401,7 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Created, d.Created);
         }
 
-        [TestMethod] // Fails: not deserialised
+        [TestMethod]
         public void EventStructWithReadOnlyBackingFieldsTest()
         {
             var e = new EventStructWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadStructWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
@@ -1415,7 +1414,7 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Created, d.Created);
         }
 
-        [TestMethod]  // Fails: not deserialised
+        [TestMethod]
         public void EventClassTest()
         {
             var e = new EventClass(Guid.NewGuid(), new PayloadClass(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
@@ -1428,7 +1427,7 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Created, d.Created);
         }
 
-        [TestMethod] // Passes
+        [TestMethod]
         public void EventClassWithPrivateSettersTest()
         {
             var e = new EventClassWithPrivateSetters(Guid.NewGuid(), new PayloadClassWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
@@ -1441,7 +1440,7 @@ namespace NetJSON.Tests {
             Assert.AreEqual(e.Created, d.Created);
         }
 
-        [TestMethod] // Fails: not deserialised
+        [TestMethod]
         public void EventClassWithReadOnlyBackingFieldsTest()
         {
             var e = new EventClassWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadClassWithWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
