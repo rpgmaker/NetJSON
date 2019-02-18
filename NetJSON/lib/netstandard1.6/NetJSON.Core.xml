@@ -326,6 +326,14 @@
             <param name="writer"></param>
             <param name="settings"></param>
         </member>
+        <member name="M:NetJSON.NetJSON.SerializeObject(System.Object,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize value using underlying object type
+            </summary>
+            <param name="value">Object value</param>
+            <param name="settings">Settings</param>
+            <returns>String</returns>
+        </member>
         <member name="M:NetJSON.NetJSON.Deserialize``1(System.String,NetJSON.NetJSONSettings)">
             <summary>
             Deserialize json to <typeparamref name="T"/> using specified settings

@@ -113,6 +113,45 @@ namespace NetJSON.Tests {
             var exceptionResult = NetJSON.Deserialize<ExceptionInfoEx>(json);
         }
 
+        private static readonly NetJSONSettings Options = new NetJSONSettings
+        {
+            CamelCase = true
+        };
+
+        [TestMethod]
+        public void TestSerializeObjectType()
+        {
+            object model = new List<MentionModel>
+            {
+                new MentionModel
+                {
+                    Text = "test",
+                    Id = 23232,
+                    Title = "test",
+                },
+                new MentionModel
+                {
+                    Text = "test",
+                    Id = 23232,
+                    Title = "test",
+
+                }
+            };
+
+
+            var resultStr = NetJSON.SerializeObject(model, Options);
+            Assert.AreNotEqual("[,]", resultStr);
+        }
+
+        public class MentionModel
+        {
+            public long Id { get; set; }
+
+            public string Title { get; set; }
+
+            public string Text { get; set; }
+        }
+
         public class SimpleObjectWithNull {
             public int Id { get; set; }
             public string EmailAddress { get; set; }

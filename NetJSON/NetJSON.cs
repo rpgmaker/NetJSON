@@ -3484,6 +3484,17 @@ namespace NetJSON {
         }
 
         /// <summary>
+        /// Serialize value using underlying object type
+        /// </summary>
+        /// <param name="value">Object value</param>
+        /// <param name="settings">Settings</param>
+        /// <returns>String</returns>
+        public static string SerializeObject(object value, NetJSONSettings settings)
+        {
+            return Serialize(value.GetType(), value, settings);
+        }
+
+        /// <summary>
         /// Deserialize json to <typeparamref name="T"/> using specified settings
         /// </summary>
         /// <typeparam name="T"></typeparam>
