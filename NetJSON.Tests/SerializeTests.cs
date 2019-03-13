@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -1531,6 +1532,15 @@ namespace NetJSON.Tests {
 
             Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
             Assert.AreEqual(map[value], deserialised[value]);
+        }
+
+        [TestMethod]
+        public void ExpandoSerializationWithStringDoubleSlash()
+        {
+            var json = @"[{""StringValue"":""C:\\ProgramData\\""}]";
+            var dict = NetJSON.Deserialize<List<Dictionary<string, object>>>(json);
+            var expando = NetJSON.Deserialize<List<ExpandoObject>>(json);
+            Assert.AreEqual(dict[0]["StringValue"], "C:\\ProgramData\\");
         }
     }
 

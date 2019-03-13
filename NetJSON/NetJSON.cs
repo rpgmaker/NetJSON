@@ -3593,11 +3593,13 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, quoteLabel);
 
-                //value = GetStringBasedValue(json, ref index)
+                //value = DecodeJSONString(json, ref index)     
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, _getStringBasedValue);
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Call, _decodeJSONString);
+
                 il.Emit(OpCodes.Stloc, valueLocal);
 
                 //if(IsDateValue(value)){
@@ -3677,8 +3679,6 @@ namespace NetJSON {
             returnAction: msil => {
                 il.MarkLabel(@return);
                 il.Emit(OpCodes.Ldloc, obj);
-                il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Call, _toStringIfStringObject);
             });
 
             return method;
