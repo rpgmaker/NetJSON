@@ -1577,6 +1577,27 @@ namespace NetJSON.Tests {
 
             Assert.AreEqual(myString, result);
         }
+
+        [TestMethod]
+        public void ShouldThrowExceptionForInvalidType()
+        {
+            //should not hangs
+            var badJson = "{  \"Id\": 31,  \"SubStruct\":  1,  \"SomeString\": \"My test string\"}";
+            MySuperStruct myStruct = null;
+            Exception ex = null;
+            try
+            {
+                myStruct = NetJSON.Deserialize<MySuperStruct>(badJson);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+
+            Assert.IsNotNull(ex);
+            Assert.IsInstanceOfType(ex, typeof(NetJSONTypeMismatchException));
+            Assert.IsNull(myStruct);
+        }
     }
 
     public class UserDefinedCustomClass
@@ -1611,6 +1632,19 @@ namespace NetJSON.Tests {
 
             return new UserDefinedCustomClass { Name = name };
         }
+    }
+
+    public class MySuperStruct
+    {
+        public long Id { get; set; }
+        public MySubStruct SubStruct { get; set; }
+        public string SomeString { get; set; }
+    }
+
+    public class MySubStruct
+    {
+        public long Id { get; set; }
+        public DateTime SomeDate { get; set; }
     }
 
     public class TestClassForCustomSerialization

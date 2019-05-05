@@ -107,6 +107,11 @@
             Exception thrown for invalid json string
             </summary>
         </member>
+        <member name="T:NetJSON.NetJSONTypeMismatchException">
+            <summary>
+            Exception thrown for invalid json string
+            </summary>
+        </member>
         <member name="T:NetJSON.NetJSONInvalidJSONPropertyException">
             <summary>
             Exception thrown for invalid json property attribute

@@ -398,6 +398,7 @@ namespace NetJSON {
             _enumeratorType = typeof(IEnumerator<>),
             _genericKeyValuePairType = typeof(KeyValuePair<,>),
             _invalidJSONExceptionType = typeof(NetJSONInvalidJSONException),
+            _typeMismatchExceptionType = typeof(NetJSONTypeMismatchException),
             _serializerType = typeof(NetJSONSerializer<>),
             _expandoObjectType = typeof(ExpandoObject),
             _genericDictionaryEnumerator = typeof(Dictionary<,>.Enumerator),
@@ -550,6 +551,7 @@ namespace NetJSON {
 
         static ConstructorInfo _strCtorWithPtr = _stringType.GetConstructor(new[] { typeof(char*), _intType, _intType });
         static ConstructorInfo _invalidJSONCtor = _invalidJSONExceptionType.GetConstructor(Type.EmptyTypes);
+        static ConstructorInfo _typeMismatchExceptionCtor = _typeMismatchExceptionType.GetConstructor(Type.EmptyTypes);
         static ConstructorInfo _settingsCtor = _settingsType.GetConstructor(Type.EmptyTypes);
 
         private static ConcurrentDictionary<string, object> _dictLockObjects = new ConcurrentDictionary<string, object>();
@@ -4807,6 +4809,9 @@ namespace NetJSON {
 
             var countLabel = il.DefineLabel();
             var isNullObjectLabel = il.DefineLabel();
+            var isNotDictOrClass = il.DefineLabel();
+
+            var isNotDictOrClassStartChar = il.DefineLabel();
 
 
             var isDict = type.IsDictionaryType();
@@ -4973,6 +4978,37 @@ namespace NetJSON {
 
                 il.Emit(OpCodes.Ldc_I4_0);
                 il.Emit(OpCodes.Stloc, isTag);
+
+                //if current != '{' throw exception
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Ldloc, count);
+                il.Emit(OpCodes.Bne_Un, isNotDictOrClass);
+
+                il.Emit(OpCodes.Ldc_I4, (int)'{');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, isNotDictOrClass);
+
+
+                // ignore whitespace and ":"
+                il.Emit(OpCodes.Ldc_I4, (int)' ');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, isNotDictOrClassStartChar);
+
+                il.Emit(OpCodes.Ldc_I4, (int)':');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, isNotDictOrClassStartChar);
+
+                il.Emit(OpCodes.Ldc_I4, (int)'n');
+                il.Emit(OpCodes.Ldloc, current);
+                il.Emit(OpCodes.Beq, isNotDictOrClassStartChar);
+
+                il.Emit(OpCodes.Newobj, _typeMismatchExceptionCtor);
+                il.Emit(OpCodes.Throw);
+
+                il.MarkLabel(isNotDictOrClassStartChar);
+
+                il.MarkLabel(isNotDictOrClass);
+
 
                 //if (count == 0 && current == 'n') {
                 //    index += 3;
