@@ -1263,7 +1263,7 @@ namespace NetJSON.Tests {
         [TestMethod]
         public void TestNotThrowingInvalidJSONForPrimitiveTypes()
         {
-            var value = NetJSON.Deserialize<string>("\"abc");
+            var value = NetJSON.Deserialize<string>("\"\"abc\"");
 
             Assert.AreEqual("\"abc", value);
         }
@@ -1542,6 +1542,81 @@ namespace NetJSON.Tests {
             var expando = NetJSON.Deserialize<List<ExpandoObject>>(json);
             Assert.AreEqual(dict[0]["StringValue"], "C:\\ProgramData\\");
         }
+
+        [TestMethod]
+        public unsafe void SerializeWithCustomType()
+        {
+            var model = new TestClassForCustomSerialization { ID = 100, Custom = new UserDefinedCustomClass { Name = "Test" } };
+
+            NetJSON.RegisterCustomTypeSerializer<UserDefinedCustomClass>(UserDefinedCustomClass.Serialize);
+            NetJSON.RegisterCustomTypeDeserializer(UserDefinedCustomClass.Deserialize);
+
+            var json = NetJSON.Serialize(model);
+            var model2 = NetJSON.Deserialize<TestClassForCustomSerialization>(json);
+
+            Assert.AreEqual(model.ID, model2.ID);
+            Assert.AreEqual(model.Custom.Name, model2.Custom.Name);
+        }
+
+
+        [TestMethod]
+        public void SerializeDeserializeStrings()
+        {
+            var netJsonSettings = new NetJSONSettings
+            {
+                CaseSensitive = true,
+                DateFormat = NetJSONDateFormat.ISO,
+                IncludeTypeInformation = true,
+                UseEnumString = true,
+                UseStringOptimization = true
+            };
+            var myString = "MyString";
+
+            var serialized = NetJSON.Serialize(myString, netJsonSettings);
+            var result = NetJSON.Deserialize<string>(serialized, netJsonSettings);
+
+            Assert.AreEqual(myString, result);
+        }
+    }
+
+    public class UserDefinedCustomClass
+    {
+        public string Name { get; set; }
+
+        public static void Serialize(UserDefinedCustomClass obj, StringBuilder sb, NetJSONSettings settings)
+        {
+            sb.AppendFormat("\"{{{0}}}\"", obj.Name);
+        }
+
+        public unsafe static UserDefinedCustomClass Deserialize(char* ptr, ref int index, NetJSONSettings settings)
+        {
+            var sb = new StringBuilder();
+            var current = '\0';
+            index++;
+            while ((current = ptr[index]) != '}')
+            {
+                if(current == '{' || current == '"')
+                {
+                    index++;
+                    continue;
+                }
+
+                sb.Append(current);
+                index++;
+            }
+
+            index+=2;
+
+            var name = sb.ToString();
+
+            return new UserDefinedCustomClass { Name = name };
+        }
+    }
+
+    public class TestClassForCustomSerialization
+    {
+        public int ID { get; set; }
+        public UserDefinedCustomClass Custom { get; set; }
     }
 
     public class EntityWithReadOnlyDictionary

@@ -33,7 +33,7 @@ using NetJSON.Internals;
 
 namespace NetJSON {
 
-    public static partial class NetJSON {
+    public unsafe static partial class NetJSON {
 
         sealed class DynamicNetJSONSerializer<T> : NetJSONSerializer<T>
         {
@@ -555,6 +555,12 @@ namespace NetJSON {
         private static ConcurrentDictionary<string, object> _dictLockObjects = new ConcurrentDictionary<string, object>();
         static ConcurrentDictionary<Type, MethodInfo> _registeredSerializerMethods =
             new ConcurrentDictionary<Type, MethodInfo>();
+
+        static ConcurrentDictionary<string, MethodInfo> _registeredCustomSerializerMethods =
+            new ConcurrentDictionary<string, MethodInfo>();
+
+        static ConcurrentDictionary<string, MethodInfo> _registeredCustomDeserializerMethods =
+            new ConcurrentDictionary<string, MethodInfo>();
 
         static Dictionary<Type, MethodInfo> _defaultSerializerTypes =
             new Dictionary<Type, MethodInfo> {
@@ -1913,6 +1919,7 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_readDeserializeMethodBuilders.TryGetValue(key, out method))
                 return method;
+
             var methodName = String.Concat(ReadStr, typeName);
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
                 type, new[] { _stringType, _settingsType });
@@ -2049,6 +2056,12 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_writeMethodBuilders.TryGetValue(key, out method))
                 return method;
+
+            if (_registeredCustomSerializerMethods.TryGetValue(typeName, out method))
+            {
+                return _writeMethodBuilders[key] = method;
+            }
+
             var methodName = String.Concat(WriteStr, typeName);
 
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
@@ -3396,7 +3409,7 @@ namespace NetJSON {
         }
 
         /// <summary>
-        /// Register serializer primitive method for <typeparamref name="T"/>
+        /// Register serializer primitive method for <typeparamref name="T"/> when object type is encountered
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="serializeFunc"></param>
@@ -3419,6 +3432,62 @@ namespace NetJSON {
             }
 
             _registeredSerializerMethods[type] = method;
+        }
+
+        /// <summary>
+        /// Register serializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="serializeFunc"></param>
+        public static void RegisterCustomTypeSerializer<T>(Action<T, StringBuilder, NetJSONSettings> serializeFunc)
+        {
+            var type = typeof(T);
+
+            if (serializeFunc == null)
+                throw new InvalidOperationException("serializeFunc cannot be null");
+
+            var method =
+#if !NET_STANDARD
+                serializeFunc.Method
+#else
+                serializeFunc.GetMethodInfo()
+#endif
+                ;
+
+            if (!(method.IsPublic && method.IsStatic))
+            {
+                throw new InvalidOperationException("serializeFun must be a public and static method");
+            }
+
+            _registeredCustomSerializerMethods[type.GetName().Fix()] = method;
+        }
+        
+        /// <summary>
+        /// Register deserializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="deserializeFunc"></param>
+        public static void RegisterCustomTypeDeserializer<T>(DeserializeCustomTypeDelegate<T> deserializeFunc)
+        {
+            var type = typeof(T);
+
+            if (deserializeFunc == null)
+                throw new InvalidOperationException("serializeFunc cannot be null");
+
+            var method =
+#if !NET_STANDARD
+                deserializeFunc.Method
+#else
+                deserializeFunc.GetMethodInfo()
+#endif
+                ;
+
+            if (!(method.IsPublic && method.IsStatic))
+            {
+                throw new InvalidOperationException("serializeFun must be a public and static method");
+            }
+
+            _registeredCustomDeserializerMethods[type.GetName().Fix()] = method;
         }
 
         /// <summary>
@@ -3797,7 +3866,31 @@ namespace NetJSON {
                     {
                         if (current != '\\')
                         {
-                            sb.Append(current);
+                            if (isJustString)
+                            {
+                                if(current == settings._quoteChar && !hasQuote)
+                                {
+                                    hasQuote = true;
+                                }
+                                else
+                                {
+                                    if (ptr[index + 1] != '\0')
+                                    {
+                                        sb.Append(current);
+                                    }
+                                    else
+                                    {
+                                        if(current != settings._quoteChar)
+                                        {
+                                            sb.Append(current);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                sb.Append(current);
+                            }
                         }
                         else
                         {
@@ -3856,6 +3949,12 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_extractMethodBuilders.TryGetValue(key, out method))
                 return method;
+
+            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            {
+                return _extractMethodBuilders[key] = method;
+            }
+
             var methodName = String.Concat(ExtractStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
@@ -4102,6 +4201,7 @@ namespace NetJSON {
 
         delegate void SetterPropertyDelegate<T>(ref T instance, object value, MethodInfo methodInfo);
         delegate void SetterFieldDelegate<T>(ref T instance, object value, FieldInfo fieldInfo);
+        public delegate T DeserializeCustomTypeDelegate<T>(char* ptr, ref int index, NetJSONSettings settings);
 
         internal static void SetterPropertyValue<T>(ref T instance, object value, MethodInfo methodInfo) {
             (_setMemberValues.GetOrAdd(methodInfo, key => {
@@ -4362,6 +4462,12 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_createListMethodBuilders.TryGetValue(key, out method))
                 return method;
+
+            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            {
+                return _createListMethodBuilders[key] = method;
+            }
+
             var methodName = String.Concat(CreateListStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,
@@ -4667,6 +4773,12 @@ namespace NetJSON {
             var typeName = type.GetName().Fix();
             if (_readMethodBuilders.TryGetValue(key, out method))
                 return method;
+
+            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            {
+                return _readMethodBuilders[key] = method;
+            }
+
             var methodName = String.Concat(CreateClassOrDictStr, typeName);
             var isObjectType = type == _objectType;
             method = typeBuilder.DefineMethodEx(methodName, StaticMethodAttribute,

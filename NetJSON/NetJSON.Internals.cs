@@ -10,6 +10,25 @@ using System.Text.RegularExpressions;
 
 namespace NetJSON.Internals
 {
+    public unsafe class NetJSONStringReader
+    {
+        private char* ptr;
+        private int index;
+
+        public NetJSONStringReader() { }
+
+        internal NetJSONStringReader(char* ptr, ref int index)
+        {
+            this.ptr = ptr;
+            this.index = index;
+        }
+
+        public char Next()
+        {
+            return '\0'; 
+        }
+    }
+
 	public sealed class TupleContainer
 	{
 		private int _size;
