@@ -201,10 +201,21 @@ namespace NetJSON
 		}
 	}
 
-	/// <summary>
-	/// Exception thrown for invalid json property attribute
+    /// <summary>
+	/// Exception thrown for invalid json string
 	/// </summary>
-	public sealed class NetJSONInvalidJSONPropertyException : Exception
+	public sealed class NetJSONTypeMismatchException : Exception
+    {
+        public NetJSONTypeMismatchException()
+            : base("Unexpected type was encountered in JSON")
+        {
+        }
+    }
+
+    /// <summary>
+    /// Exception thrown for invalid json property attribute
+    /// </summary>
+    public sealed class NetJSONInvalidJSONPropertyException : Exception
 	{
 		/// <summary>
 		/// Default constructor

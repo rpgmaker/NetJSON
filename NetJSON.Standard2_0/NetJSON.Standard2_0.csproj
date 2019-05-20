@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>NetJSON</AssemblyName>
+    <RootNamespace>NetJSON</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>TRACE;NET_STANDARD;NET_STANDARD_20</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>false</Optimize>
+    <DocumentationFile>bin\Debug\netstandard2.0\NetJSON.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;NET_STANDARD;NET_STANDARD_20</DefineConstants>
+    <DocumentationFile>bin\Release\netstandard2.0\NetJSON.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)NetJSON\lib\netstandard2.0\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).xml&quot; &quot;$(SolutionDir)NetJSON\lib\netstandard2.0\&quot;&#xD;&#xA;" />
+  </Target>
+
+  <ItemGroup>
+    <Compile Include="..\NetJSON\AutomaticTypeConverter.cs" Link="AutomaticTypeConverter.cs" />
+    <Compile Include="..\NetJSON\IntUtility.cs" Link="IntUtility.cs" />
+    <Compile Include="..\NetJSON\Models.cs" Link="Models.cs" />
+    <Compile Include="..\NetJSON\NetJSON.cs" Link="NetJSON.cs" />
+    <Compile Include="..\NetJSON\NetJSON.Internals.cs" Link="NetJSON.Internals.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reflection" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Emit.ILGeneration" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Extensions" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

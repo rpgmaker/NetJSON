@@ -3,10 +3,12 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
@@ -110,6 +112,45 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(exception);
 
             var exceptionResult = NetJSON.Deserialize<ExceptionInfoEx>(json);
+        }
+
+        private static readonly NetJSONSettings Options = new NetJSONSettings
+        {
+            CamelCase = true
+        };
+
+        [TestMethod]
+        public void TestSerializeObjectType()
+        {
+            object model = new List<MentionModel>
+            {
+                new MentionModel
+                {
+                    Text = "test",
+                    Id = 23232,
+                    Title = "test",
+                },
+                new MentionModel
+                {
+                    Text = "test",
+                    Id = 23232,
+                    Title = "test",
+
+                }
+            };
+
+
+            var resultStr = NetJSON.SerializeObject(model, Options);
+            Assert.AreNotEqual("[,]", resultStr);
+        }
+
+        public class MentionModel
+        {
+            public long Id { get; set; }
+
+            public string Title { get; set; }
+
+            public string Text { get; set; }
         }
 
         public class SimpleObjectWithNull {
@@ -781,6 +822,7 @@ namespace NetJSON.Tests {
         }
 
         [TestMethod]
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         public void SerializePolyObjects() {
             
             var graph = new Graph { name = "my graph" };
@@ -1218,19 +1260,12 @@ namespace NetJSON.Tests {
             Assert.IsNotNull(result.Val);
         }
 
-		[TestMethod]
-		[ExpectedException(typeof(NetJSONInvalidJSONException), "Invalid Unicode escape sequence", AllowDerivedTypes = false)]
-		public void TestInvalidUnicodeEscapingSequence()
-		{
-            Assert.AreEqual("abc\u00a0", NetJSON.Deserialize<string>("abc\\u00A"));
-		}
-
         [TestMethod]
         public void TestNotThrowingInvalidJSONForPrimitiveTypes()
         {
-            Assert.AreEqual("\"abc", NetJSON.Deserialize<string>("\"abc"));
-            Assert.AreEqual("abc\"", NetJSON.Deserialize<string>("abc\""));
-            Assert.AreEqual("abc", NetJSON.Deserialize<string>("abc\\"));
+            var value = NetJSON.Deserialize<string>("\"\"abc\"");
+
+            Assert.AreEqual("\"abc", value);
         }
 
         [TestMethod]
@@ -1239,6 +1274,132 @@ namespace NetJSON.Tests {
             var value = NetJSON.Deserialize<string>(default(string));
 
             Assert.AreEqual(null, value);
+        }
+
+        [TestMethod]
+        public void TestSimpleStruct()
+        {
+            var settings = new NetJSONSettings();
+            var data = new SimpleObjectStruct() { ID = 10, Name = "Test", Value = "Tester" };
+            var json = NetJSON.Serialize(data, settings);
+            var data2 = NetJSON.Deserialize<SimpleObjectStruct>(json, settings);
+
+            Assert.AreEqual(data.ID, data2.ID);
+            Assert.AreEqual(data.Name, data2.Name);
+            Assert.AreEqual(data.Value, data2.Value);
+        }
+
+        [TestMethod]
+        public void CanDeserializeLargeNumbers()
+        {
+            var test = NetJSON.Deserialize<Dictionary<string, object>>("{\"test\":9999999999}");
+            Assert.AreEqual(test["test"], 9999999999);
+        }
+
+        [TestMethod]
+        public void CanSerializeAndDeserializedEscapeStringInDictionary()
+        {
+            var testDictionary = new Dictionary<string, object>();
+            testDictionary["Path"] = @"\\fabcde\pabcde\abcde\abcde.txt";
+
+            var json = NetJSON.Serialize(testDictionary);
+            var data = NetJSON.Deserialize<Dictionary<string, object>>(json);
+            Assert.AreEqual(testDictionary["Path"], data["Path"]);
+        }
+
+        [TestMethod]
+        public void CanDeserializeKeyAndValueProperly()
+        {
+            var xy = new A();
+            xy.Details.Add(666, null);
+
+            var json = NetJSON.Serialize(xy);
+            var obj = NetJSON.Deserialize<A>(json);
+
+            Assert.IsTrue(xy.Details.ContainsKey(666));
+        }
+
+        [TestMethod]
+        public void CanDeserilizeDictionaryKeyAndValue()
+        {
+            var dict = new Dictionary<int, B>();
+            dict.Add(666, new B());
+            var json = NetJSON.Serialize(dict);
+            var obj = NetJSON.Deserialize<Dictionary<int, B>>(json);
+
+            Assert.IsTrue(obj.ContainsKey(666));
+        }
+
+        [TestMethod]
+        public void CanDeserializeObjectWithDefaultValueForBoolean()
+        {
+            var usr = NetJSON.Deserialize<YadroUser>(File.ReadAllText("netjsonObj.txt"), new NetJSONSettings { SkipDefaultValue = false });
+            Assert.IsFalse(usr.Enabled);
+        }
+
+        [TestMethod]
+        public void CanDeserializeObjectWithDefaultValueOfFalseBoolean()
+        {
+            var json = "{\"Enabled\": false}";
+            var data = NetJSON.Deserialize<EnabledClass>(json);
+            Assert.IsFalse(data.Enabled);
+        }
+
+        private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
+
+        [TestMethod]
+        public void HandlesNullable()
+        {
+            var nullable = new NullableEntity { Id = Guid.NewGuid(), Value = new ValueObject { Value = "Test" } };
+            var serialised = NetJSON.Serialize(nullable, Settings);
+            var deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
+            Assert.AreEqual(nullable.Id, deserialised.Id);
+            Assert.AreEqual(nullable.Value.Value, deserialised.Value.Value);
+
+            nullable = new NullableEntity();
+            serialised = NetJSON.Serialize(nullable, Settings);
+            deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
+            Assert.IsFalse(deserialised.Id.HasValue);
+        }
+
+        [TestMethod]
+        public void HandlesReadOnlyDictionary()
+        {
+            var entity = new EntityWithReadOnlyDictionary { Map = new Dictionary<string, string> { { "One", "Eno" }, { "Two", "Owt" }, { "Three", "Eerht" } } };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<EntityWithReadOnlyDictionary>(serialised, Settings);
+
+            Assert.AreNotSame(entity.Map, deserialised.Map);
+            Assert.AreEqual(entity.Map.Count, deserialised.Map.Count);
+            foreach (var item in entity.Map)
+            {
+                Assert.IsTrue(deserialised.Map.ContainsKey(item.Key));
+                Assert.AreEqual(item.Value, deserialised.Map[item.Key]);
+            }
+        }
+
+        [TestMethod]
+        public void HandlesReadOnlyCollection()
+        {
+            var entity = new Entity { Items = new[] { "One", "Two", "Three" } };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<Entity>(serialised, Settings);
+
+            Assert.AreEqual(entity.Items.Count(), deserialised.Items.Count());
+            foreach (var item in entity.Items)
+                Assert.IsTrue(deserialised.Items.Contains(item));
+        }
+
+        [TestMethod]
+        public void HandlesReadOnlyList()
+        {
+            var entity = new EntityWithReadOnlyList { Strings = new List<string> { "Test", "Test2" }  };
+            var serialised = NetJSON.Serialize(entity, Settings);
+            var deserialised = NetJSON.Deserialize<EntityWithReadOnlyList>(serialised, Settings);
+
+            Assert.AreEqual(2, deserialised.Strings.Count);
+            Assert.AreEqual("Test", deserialised.Strings[0]);
+            Assert.AreEqual("Test2", deserialised.Strings[1]);
         }
 
         private static bool CanSerialize(MemberInfo memberInfo)
@@ -1251,6 +1412,418 @@ namespace NetJSON.Tests {
 
             return true;
         }
+
+        private static readonly Random Random = new Random();
+
+        [TestMethod]
+        public void EventStructTest()
+        {
+            var e = new EventStruct(Guid.NewGuid(), new PayloadStruct(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStruct>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void EventStructWithPrivateSettersTest()
+        {
+            var e = new EventStructWithPrivateSetters(Guid.NewGuid(), new PayloadStructWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStructWithPrivateSetters>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void EventStructWithReadOnlyBackingFieldsTest()
+        {
+            var e = new EventStructWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadStructWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventStructWithReadOnlyBackingFields>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void EventClassTest()
+        {
+            var e = new EventClass(Guid.NewGuid(), new PayloadClass(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClass>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void EventClassWithPrivateSettersTest()
+        {
+            var e = new EventClassWithPrivateSetters(Guid.NewGuid(), new PayloadClassWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClassWithPrivateSetters>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void EventClassWithReadOnlyBackingFieldsTest()
+        {
+            var e = new EventClassWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadClassWithWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
+            var s = NetJSON.Serialize(e, Settings);
+            var d = NetJSON.Deserialize<EventClassWithReadOnlyBackingFields>(s, Settings);
+
+            Assert.AreEqual(e.Id, d.Id);
+            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
+            Assert.AreEqual(e.Version, d.Version);
+            Assert.AreEqual(e.Created, d.Created);
+        }
+
+        [TestMethod]
+        public void HandlesGuids()
+        {
+            var value = Guid.NewGuid();
+            var serialised = NetJSON.Serialize(value, Settings);
+            var deserialised = NetJSON.Deserialize<Guid>(serialised, Settings);
+            Assert.AreEqual(value, deserialised);
+            var values = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+            serialised = NetJSON.Serialize(values, Settings);
+            var deserialisedArray = NetJSON.Deserialize<List<Guid>>(serialised, Settings); // Fails
+        }
+
+        [TestMethod]
+        public void HandlesDateTimeOffsetDictionaryKey()
+        {
+            var value = DateTimeOffset.UtcNow;
+            var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:41:03.987489Z"
+            Assert.AreEqual(value, NetJSON.Deserialize<DateTimeOffset>(s));
+            var map = new Dictionary<DateTimeOffset, int> { { value, Random.Next() } };
+            var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:41:29 +00:00":266037427}
+            var deserialised = NetJSON.Deserialize<Dictionary<DateTimeOffset, int>>(serialised, Settings);
+
+            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
+            Assert.AreEqual(map[value], deserialised[value]);
+        }
+
+        [TestMethod]
+        public void HandlesDateTimeDictionaryKey()
+        {
+            var value = DateTime.UtcNow;
+            var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:35:50.9314230Z"
+            Assert.AreEqual(value, NetJSON.Deserialize<DateTime>(s));
+
+            var map = new Dictionary<DateTime, int> { { value, Random.Next() } };
+            var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:37:26":871282158}
+            var deserialised = NetJSON.Deserialize<Dictionary<DateTime, int>>(serialised, Settings);
+
+            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
+            Assert.AreEqual(map[value], deserialised[value]);
+        }
+
+        [TestMethod]
+        public void ExpandoSerializationWithStringDoubleSlash()
+        {
+            var json = @"[{""StringValue"":""C:\\ProgramData\\""}]";
+            var dict = NetJSON.Deserialize<List<Dictionary<string, object>>>(json);
+            var expando = NetJSON.Deserialize<List<ExpandoObject>>(json);
+            Assert.AreEqual(dict[0]["StringValue"], "C:\\ProgramData\\");
+        }
+
+        [TestMethod]
+        public unsafe void SerializeWithCustomType()
+        {
+            var model = new TestClassForCustomSerialization { ID = 100, Custom = new UserDefinedCustomClass { Name = "Test" } };
+
+            NetJSON.RegisterCustomTypeSerializer<UserDefinedCustomClass>(UserDefinedCustomClass.Serialize);
+            NetJSON.RegisterCustomTypeDeserializer(UserDefinedCustomClass.Deserialize);
+
+            var json = NetJSON.Serialize(model);
+            var model2 = NetJSON.Deserialize<TestClassForCustomSerialization>(json);
+
+            Assert.AreEqual(model.ID, model2.ID);
+            Assert.AreEqual(model.Custom.Name, model2.Custom.Name);
+        }
+
+
+        [TestMethod]
+        public void SerializeDeserializeStrings()
+        {
+            var netJsonSettings = new NetJSONSettings
+            {
+                CaseSensitive = true,
+                DateFormat = NetJSONDateFormat.ISO,
+                IncludeTypeInformation = true,
+                UseEnumString = true,
+                UseStringOptimization = true
+            };
+            var myString = "MyString";
+
+            var serialized = NetJSON.Serialize(myString, netJsonSettings);
+            var result = NetJSON.Deserialize<string>(serialized, netJsonSettings);
+
+            Assert.AreEqual(myString, result);
+        }
+
+        [TestMethod]
+        public void ShouldThrowExceptionForInvalidType()
+        {
+            //should not hangs
+            var badJson = "{  \"Id\": 31,  \"SubStruct\":  1,  \"SomeString\": \"My test string\"}";
+            MySuperStruct myStruct = null;
+            Exception ex = null;
+            try
+            {
+                myStruct = NetJSON.Deserialize<MySuperStruct>(badJson);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+
+            Assert.IsNotNull(ex);
+            Assert.IsInstanceOfType(ex, typeof(NetJSONTypeMismatchException));
+            Assert.IsNull(myStruct);
+        }
+    }
+
+    public class UserDefinedCustomClass
+    {
+        public string Name { get; set; }
+
+        public static void Serialize(UserDefinedCustomClass obj, StringBuilder sb, NetJSONSettings settings)
+        {
+            sb.AppendFormat("\"{{{0}}}\"", obj.Name);
+        }
+
+        public unsafe static UserDefinedCustomClass Deserialize(char* ptr, ref int index, NetJSONSettings settings)
+        {
+            var sb = new StringBuilder();
+            var current = '\0';
+            index++;
+            while ((current = ptr[index]) != '}')
+            {
+                if(current == '{' || current == '"')
+                {
+                    index++;
+                    continue;
+                }
+
+                sb.Append(current);
+                index++;
+            }
+
+            index+=2;
+
+            var name = sb.ToString();
+
+            return new UserDefinedCustomClass { Name = name };
+        }
+    }
+
+    public class MySuperStruct
+    {
+        public long Id { get; set; }
+        public MySubStruct SubStruct { get; set; }
+        public string SomeString { get; set; }
+    }
+
+    public class MySubStruct
+    {
+        public long Id { get; set; }
+        public DateTime SomeDate { get; set; }
+    }
+
+    public class TestClassForCustomSerialization
+    {
+        public int ID { get; set; }
+        public UserDefinedCustomClass Custom { get; set; }
+    }
+
+    public class EntityWithReadOnlyDictionary
+    {
+        public IReadOnlyDictionary<string, string> Map { get; set; }
+    }
+
+    public class EntityWithReadOnlyList
+    {
+        public IReadOnlyList<string> Strings { get; set; }
+    }
+
+    public class Entity
+    {
+        public IReadOnlyCollection<string> Items { get; set; }
+    }
+
+    public class NullableEntity
+    {
+        public Guid? Id { get; set; }
+        public ValueObject? Value { get; set; }
+    }
+
+    public struct ValueObject
+    {
+        public string Value { get; set; }
+    }
+
+
+    public class EnabledClass
+    {
+        public EnabledClass()
+        {
+            Enabled = true;
+        }
+
+        public bool Enabled { get; set; }
+    }
+
+    public class YadroUser
+    {
+        public YadroUser()
+        {
+            Id = -1;
+            CompanyId = -1;
+            Email = String.Empty;
+            Login = String.Empty;
+            Password = String.Empty;
+            Name = String.Empty;
+            Surname = String.Empty;
+            IsServerAdministrator = false;
+            Enabled = true;
+            HasWebAuthorisationAccess = true;
+            UltimateUser = false;
+            ToCreateOnCluster = true;
+            UserTokenType = "GccObjects.Net.UserManagement.GccUserRemoteView";
+            CultureId = 2057;
+            DefaultTimeZone = 0;
+            UseDaylightSaving = true;
+        }
+
+        /// <summary>
+        /// Free to store your own data
+        /// </summary>
+        public string UserToken { get; set; }
+
+        /// <summary>
+        /// User's Id
+        /// </summary>
+        public long Id { get; set; }
+
+        /// <summary>
+        /// Id of the company where user belongs to
+        /// </summary>
+        public long CompanyId { get; set; }
+
+        /// <summary>
+        /// User's email address
+        /// </summary>
+        public string Email { get; set; }
+
+        /// <summary>
+        /// User's login
+        /// </summary>
+        public string Login { get; set; }
+
+        /// <summary>
+        /// User's password
+        /// </summary>
+        public string Password { get; set; }
+
+        /// <summary>
+        /// User's name
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// User's Surname
+        /// </summary>
+        public string Surname { get; set; }
+
+        /// <summary>
+        /// If the user is server administrator
+        /// </summary>
+        public bool IsServerAdministrator { get; set; }
+
+        /// <summary>
+        /// Has ability to be authorized via web
+        /// </summary>
+        public bool HasWebAuthorisationAccess { get; set; }
+
+        /// <summary>
+        /// If user is enabled
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>
+        /// Tells that this user .... Default is false.
+        /// </summary>
+        public bool UltimateUser { get; set; }
+
+        /// <summary>
+        /// 12 digits firma identificator
+        /// </summary>
+        public string FirmaIdentificator { get; set; }
+
+        /// <summary>
+        /// If user must be skipped to be created on the cluster
+        /// </summary>
+        public bool ToCreateOnCluster { get; set; }
+
+        /// <summary>
+        /// By default it contains UserRemoteView, but can be changed
+        /// </summary>
+        public string UserTokenType { get; set; }
+
+        /// <summary>
+        /// 2057 en-GB; 1049 ru-RU; 1031 de-DE; 1062 lv-LV; 1033 en-US etc...
+        /// Default 2057
+        /// </summary>       
+        public int CultureId { get; set; }
+
+        /// <summary>
+        /// -12 0 +12 hours from GMT.
+        /// Default 0
+        /// </summary>       
+        public int DefaultTimeZone { get; set; }
+        /// <summary>
+        /// If selected time zone uses daylight saving
+        /// Default true
+        /// </summary>
+        public bool UseDaylightSaving { get; set; }
+    }
+
+    public class A
+    {
+        public A()
+        {
+            Details = new Dictionary<int, B>();
+        }
+
+        public Dictionary<int, B> Details { get; set; }
+    }
+
+    public class B
+    {
+    }
+
+    struct SimpleObjectStruct
+    {
+        public int ID;
+        public string Name;
+        public string Value;
     }
 
     public class Test
@@ -1964,5 +2537,123 @@ namespace NetJSON.Tests {
     public class PersonX2 : PersonAbstract
     {
         public override string Name { get; set; }
+    }
+
+    public struct EventStruct
+    {
+        public EventStruct(Guid id, PayloadStruct payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; }
+        public PayloadStruct Payload { get; }
+        public int Version { get; }
+        public DateTimeOffset Created { get; }
+    }
+
+    public struct PayloadStruct
+    {
+        public PayloadStruct(string value) { Value = value; }
+
+        public string Value { get; }
+    }
+
+    public struct EventStructWithPrivateSetters
+    {
+        public EventStructWithPrivateSetters(Guid id, PayloadStructWithPrivateSetter payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; private set; }
+        public PayloadStructWithPrivateSetter Payload { get; private set; }
+        public int Version { get; private set; }
+        public DateTimeOffset Created { get; private set; }
+    }
+
+    public struct PayloadStructWithPrivateSetter
+    {
+        public PayloadStructWithPrivateSetter(string value) { Value = value; }
+
+        public string Value { get; private set; }
+    }
+
+    public struct EventStructWithReadOnlyBackingFields
+    {
+        private readonly Guid _id;
+        private readonly PayloadStructWithReadOnlyBackingField _payload;
+        private readonly int _version;
+        private readonly DateTimeOffset _created;
+
+        public EventStructWithReadOnlyBackingFields(Guid id, PayloadStructWithReadOnlyBackingField payload, int version, DateTimeOffset created) { _id = id; _payload = payload; _version = version; _created = created; }
+
+        public Guid Id => _id;
+        public PayloadStructWithReadOnlyBackingField Payload => _payload;
+        public int Version => _version;
+        public DateTimeOffset Created => _created;
+    }
+
+    public struct PayloadStructWithReadOnlyBackingField
+    {
+        private readonly string _value;
+
+        public PayloadStructWithReadOnlyBackingField(string value) { _value = value; }
+
+        public string Value => _value;
+    }
+
+    public class EventClass
+    {
+        public EventClass(Guid id, PayloadClass payload, int version, DateTimeOffset created) {
+            Id = id; Payload = payload; Version = version; Created = created;
+        }
+
+        public Guid Id { get; }
+        public PayloadClass Payload { get; }
+        public int Version { get; }
+        public DateTimeOffset Created { get; }
+    }
+
+    public class PayloadClass
+    {
+        public PayloadClass(string value) { Value = value; }
+
+        public string Value { get; }
+    }
+
+    public class EventClassWithPrivateSetters
+    {
+        public EventClassWithPrivateSetters(Guid id, PayloadClassWithPrivateSetter payload, int version, DateTimeOffset created) { Id = id; Payload = payload; Version = version; Created = created; }
+
+        public Guid Id { get; private set; }
+        public PayloadClassWithPrivateSetter Payload { get; private set; }
+        public int Version { get; private set; }
+        public DateTimeOffset Created { get; private set; }
+    }
+
+    public class PayloadClassWithPrivateSetter
+    {
+        public PayloadClassWithPrivateSetter(string value) { Value = value; }
+
+        public string Value { get; private set; }
+    }
+
+    public class EventClassWithReadOnlyBackingFields
+    {
+        private readonly Guid _id;
+        private readonly PayloadClassWithWithReadOnlyBackingField _payload;
+        private readonly int _version;
+        private readonly DateTimeOffset _created;
+
+        public EventClassWithReadOnlyBackingFields(Guid id, PayloadClassWithWithReadOnlyBackingField payload, int version, DateTimeOffset created) { _id = id; _payload = payload; _version = version; _created = created; }
+
+        public Guid Id => _id;
+        public PayloadClassWithWithReadOnlyBackingField Payload => _payload;
+        public int Version => _version;
+        public DateTimeOffset Created => _created;
+    }
+
+    public class PayloadClassWithWithReadOnlyBackingField
+    {
+        private readonly string _value;
+
+        public PayloadClassWithWithReadOnlyBackingField(string value) { _value = value; }
+
+        public string Value => _value;
     }
 }

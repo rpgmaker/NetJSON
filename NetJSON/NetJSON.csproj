@@ -60,15 +60,8 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>
-copy "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net40\$(TargetFileName)"
-
-copy "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net40\$(TargetName).xml"
-
-
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.dll" "$(SolutionDir)NetJSON\lib\netstandard1.6\NetJSON.Core.dll"
-copy "$(SolutionDir)NetJSON.Core\$(OutDir)\netstandard1.6\NetJSON.Core.xml" "$(SolutionDir)NetJSON\lib\netstandard1.6\NetJSON.Core.xml"
-
+    <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net40\"
+xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net40\"
 
 </PostBuildEvent>
   </PropertyGroup>

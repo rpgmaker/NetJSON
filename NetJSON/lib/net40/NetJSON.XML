@@ -107,6 +107,11 @@
             Exception thrown for invalid json string
             </summary>
         </member>
+        <member name="T:NetJSON.NetJSONTypeMismatchException">
+            <summary>
+            Exception thrown for invalid json string
+            </summary>
+        </member>
         <member name="T:NetJSON.NetJSONInvalidJSONPropertyException">
             <summary>
             Exception thrown for invalid json property attribute
@@ -271,10 +276,24 @@
         </member>
         <member name="M:NetJSON.NetJSON.RegisterTypeSerializer``1(System.Func{``0,System.String})">
             <summary>
-            Register serializer primitive method for <typeparamref name="T"/>
+            Register serializer primitive method for <typeparamref name="T"/> when object type is encountered
             </summary>
             <typeparam name="T"></typeparam>
             <param name="serializeFunc"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.RegisterCustomTypeSerializer``1(System.Action{``0,System.Text.StringBuilder,NetJSON.NetJSONSettings})">
+            <summary>
+            Register serializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="serializeFunc"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.RegisterCustomTypeDeserializer``1(NetJSON.NetJSON.DeserializeCustomTypeDelegate{``0})">
+            <summary>
+            Register deserializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="deserializeFunc"></param>
         </member>
         <member name="M:NetJSON.NetJSON.Serialize``1(``0)">
             <summary>
@@ -325,6 +344,14 @@
             <param name="value"></param>
             <param name="writer"></param>
             <param name="settings"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.SerializeObject(System.Object,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize value using underlying object type
+            </summary>
+            <param name="value">Object value</param>
+            <param name="settings">Settings</param>
+            <returns>String</returns>
         </member>
         <member name="M:NetJSON.NetJSON.Deserialize``1(System.String,NetJSON.NetJSONSettings)">
             <summary>

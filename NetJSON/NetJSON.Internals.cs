@@ -10,6 +10,25 @@ using System.Text.RegularExpressions;
 
 namespace NetJSON.Internals
 {
+    public unsafe class NetJSONStringReader
+    {
+        private char* ptr;
+        private int index;
+
+        public NetJSONStringReader() { }
+
+        internal NetJSONStringReader(char* ptr, ref int index)
+        {
+            this.ptr = ptr;
+            this.index = index;
+        }
+
+        public char Next()
+        {
+            return '\0'; 
+        }
+    }
+
 	public sealed class TupleContainer
 	{
 		private int _size;
@@ -93,13 +112,13 @@ namespace NetJSON.Internals
 
 	static partial class CompatibleExtensions
 	{
-#if !NET_CORE && !NET_PCL
+#if !NET_STANDARD && !NET_PCL && !NET_46 && !NET_47
 		internal static Type GetTypeInfo(this Type type) {
 			return type;
 		}
 #endif
 
-		internal static void EmitClearStringBuilder(this ILGenerator il) {
+        internal static void EmitClearStringBuilder(this ILGenerator il) {
 #if !NET_35
 			il.Emit(OpCodes.Callvirt, typeof(StringBuilder).GetMethod("Clear"));
 #else
@@ -149,7 +168,7 @@ namespace NetJSON.Internals
 				return new string(ptr, startIndex, length);
 		}
 
-#if NET_CORE
+#if NET_STANDARD
         // Retrieved from https://github.com/dotnet/corefx/pull/10088
         private static readonly Func<Type, object> s_getUninitializedObjectDelegate = (Func<Type, object>)
  typeof(string).GetTypeInfo().Assembly.GetType("System.Runtime.Serialization.FormatterServices")
@@ -168,7 +187,7 @@ namespace NetJSON.Internals
 #endif
 
         internal static T GetUninitializedInstance<T>() {
-#if NET_CORE
+#if NET_STANDARD
             return (T)GetUninitializedObject(typeof(T));
 #else
 			return (T)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(T));
@@ -338,13 +357,26 @@ namespace NetJSON.Internals
 			return value.StartsWith("\\/Date") || _dateISORegex.IsMatch(value);
 		}
 
-        internal unsafe static object ToStringIfString(object value, NetJSONSettings settings)
+        internal unsafe static string ToStringIfString(object value, NetJSONSettings settings)
         {
             var str = value as string;
             if(str != null)
             {
+                StringBuilder sb = new StringBuilder();
+                NetJSON.EncodedJSONString(sb, str, settings);
+                return sb.ToString();
+            }
+
+            return str;
+        }
+
+        internal unsafe static object ToStringIfStringObject(object value, NetJSONSettings settings)
+        {
+            var str = value as string;
+            if (str != null)
+            {
                 str = string.Concat('"', str, '"');
-                fixed(char* p = str)
+                fixed (char* p = str)
                 {
                     char* ptr = p;
                     int index = 0;
@@ -355,7 +387,7 @@ namespace NetJSON.Internals
             return value;
         }
 
-		private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
+        private static DateTime StringToDate(string value, NetJSONSettings settings, out TimeSpan offset, bool isDateTimeOffset) {
 			offset = TimeSpan.Zero;
 
             if (settings._hasDateStringFormat)
@@ -467,9 +499,9 @@ namespace NetJSON.Internals
 		}
 
 		internal static Guid FastStringToGuid(string value) {
-			//TODO: Optimize
-			return new Guid(value);
-		}
+            //TODO: Optimize
+            return new Guid(value);
+        }
 
 		internal static Type FastStringToType(string value) {
 			return Type.GetType(value, false);
@@ -775,12 +807,12 @@ namespace NetJSON.Internals
 
 		internal static bool CustomTypeEquality(Type type1, Type type2) {
 			if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 				.IsEnum) {
 				if (type1
-#if NET_CORE
+#if NET_STANDARD
     .GetTypeInfo()
 #endif
 					.IsEnum && type2 == typeof(Enum))
@@ -961,7 +993,7 @@ namespace NetJSON.Internals
 
 		internal static string AllDateToString(DateTime date, NetJSONSettings settings) {
 			var offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(date);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(date);
@@ -1066,7 +1098,7 @@ namespace NetJSON.Internals
 
 			if (date.Kind == DateTimeKind.Utc && timeZoneFormat == NetJSONTimeZoneFormat.Utc) {
 				offset =
-#if NET_CORE
+#if NET_STANDARD
                     TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
 #else
 					TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
@@ -1084,8 +1116,13 @@ namespace NetJSON.Internals
 			return LongToStr(epochTime);// IntUtility.ltoa(epochTime);
 		}
 
-		internal static void SetterPropertyValue<T>(T instance, object value, MethodInfo methodInfo) {
-			NetJSON.SetterPropertyValue(instance, value, methodInfo);
+		internal static void SetterPropertyValue<T>(ref T instance, object value, MethodInfo methodInfo) {
+			NetJSON.SetterPropertyValue(ref instance, value, methodInfo);
 		}
-	}
+
+        internal static void SetterFieldValue<T>(ref T instance, object value, FieldInfo fieldInfo)
+        {
+            NetJSON.SetterFieldValue(ref instance, value, fieldInfo);
+        }
+    }
 }
