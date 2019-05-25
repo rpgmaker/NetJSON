@@ -3000,12 +3000,30 @@ namespace NetJSON {
                     var skipDefaultValueTrueLabel = il.DefineLabel();
                     var skipDefaultValueFalseLabel = il.DefineLabel();
                     var skipDefaultValueTrueAndHasValueLabel = il.DefineLabel();
+                    
                     var successLocal = il.DeclareLocal(_boolType);
+                    var hasNullableValue = il.DeclareLocal(_boolType);
 
                     var hasValueMethod = isNullable ? originPropType.GetMethod("get_HasValue") : null;
 
                     il.Emit(OpCodes.Ldc_I4, 0);
                     il.Emit(OpCodes.Stloc, successLocal);
+
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    il.Emit(OpCodes.Stloc, hasNullableValue);
+
+                    if (isNullable)
+                    {
+                        var hasNullableValueLabel = il.DefineLabel();
+                        il.Emit(OpCodes.Ldloca, nullablePropValue);
+                        il.Emit(OpCodes.Call, hasValueMethod);
+                        il.Emit(OpCodes.Brfalse, hasNullableValueLabel);
+
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        il.Emit(OpCodes.Stloc, hasNullableValue);
+
+                        il.MarkLabel(hasNullableValueLabel);
+                    }
 
                     il.Emit(OpCodes.Ldloc, skipDefaultValue);
                     il.Emit(OpCodes.Brfalse, skipDefaultValueTrueLabel);
@@ -3048,7 +3066,7 @@ namespace NetJSON {
                         } else il.Emit(OpCodes.Beq, propNullLabel);
                     }
 
-                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue, true, isNullable, hasNullableValue);
 
                     il.Emit(OpCodes.Ldc_I4, 1);
                     il.Emit(OpCodes.Stloc, successLocal);
@@ -3063,7 +3081,7 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldloc, successLocal);
                     il.Emit(OpCodes.Brtrue, skipDefaultValueFalseLabel);
 
-                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+                    WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue, false, isNullable, hasNullableValue);
 
                     il.Emit(OpCodes.Ldc_I4, 1);
                     il.Emit(OpCodes.Stloc, successLocal);
@@ -3079,7 +3097,7 @@ namespace NetJSON {
                         il.Emit(OpCodes.Ldloc, successLocal);
                         il.Emit(OpCodes.Brtrue, skipDefaultValueTrueAndHasValueLabel);
 
-                        WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue);
+                        WritePropertyForType(typeBuilder, il, hasValue, counter, nameLocal, propType, propValue, true, isNullable, hasNullableValue);
 
                         il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
                     }
@@ -3144,7 +3162,7 @@ namespace NetJSON {
             il.Emit(OpCodes.Pop);
         }
 
-        private static void WritePropertyForType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder hasValue, int counter, LocalBuilder name, Type propType, LocalBuilder propValue) {
+        private static void WritePropertyForType(TypeBuilder typeBuilder, ILGenerator il, LocalBuilder hasValue, int counter, LocalBuilder name, Type propType, LocalBuilder propValue, bool skipDefault, bool nullable, LocalBuilder hasNullableValue) {
             if (counter > 0) {
 
                 var hasValueDelimeterLabel = il.DefineLabel();
@@ -3172,19 +3190,52 @@ namespace NetJSON {
             il.Emit(OpCodes.Pop);
 
 
-            if (propType == _intType || propType == _longType) {
+            if ((propType == _intType || propType == _longType) && !nullable) {
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldloc, propValue);
 
                 il.Emit(OpCodes.Call, propType == _longType ? _generatorLongToStr : _generatorIntToStr);
                 il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
                 il.Emit(OpCodes.Pop);
-            } else {
+            }
+            else {
+
+                var needLabel = !skipDefault && nullable;
+                var writeNullForSkippedNullable = il.DefineLabel();
+                var writeNormal = il.DefineLabel();
+                var isSkippedValue = il.DeclareLocal(_boolType);
+
+                il.Emit(OpCodes.Ldc_I4_0);
+                il.Emit(OpCodes.Stloc, isSkippedValue);
+
+                il.Emit(OpCodes.Ldc_I4, skipDefault ? 1 : 0);
+                il.Emit(OpCodes.Brtrue, writeNullForSkippedNullable);
+                il.Emit(OpCodes.Ldc_I4, nullable ? 1 : 0);
+                il.Emit(OpCodes.Brfalse, writeNullForSkippedNullable);
+                il.Emit(OpCodes.Ldloc, hasNullableValue);
+                il.Emit(OpCodes.Brtrue, writeNullForSkippedNullable);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldstr, NullStr);
+                il.Emit(OpCodes.Callvirt, _stringBuilderAppend);
+                il.Emit(OpCodes.Pop);
+
+                il.Emit(OpCodes.Ldc_I4_1);
+                il.Emit(OpCodes.Stloc, isSkippedValue);
+
+                il.MarkLabel(writeNullForSkippedNullable);
+
+                // If value is not skipped due to skip default and not having a value
+                il.Emit(OpCodes.Ldloc, isSkippedValue);
+                il.Emit(OpCodes.Brtrue, writeNormal);
+
                 il.Emit(OpCodes.Ldloc, propValue);
 
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Call, WriteSerializeMethodFor(typeBuilder, propType));
+
+                il.MarkLabel(writeNormal);
             }
 
             il.Emit(OpCodes.Ldc_I4_1);

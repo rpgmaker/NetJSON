@@ -1598,6 +1598,91 @@ namespace NetJSON.Tests {
             Assert.IsInstanceOfType(ex, typeof(NetJSONTypeMismatchException));
             Assert.IsNull(myStruct);
         }
+
+        [TestMethod]
+        public void ShouldNotFailWhenUsingUlongEnum()
+        {
+            var obj = new ULongClass { LongEnum = ULongEnum.A };
+            var json = NetJSON.Serialize(obj);
+            var data = NetJSON.Deserialize<ULongClass>(json);
+
+            Assert.AreEqual((ulong)data.LongEnum, (ulong)obj.LongEnum);
+        }
+
+        [TestMethod]
+        public void ShouldNotFailWhenUlongFlagEnum()
+        {
+            var obj = new ULongClass() { LongEnum = ULongEnum.ULongEnumValueA | ULongEnum.ULongEnumValueB };
+            var json = NetJSON.Serialize(obj);
+            var dto = NetJSON.Deserialize<ULongClass>(json);
+            var ulongValue = (ulong)dto.LongEnum;
+
+            Assert.AreEqual((ulong)dto.LongEnum, (ulong)obj.LongEnum);
+        }
+
+
+        [TestMethod]
+        public void ShouldSerializeIntWithDefault()
+        {
+            var settings = new NetJSONSettings { SkipDefaultValue = false };
+            var json = "{\"Id\":0}";
+            var obj2 = NetJSON.Deserialize<IntWithDefault>(json, settings);
+
+            Assert.AreEqual(0, obj2.Id);
+        }
+
+        [TestMethod]
+        public void ShouldSerializeNullableIntWithDefault()
+        {
+            var settings = new NetJSONSettings { SkipDefaultValue = false };
+            var json = NetJSON.Serialize(new IntNullableDefault { Id = null }, settings);
+            var obj2 = NetJSON.Deserialize<IntNullableDefault>(json, settings);
+
+            Assert.IsNull(obj2.Id);
+        }
+
+        [TestMethod]
+        public void ShouldSerializeNullableIntWithValue()
+        {
+            var settings = new NetJSONSettings { SkipDefaultValue = false };
+            var json = NetJSON.Serialize(new IntNullableDefault { Id = 0 }, settings);
+            var obj2 = NetJSON.Deserialize<IntNullableDefault>(json, settings);
+
+            Assert.IsTrue(obj2.Id == 0);
+        }
+    }
+
+    public class IntWithDefault
+    {
+        public int Id { get; set; }
+    }
+
+    public class IntNullableDefault
+    {
+        public int? Id { get; set; }
+    }
+
+    public class ULongClass
+    {
+        public ULongEnum LongEnum { get; set; }
+    }
+
+    public class UIntClass
+    {
+        public UIntEnum LongEnum { get; set; }
+    }
+
+    [Flags]
+    public enum ULongEnum : ulong
+    {
+        A = 100,
+        ULongEnumValueA = 0x00400,
+        ULongEnumValueB = 0x400000000
+    }
+
+    public enum UIntEnum : uint
+    {
+        ID, ID2 = uint.MaxValue, ID3 = 100000
     }
 
     public class UserDefinedCustomClass
