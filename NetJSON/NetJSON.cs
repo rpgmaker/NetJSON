@@ -2530,7 +2530,8 @@ namespace NetJSON {
                         }
                     }
 
-                    if (!types.Contains(type) && !type.GetTypeInfo().IsAbstract)
+                    var typeInfo = type.GetTypeInfo();
+                    if (!types.Contains(type) && (!typeInfo.IsAbstract || typeInfo.IsInterface))
                         types.Insert(0, type);
 
                     return types;

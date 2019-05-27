@@ -1650,7 +1650,55 @@ namespace NetJSON.Tests {
 
             Assert.IsTrue(obj2.Id == 0);
         }
+
+        [TestMethod]
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        public void CanSerializeSimpleClassWithInterface()
+        {
+            NetJSON.IncludeTypeInformation = true;
+            var jsonSettingsB = new NetJSONSettings() { DateFormat = NetJSONDateFormat.ISO, SkipDefaultValue = false, UseEnumString = true, };
+            var sc = new SimpleClass();
+            var isc = (ISimpleClass)sc;
+            var scs = NetJSON.Serialize(typeof(SimpleClass), sc, jsonSettingsB);
+            var iscs = NetJSON.Serialize(typeof(ISimpleClass), isc, jsonSettingsB);
+            var scsd = NetJSON.Deserialize<SimpleClass>(iscs, jsonSettingsB) as ISimpleClass;
+
+            Assert.AreEqual(scsd.SimpleClassProp, sc.SimpleClassProp);
+            Assert.AreEqual(scsd.SimpleClassBaseProp, sc.SimpleClassBaseProp);
+        }
+
+        [TestMethod]
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        public void CanSerializeCollectionSimpleWithInterface()
+        {
+            NetJSON.IncludeTypeInformation = true;
+            var jsonSettings = new NetJSONSettings() { DateFormat = NetJSONDateFormat.ISO, SkipDefaultValue = false, UseEnumString = true };
+            var isc = (ISimpleClassBase)new SimpleClass();
+            var iscEnumerable = new List<ISimpleClassBase>() { new SimpleClass() };
+            var iscs = NetJSON.SerializeObject(isc, jsonSettings);
+            var iscsE = NetJSON.SerializeObject(iscEnumerable, jsonSettings);
+            Assert.IsTrue(iscsE.Contains("$type"));
+        }
     }
+
+    public class SimpleClass : ISimpleClass
+    {
+        public string SimpleClassProp { get; set; } = "Test";
+        public string SimpleClassBaseProp { get; set; } = "Test";
+    }
+
+    [NetJSONKnownType(typeof(SimpleClass))]
+    public interface ISimpleClass : ISimpleClassBase
+    {
+        string SimpleClassProp { get; set; }
+    }
+
+    [NetJSONKnownType(typeof(SimpleClass))]
+    public interface ISimpleClassBase
+    {
+        string SimpleClassBaseProp { get; set; }
+    }
+
 
     public class IntWithDefault
     {
