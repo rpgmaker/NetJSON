@@ -1745,24 +1745,19 @@ namespace NetJSON.Tests {
             sb.AppendFormat("\"{{{0}}}\"", obj.Name);
         }
 
-        public unsafe static UserDefinedCustomClass Deserialize(char* ptr, ref int index, NetJSONSettings settings)
+        public unsafe static UserDefinedCustomClass Deserialize(NetJSONStringReader reader, NetJSONSettings settings)
         {
             var sb = new StringBuilder();
             var current = '\0';
-            index++;
-            while ((current = ptr[index]) != '}')
+            while ((current = reader.Next()) != '}')
             {
                 if(current == '{' || current == '"')
                 {
-                    index++;
                     continue;
                 }
 
                 sb.Append(current);
-                index++;
             }
-
-            index+=2;
 
             var name = sb.ToString();
 

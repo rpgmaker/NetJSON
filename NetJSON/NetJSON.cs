@@ -417,7 +417,8 @@ namespace NetJSON {
             _netjsonPropertyType = typeof(NetJSONPropertyAttribute),
             _textReaderType = typeof(TextReader),
             _stringComparison = typeof(StringComparison),
-            _settingsType = typeof(NetJSONSettings);
+            _settingsType = typeof(NetJSONSettings),
+            _netjsonStringReaderType = typeof(NetJSONStringReader);
 
         static MethodInfo _stringBuilderToString =
             _stringBuilderType.GetMethod("ToString", Type.EmptyTypes),
@@ -478,6 +479,7 @@ namespace NetJSON {
             _isArrayEndChar = _internalJsonType.GetMethod("IsArrayEndChar", MethodBinding),
             _encodedJSONString = _jsonType.GetMethod("EncodedJSONString", MethodBinding),
             _decodeJSONString = _jsonType.GetMethod("DecodeJSONString", MethodBinding),
+            _readerDeserializer = _jsonType.GetMethod("ReaderDeserializer", MethodBinding),
             _skipProperty = _internalJsonType.GetMethod("SkipProperty", MethodBinding),
             _prettifyJSONIfNeeded = _jsonType.GetMethod("PrettifyJSONIfNeeded", MethodBinding),
             _isRawPrimitive = _internalJsonType.GetMethod("IsRawPrimitive", MethodBinding),
@@ -613,6 +615,9 @@ namespace NetJSON {
         static readonly ConcurrentDictionary<FieldInfo, Delegate> _setMemberFieldValues = new ConcurrentDictionary<FieldInfo, Delegate>();
 
         static ConcurrentDictionary<string, Func<object>> _typeIdentifierFuncs = new ConcurrentDictionary<string, Func<object>>();
+
+        static ConcurrentDictionary<string, Func<NetJSONStringReader, NetJSONSettings, object>> _customDeserializerForNetJSONStringReaders = 
+            new ConcurrentDictionary<string, Func<NetJSONStringReader, NetJSONSettings, object>>();
 
         static ConcurrentDictionary<Type, bool> _primitiveTypes =
             new ConcurrentDictionary<Type, bool>();
@@ -3997,6 +4002,36 @@ namespace NetJSON {
             return sb.ToString();
         }
 
+        internal static T InvokeCustomDeserializerForReader<T>(MethodInfo methodInfo, NetJSONStringReader reader, NetJSONSettings settings)
+        {
+            var typeName = typeof(T).GetName().Fix();
+            return (T)_customDeserializerForNetJSONStringReaders.GetOrAdd(typeName, _ => {
+                lock (GetDictLockObject("InvokeCustomDeserializerForReader"))
+                {
+                    var meth = new DynamicMethod(Guid.NewGuid().ToString("N"), _objectType, new Type[] { _netjsonStringReaderType, _settingsType }, restrictedSkipVisibility: true);
+
+                    var il = meth.GetILGenerator();
+
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Call, methodInfo);
+                    il.Emit(OpCodes.Ret);
+
+                    return meth.CreateDelegate(typeof(Func<NetJSONStringReader, NetJSONSettings, object>)) as Func<NetJSONStringReader, NetJSONSettings, object>;
+                }
+            })(reader, settings);
+        }
+
+        internal static T ReaderDeserializer<T>(char* ptr, ref int index, NetJSONSettings settings)
+        {
+            var typeName = typeof(T).GetName().Fix();
+            var method = _registeredCustomDeserializerMethods[typeName];
+            var reader = new NetJSONStringReader(ptr, index);
+            var result = InvokeCustomDeserializerForReader<T>(method, reader, settings);
+            index += reader.counter + 1;
+            return result;
+        }
+
         private static MethodInfo GenerateExtractValueFor(TypeBuilder typeBuilder, Type type) {
             MethodInfo method;
             var key = string.Concat(type.FullName, typeBuilder == null ? Dynamic : string.Empty);
@@ -4004,9 +4039,9 @@ namespace NetJSON {
             if (_extractMethodBuilders.TryGetValue(key, out method))
                 return method;
 
-            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            if (_registeredCustomDeserializerMethods.ContainsKey(typeName))
             {
-                return _extractMethodBuilders[key] = method;
+                return _extractMethodBuilders[key] = _readerDeserializer.MakeGenericMethod(type);
             }
 
             var methodName = String.Concat(ExtractStr, typeName);
@@ -4255,7 +4290,7 @@ namespace NetJSON {
 
         delegate void SetterPropertyDelegate<T>(ref T instance, object value, MethodInfo methodInfo);
         delegate void SetterFieldDelegate<T>(ref T instance, object value, FieldInfo fieldInfo);
-        public delegate T DeserializeCustomTypeDelegate<T>(char* ptr, ref int index, NetJSONSettings settings);
+        public delegate T DeserializeCustomTypeDelegate<T>(NetJSONStringReader reader, NetJSONSettings settings);
 
         internal static void SetterPropertyValue<T>(ref T instance, object value, MethodInfo methodInfo) {
             (_setMemberValues.GetOrAdd(methodInfo, key => {
@@ -4517,9 +4552,9 @@ namespace NetJSON {
             if (_createListMethodBuilders.TryGetValue(key, out method))
                 return method;
 
-            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            if (_registeredCustomDeserializerMethods.ContainsKey(typeName))
             {
-                return _createListMethodBuilders[key] = method;
+                return _createListMethodBuilders[key] = _readerDeserializer.MakeGenericMethod(type);
             }
 
             var methodName = String.Concat(CreateListStr, typeName);
@@ -4828,9 +4863,9 @@ namespace NetJSON {
             if (_readMethodBuilders.TryGetValue(key, out method))
                 return method;
 
-            if (_registeredCustomDeserializerMethods.TryGetValue(typeName, out method))
+            if (_registeredCustomDeserializerMethods.ContainsKey(typeName))
             {
-                return _readMethodBuilders[key] = method;
+                return _readMethodBuilders[key] = _readerDeserializer.MakeGenericMethod(type);
             }
 
             var methodName = String.Concat(CreateClassOrDictStr, typeName);

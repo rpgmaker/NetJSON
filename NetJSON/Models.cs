@@ -22,7 +22,30 @@ namespace NetJSON
 		}
 	}
 
-	public sealed class NetJSONSettings
+    public unsafe sealed class NetJSONStringReader
+    {
+        private char* ptr;
+        private int index;
+        internal int counter;
+
+        public NetJSONStringReader() { }
+
+        internal NetJSONStringReader(char* ptr, int index)
+        {
+            this.ptr = ptr;
+            this.index = index;
+            this.counter++;
+            this.index++;
+        }
+
+        public char Next()
+        {
+            counter++;
+            return ptr[index++];
+        }
+    }
+
+    public sealed class NetJSONSettings
 	{
         internal bool _hasDateStringFormat = false;
 		/// <summary>
