@@ -1661,7 +1661,7 @@ namespace NetJSON.Tests {
             var isc = (ISimpleClass)sc;
             var scs = NetJSON.Serialize(typeof(SimpleClass), sc, jsonSettingsB);
             var iscs = NetJSON.Serialize(typeof(ISimpleClass), isc, jsonSettingsB);
-            var scsd = NetJSON.Deserialize<SimpleClass>(iscs, jsonSettingsB) as ISimpleClass;
+            var scsd = NetJSON.Deserialize<ISimpleClass>(iscs, jsonSettingsB) as ISimpleClass;
 
             Assert.AreEqual(scsd.SimpleClassProp, sc.SimpleClassProp);
             Assert.AreEqual(scsd.SimpleClassBaseProp, sc.SimpleClassBaseProp);
@@ -1677,7 +1677,10 @@ namespace NetJSON.Tests {
             var iscEnumerable = new List<ISimpleClassBase>() { new SimpleClass() };
             var iscs = NetJSON.SerializeObject(isc, jsonSettings);
             var iscsE = NetJSON.SerializeObject(iscEnumerable, jsonSettings);
-            Assert.IsTrue(iscsE.Contains("$type"));
+            var discsE = NetJSON.Deserialize<List<ISimpleClassBase>>(iscsE, jsonSettings);
+            Assert.AreEqual(1, discsE.Count);
+            Assert.AreEqual((discsE[0] as SimpleClass).SimpleClassProp, (isc as SimpleClass).SimpleClassProp);
+            Assert.AreEqual(discsE[0].SimpleClassBaseProp, isc.SimpleClassBaseProp);
         }
     }
 

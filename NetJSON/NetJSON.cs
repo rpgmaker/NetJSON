@@ -2504,7 +2504,7 @@ namespace NetJSON {
         private static List<Type> GetIncludedTypeTypes(Type type) {
             var pTypes = _includedTypeTypes.GetOrAdd(type, _ => {
                 lock (GetDictLockObject("GetIncludeTypeTypes")) {
-                    var attrs = type.GetTypeInfo().GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), true).OfType<NetJSONKnownTypeAttribute>();
+                    var attrs = type.GetTypeInfo().GetCustomAttributes(typeof(NetJSONKnownTypeAttribute), false).OfType<NetJSONKnownTypeAttribute>();
                     var types = attrs.Any() ? attrs.Where(x => !x.Type.GetTypeInfo().IsAbstract).Select(x => x.Type).ToList() : null;
                     
                     //Expense call to auto-magically figure all subclass of current type
@@ -4958,16 +4958,39 @@ namespace NetJSON {
             }
             else
             {
-                var ctor = type.GetConstructor(Type.EmptyTypes);
-                if (ctor == null)
+                var typeInfo = type.GetTypeInfo();
+                if (typeInfo.IsInterface || typeInfo.IsAbstract)
                 {
-                    if (type.GetTypeInfo().IsInterface)
+                    il.Emit(OpCodes.Ldnull);
+                    il.Emit(OpCodes.Stloc, obj);
+                }
+                else
+                {
+                    var ctor = type.GetConstructor(Type.EmptyTypes);
+                    if (ctor == null)
                     {
-                        il.Emit(OpCodes.Ldnull);
+                        if (typeInfo.IsInterface || typeInfo.IsAbstract)
+                        {
+                            il.Emit(OpCodes.Ldnull);
+                            il.Emit(OpCodes.Stloc, obj);
+                        }
+                        else
+                        {
+                            selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
+                            if (isTypeValueType)
+                            {
+                                il.Emit(OpCodes.Ldloca, obj);
+                                il.Emit(OpCodes.Initobj, type);
+                            }
+                            else
+                            {
+                                il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                                il.Emit(OpCodes.Stloc, obj);
+                            }
+                        }
                     }
                     else
                     {
-                        selectedCtor = type.GetConstructors().OrderBy(x => x.GetParameters().Length).LastOrDefault();
                         if (isTypeValueType)
                         {
                             il.Emit(OpCodes.Ldloca, obj);
@@ -4975,22 +4998,9 @@ namespace NetJSON {
                         }
                         else
                         {
-                            il.Emit(OpCodes.Call, _getUninitializedInstance.MakeGenericMethod(type));
+                            il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
                             il.Emit(OpCodes.Stloc, obj);
                         }
-                    }
-                }
-                else
-                {
-                    if (isTypeValueType)
-                    {
-                        il.Emit(OpCodes.Ldloca, obj);
-                        il.Emit(OpCodes.Initobj, type);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Newobj, ctor);//NewObjNoctor
-                        il.Emit(OpCodes.Stloc, obj);
                     }
                 }
             }
