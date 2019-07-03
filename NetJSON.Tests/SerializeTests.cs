@@ -1682,6 +1682,28 @@ namespace NetJSON.Tests {
             Assert.AreEqual((discsE[0] as SimpleClass).SimpleClassProp, (isc as SimpleClass).SimpleClassProp);
             Assert.AreEqual(discsE[0].SimpleClassBaseProp, isc.SimpleClassBaseProp);
         }
+
+        [TestMethod]
+        public void ShouldNotFailWhenUsingNegativeIntEnumWithEnumString()
+        {
+            var settings = new NetJSONSettings { UseEnumString = true };
+            var obj = new IntClass { LongEnum = IntEnum.ID2 };
+            var json = NetJSON.Serialize(obj, settings);
+            var data = NetJSON.Deserialize<IntClass>(json, settings);
+
+            Assert.AreEqual((int)data.LongEnum, (int)obj.LongEnum);
+        }
+
+        [TestMethod]
+        public void ShouldNotFailWhenUsingNegativeIntEnumWithValue()
+        {
+            var settings = new NetJSONSettings { UseEnumString = false };
+            var obj = new IntClass { LongEnum = IntEnum.ID2 };
+            var json = NetJSON.Serialize(obj, settings);
+            var data = NetJSON.Deserialize<IntClass>(json, settings);
+
+            Assert.AreEqual((int)data.LongEnum, (int)obj.LongEnum);
+        }
     }
 
     public class SimpleClass : ISimpleClass
@@ -1723,6 +1745,11 @@ namespace NetJSON.Tests {
         public UIntEnum LongEnum { get; set; }
     }
 
+    public class IntClass
+    {
+        public IntEnum LongEnum { get; set; }
+    }
+
     [Flags]
     public enum ULongEnum : ulong
     {
@@ -1734,6 +1761,11 @@ namespace NetJSON.Tests {
     public enum UIntEnum : uint
     {
         ID, ID2 = uint.MaxValue, ID3 = 100000
+    }
+
+    public enum IntEnum : int
+    {
+        ID = 0, ID2 = -1000
     }
 
     public class UserDefinedCustomClass
