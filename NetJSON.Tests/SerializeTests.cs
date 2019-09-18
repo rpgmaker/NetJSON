@@ -1704,6 +1704,30 @@ namespace NetJSON.Tests {
 
             Assert.AreEqual((int)data.LongEnum, (int)obj.LongEnum);
         }
+
+
+        [TestMethod]
+        public void ShouldNotFailFloatConvert()
+        {
+            var testFloat = new TestFloatClass
+            {
+                IntValue = 10,
+                FloatValue = 10.5f,
+                StringValue = "10"
+            };
+
+            var json = NetJSON.Serialize(testFloat);
+            var testFloatData = NetJSON.Deserialize<TestFloatClass>(json);
+
+            Assert.AreEqual(10.5f, testFloatData.FloatValue);
+        }
+    }
+
+    public class TestFloatClass
+    {
+        public int IntValue { get; set; }
+        public float FloatValue { get; set; }
+        public string StringValue { get; set; }
     }
 
     public class SimpleClass : ISimpleClass

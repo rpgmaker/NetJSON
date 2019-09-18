@@ -748,7 +748,7 @@ namespace NetJSON.Internals
 						index += 4;
 						return null;
 					}
-                    else if(!(((int)current) >= 48 && ((int)current) <= 57) && current != '-')
+                    else if(!(((int)current) >= 48 && ((int)current) <= 57) && current != '-' && current != '.')
                     {
                         value = new string(ptr, startIndex, index - startIndex - indexDiff);
                         --index;
