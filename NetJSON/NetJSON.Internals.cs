@@ -244,6 +244,11 @@ namespace NetJSON.Internals
 		}
 
 		internal static char FastStringToChar(string value) {
+            if (value == null || value.Length == 0)
+            {
+                return default(char);
+            }
+
 			return value[0];
 		}
 
