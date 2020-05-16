@@ -3823,6 +3823,7 @@ namespace NetJSON {
             
             var startLoop = il.DefineLabel();
             var @break = needBreak ? il.DefineLabel() : default(Label);
+            var invalidIfNull = il.DefineLabel();
 
             //Logic before loop
 
@@ -3840,6 +3841,16 @@ namespace NetJSON {
             il.MarkLabel(startLoop);
 
             GenerateUpdateCurrent(il, current, ptr);
+
+            // Throw invalid json if needed
+            /*il.Emit(OpCodes.Ldc_I4, (int)'\0');
+            il.Emit(OpCodes.Ldloc, current);
+            il.Emit(OpCodes.Bne_Un, invalidIfNull);
+
+            il.Emit(OpCodes.Newobj, _invalidJSONCtor);
+            il.Emit(OpCodes.Throw);
+
+            il.MarkLabel(invalidIfNull);*/
 
             //Logic within loop
             if (whileAction != null)
@@ -5479,6 +5490,7 @@ namespace NetJSON {
 
         private static void GenerateGetClassOrDictStringType(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder settings, LocalBuilder foundQuote, LocalBuilder prev, LocalBuilder startIndex, LocalBuilder quotes, bool isDict, Type keyType, Type valueType, bool isKeyValuePair, bool isExpandoObject, bool isTuple, Type[] tupleArguments, int tupleCount, LocalBuilder obj, bool isTypeValueType, LocalBuilder tupleCountLocal, MethodInfo dictSetItem, LocalBuilder current, LocalBuilder ptr, Label startLoop) {
             var currentQuoteLabel = il.DefineLabel();
+            var inCompleteQuoteLabel = il.DefineLabel();
             var currentQuotePrevNotLabel = il.DefineLabel();
             var keyLocal = il.DeclareLocal(_stringType);
 
@@ -5632,6 +5644,17 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldloc, prev);
             il.Emit(OpCodes.Ldc_I4, (int)'\\');
             il.Emit(OpCodes.Beq, currentQuotePrevNotLabel);
+
+            // Check quotes count if less than 2 then missing quotes (Throw Exception for missing quote)
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Ldloc, quotes);
+            il.Emit(OpCodes.Bgt, inCompleteQuoteLabel);
+
+            il.Emit(OpCodes.Newobj, _invalidJSONCtor);
+            il.Emit(OpCodes.Throw);
+
+            il.MarkLabel(inCompleteQuoteLabel);
+
 
             //var key = new string(ptr, startIndex, index - startIndex)
             il.Emit(OpCodes.Ldloc, ptr);

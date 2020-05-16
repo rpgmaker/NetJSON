@@ -1740,10 +1740,31 @@ namespace NetJSON.Tests {
             Assert.IsTrue(simple.APPL_EVENT == '\0');
         }
         
+        [TestMethod]
         public void ShouldThrowErrorForInvalidDictionaryJSON()
         {
             //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
-            var json = "{\"Value\":\"\",Regex\":false}"; //bad JSON
+            var json = "{Value\":\"\",\"Regex\":false}"; //bad JSON
+            var jsonChar = json.ToCharArray();
+            var exception = default(Exception);
+            try
+            {
+                var data = NetJSON.Deserialize<Dictionary<string, object>>(json);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+
+            Assert.IsNotNull(exception, "Should throw invalid json exception");
+        }
+
+        [TestMethod]
+        public void ShouldThrowErrorForInvalidDictionaryJSONNoQuote()
+        {
+            //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
+            var json = "{Value:\"\",\"Regex\":false}"; //bad JSON
+            var jsonChar = json.ToCharArray();
             var exception = default(Exception);
             try
             {
