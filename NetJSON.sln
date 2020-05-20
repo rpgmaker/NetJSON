@@ -22,9 +22,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.V4_6", "NetJSON.V4_
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.V4_7", "NetJSON.V4_7\NetJSON.V4_7.csproj", "{70D8E770-96B0-4565-A3CF-772D606A707E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.Standard2_0", "NetJSON.Standard2_0\NetJSON.Standard2_0.csproj", "{88A86D83-23B0-469E-AD09-40BBDE964009}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Standard2_0", "NetJSON.Standard2_0\NetJSON.Standard2_0.csproj", "{88A86D83-23B0-469E-AD09-40BBDE964009}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.Standard2_0.Tests", "NetJSON.Standard2_0.Tests\NetJSON.Standard2_0.Tests.csproj", "{FC18955D-C829-4B67-8D1B-471FC083D29F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Standard2_0.Tests", "NetJSON.Standard2_0.Tests\NetJSON.Standard2_0.Tests.csproj", "{FC18955D-C829-4B67-8D1B-471FC083D29F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.TestHarness", "NetJSON.TestHarness\NetJSON.TestHarness.csproj", "{A3C27161-165E-4357-9E1C-1A6FB334CF11}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -144,6 +146,18 @@ Global
 		{FC18955D-C829-4B67-8D1B-471FC083D29F}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
 		{FC18955D-C829-4B67-8D1B-471FC083D29F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FC18955D-C829-4B67-8D1B-471FC083D29F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetCore-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetCore-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetCore-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetCore-Release|Any CPU.Build.0 = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetFX-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetFX-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetFX-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

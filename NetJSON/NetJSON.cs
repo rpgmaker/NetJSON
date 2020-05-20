@@ -516,6 +516,7 @@ namespace NetJSON {
             _settingsCurrentSettings = _settingsType.GetProperty("CurrentSettings", MethodBinding).GetGetMethod(),
             _settingsCamelCase = _settingsType.GetProperty("CamelCase", MethodBinding).GetGetMethod(),
             _throwIfInvalidJSON = _internalJsonType.GetMethod("ThrowIfInvalidJSON", MethodBinding),
+            _failIfInvalidCharacter = _internalJsonType.GetMethod("FailIfInvalidCharacter", MethodBinding),
             _toCamelCase = _internalJsonType.GetMethod("ToCamelCase", MethodBinding);
 
         private static FieldInfo _guidEmptyGuid = _guidType.GetField("Empty"),
@@ -5491,6 +5492,7 @@ namespace NetJSON {
         private static void GenerateGetClassOrDictStringType(TypeBuilder typeBuilder, Type type, ILGenerator il, LocalBuilder settings, LocalBuilder foundQuote, LocalBuilder prev, LocalBuilder startIndex, LocalBuilder quotes, bool isDict, Type keyType, Type valueType, bool isKeyValuePair, bool isExpandoObject, bool isTuple, Type[] tupleArguments, int tupleCount, LocalBuilder obj, bool isTypeValueType, LocalBuilder tupleCountLocal, MethodInfo dictSetItem, LocalBuilder current, LocalBuilder ptr, Label startLoop) {
             var currentQuoteLabel = il.DefineLabel();
             var inCompleteQuoteLabel = il.DefineLabel();
+            var isCurrentQuoteLabel = il.DefineLabel();
             var currentQuotePrevNotLabel = il.DefineLabel();
             var keyLocal = il.DeclareLocal(_stringType);
 
@@ -5553,6 +5555,17 @@ namespace NetJSON {
             il.MarkLabel(notHasOverrideLabel);
 
             il.Emit(OpCodes.Ldloc, isCurrentLocal);
+            il.Emit(OpCodes.Brfalse, isCurrentQuoteLabel);
+
+            //quotes++
+            il.Emit(OpCodes.Ldloc, quotes);
+            il.Emit(OpCodes.Ldc_I4_1);
+            il.Emit(OpCodes.Add);
+            il.Emit(OpCodes.Stloc, quotes);
+
+            il.MarkLabel(isCurrentQuoteLabel);
+
+            il.Emit(OpCodes.Ldloc, isCurrentLocal);
 
             //if(current == _ThreadQuoteChar && quotes == 0)
 
@@ -5563,18 +5576,18 @@ namespace NetJSON {
             il.Emit(OpCodes.Brfalse, currentQuoteLabel);
 
             il.Emit(OpCodes.Ldloc, quotes);
-            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_1);
             il.Emit(OpCodes.Bne_Un, currentQuoteLabel);
 
             //foundQuote = true
             il.Emit(OpCodes.Ldc_I4_1);
             il.Emit(OpCodes.Stloc, foundQuote);
 
-            //quotes++
-            il.Emit(OpCodes.Ldloc, quotes);
-            il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Add);
-            il.Emit(OpCodes.Stloc, quotes);
+            ////quotes++
+            //il.Emit(OpCodes.Ldloc, quotes);
+            //il.Emit(OpCodes.Ldc_I4_1);
+            //il.Emit(OpCodes.Add);
+            //il.Emit(OpCodes.Stloc, quotes);
 
             //startIndex = index + 1;
             il.Emit(OpCodes.Ldarg_1);
@@ -5645,16 +5658,24 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldc_I4, (int)'\\');
             il.Emit(OpCodes.Beq, currentQuotePrevNotLabel);
 
-            // Check quotes count if less than 2 then missing quotes (Throw Exception for missing quote)
-            il.Emit(OpCodes.Ldc_I4_2);
+            // Check quotes count if less than 2 then missing quotes (Throw Exception for missing quote)     
             il.Emit(OpCodes.Ldloc, quotes);
-            il.Emit(OpCodes.Bgt, inCompleteQuoteLabel);
+            il.Emit(OpCodes.Ldc_I4_2);
+            il.Emit(OpCodes.Bge, inCompleteQuoteLabel);
 
             il.Emit(OpCodes.Newobj, _invalidJSONCtor);
             il.Emit(OpCodes.Throw);
 
             il.MarkLabel(inCompleteQuoteLabel);
 
+            //Check if end character in range is ":"
+            il.Emit(OpCodes.Ldloc, ptr);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Ldind_I4);
+            il.Emit(OpCodes.Ldloc, startIndex);
+            il.Emit(OpCodes.Sub);
+            il.Emit(OpCodes.Call, _failIfInvalidCharacter);
 
             //var key = new string(ptr, startIndex, index - startIndex)
             il.Emit(OpCodes.Ldloc, ptr);

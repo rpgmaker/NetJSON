@@ -263,6 +263,15 @@ namespace NetJSON.Internals
 			return StringToDate(value, settings, out offset, isDateTimeOffset: false);
 		}
 
+        internal unsafe static void FailIfInvalidCharacter(char* ptr, int startIndex, int length)
+        {
+            var current = *(ptr + startIndex + length - 1);
+            if(current == ':')
+            {
+                throw new NetJSONInvalidJSONException();
+            }
+        }
+
 		internal unsafe static string ToCamelCase(string str) {
 			fixed (char* p = str) {
 				char* buffer = stackalloc char[str.Length];

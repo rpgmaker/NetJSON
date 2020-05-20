@@ -1739,7 +1739,26 @@ namespace NetJSON.Tests {
             Assert.AreEqual(simple.EVENTID, 19);
             Assert.IsTrue(simple.APPL_EVENT == '\0');
         }
-        
+
+        [TestMethod]
+        public void ShouldThrowErrorForInvalidClassJSON()
+        {
+            //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
+            var json = "{Value\":\"\",\"Regex\":false}"; //bad JSON
+            var jsonChar = json.ToCharArray();
+            var exception = default(Exception);
+            try
+            {
+                var data = NetJSON.Deserialize<Dummy>(json);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+
+            Assert.IsNotNull(exception, "Should throw invalid json exception");
+        }
+
         [TestMethod]
         public void ShouldThrowErrorForInvalidDictionaryJSON()
         {
@@ -1777,6 +1796,12 @@ namespace NetJSON.Tests {
 
             Assert.IsNotNull(exception, "Should throw invalid json exception");
         }
+    }
+
+    public class Dummy
+    {
+        public string Value { get; set; }
+        public string Regex { get; set; }
     }
 
     public class CNTL_SIMPLE_EVENT
