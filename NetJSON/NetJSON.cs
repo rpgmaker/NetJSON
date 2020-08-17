@@ -4444,13 +4444,15 @@ namespace NetJSON {
                     //        il.Emit(OpCodes.Pop);
                     //    }
                     //} else il.Emit(OpCodes.Stfld, field);
-                } else {
+                } else
+                {
                     var propValue = il.DeclareLocal(originPropType);
                     var isValueType = propType.GetTypeInfo().IsValueType;
                     var isPrimitiveType = propType.IsPrimitiveType();
                     var isStruct = isValueType && !isPrimitiveType;
                     var isBool = propType == _boolType;
                     var propNullLabel = !isNullable && !isBool ? il.DefineLabel() : default(Label);
+                    var skipDefaultFalseLabel = !isNullable && !isBool ? il.DefineLabel() : default(Label);
                     var hasPropLabel = propNullLabel != default(Label);
                     var nullablePropValue = isNullable ? il.DeclareLocal(originPropType) : null;
                     var equalityMethod = propType.GetMethod("op_Equality");
@@ -4463,24 +4465,35 @@ namespace NetJSON {
 
                     il.Emit(OpCodes.Stloc, propValue);
 
-                    if (hasPropLabel) {
+                    if (hasPropLabel)
+                    {
                         if (isStruct)
                             il.Emit(OpCodes.Ldloca, propValue);
                         else
                             il.Emit(OpCodes.Ldloc, propValue);
 
-                        if (isValueType && isPrimitiveType) {
+                        if (isValueType && isPrimitiveType)
+                        {
                             LoadDefaultValueByType(il, propType);
-                        } else {
+                        }
+                        else
+                        {
                             if (!isValueType)
                                 il.Emit(OpCodes.Ldnull);
                         }
 
-                        if (equalityMethod != null) {
+                        if (equalityMethod != null)
+                        {
                             il.Emit(OpCodes.Call, equalityMethod);
                             il.Emit(OpCodes.Brtrue, propNullLabel);
-                        } else {
-                            if (isStruct) {
+                            il.Emit(OpCodes.Ldarg, 4);
+                            il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
+                            il.Emit(OpCodes.Brfalse, propNullLabel);
+                        }
+                        else
+                        {
+                            if (isStruct)
+                            {
 
                                 var tempValue = il.DeclareLocal(propType);
 
@@ -4493,57 +4506,37 @@ namespace NetJSON {
                                 il.Emit(OpCodes.Callvirt, _objectEquals);
 
                                 il.Emit(OpCodes.Brtrue, propNullLabel);
-
-                            } else
-                                il.Emit(OpCodes.Beq, propNullLabel);
-                        }
-                    }
-
-                    il.Emit(OpCodes.Ldarg_2);
-                    il.Emit(OpCodes.Ldloc, propValue);
-                    //if (isNullable) {
-                    //    il.Emit(OpCodes.Newobj, _nullableType.MakeGenericType(propType).GetConstructor(new[] { propType }));
-                    //}
-
-                    if (isProp) {
-                        if (setter != null) {
-                            if (!setter.IsPublic) {
-                                if (propType.GetTypeInfo().IsValueType)
-                                    il.Emit(OpCodes.Box, isNullable ? prop.PropertyType : propType);
-                                il.Emit(OpCodes.Ldtoken, setter);
-                                il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
-                                il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
-                            } else
-                                il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
-                        } else {
-                            var setField = type.GetField($"<{propName}>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-                            if (setField == null)
-                            {
-                                //TODO: Use IL body and field token from prop.GetGetMethod().GetMethodBody()
-                                setField = fields.FirstOrDefault(x => x.Name.EndsWith(propName, StringComparison.OrdinalIgnoreCase));
-                            }
-
-                            if (setField != null)
-                            {
-                                if (propType.GetTypeInfo().IsValueType)
-                                    il.Emit(OpCodes.Box, propType);
-                                il.Emit(OpCodes.Ldtoken, setField);
-                                il.Emit(OpCodes.Call, _methodGetFieldFromHandle);
-                                il.Emit(OpCodes.Call, _setterFieldValueMethod.MakeGenericMethod(type));
+                                il.Emit(OpCodes.Ldarg, 4);
+                                il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
+                                il.Emit(OpCodes.Brfalse, propNullLabel);
                             }
                             else
                             {
-                                il.Emit(OpCodes.Pop);
-                                il.Emit(OpCodes.Pop);
+                                il.Emit(OpCodes.Beq, propNullLabel);
+                                il.Emit(OpCodes.Ldarg, 4);
+                                il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
+                                il.Emit(OpCodes.Brfalse, propNullLabel);
                             }
                         }
+                    }
 
-                    } else il.Emit(OpCodes.Stfld, field);
-
-                    il.Emit(OpCodes.Ret);
+                    SetClassMemberValue(type, isTypeValueType, il, fields, prop, field, setter, isProp, propName, propType, isNullable, propValue);
 
                     if (hasPropLabel)
+                    {
                         il.MarkLabel(propNullLabel);
+                    }
+
+                    if (hasPropLabel)
+                    {
+                        il.Emit(OpCodes.Ldarg, 4);
+                        il.Emit(OpCodes.Callvirt, _settingsSkipDefaultValue);
+                        il.Emit(OpCodes.Brtrue, skipDefaultFalseLabel);
+
+                        SetClassMemberValue(type, isTypeValueType, il, fields, prop, field, setter, isProp, propName, propType, isNullable, propValue);
+
+                        il.MarkLabel(skipDefaultFalseLabel);
+                    }
                 }
 
                 il.Emit(OpCodes.Ret);
@@ -4555,6 +4548,56 @@ namespace NetJSON {
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldarg, 4);
             il.Emit(OpCodes.Call, _skipProperty);
+        }
+
+        private static void SetClassMemberValue(Type type, bool isTypeValueType, ILGenerator il, FieldInfo[] fields, PropertyInfo prop, FieldInfo field, MethodInfo setter, bool isProp, string propName, Type propType, bool isNullable, LocalBuilder propValue)
+        {
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Ldloc, propValue);
+
+            if (isProp)
+            {
+                if (setter != null)
+                {
+                    if (!setter.IsPublic)
+                    {
+                        if (propType.GetTypeInfo().IsValueType)
+                            il.Emit(OpCodes.Box, isNullable ? prop.PropertyType : propType);
+                        il.Emit(OpCodes.Ldtoken, setter);
+                        il.Emit(OpCodes.Call, _methodGetMethodFromHandle);
+                        il.Emit(OpCodes.Call, _setterPropertyValueMethod.MakeGenericMethod(type));
+                    }
+                    else
+                        il.Emit(isTypeValueType ? OpCodes.Call : OpCodes.Callvirt, setter);
+                }
+                else
+                {
+                    var setField = type.GetField($"<{propName}>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (setField == null)
+                    {
+                        //TODO: Use IL body and field token from prop.GetGetMethod().GetMethodBody()
+                        setField = fields.FirstOrDefault(x => x.Name.EndsWith(propName, StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (setField != null)
+                    {
+                        if (propType.GetTypeInfo().IsValueType)
+                            il.Emit(OpCodes.Box, propType);
+                        il.Emit(OpCodes.Ldtoken, setField);
+                        il.Emit(OpCodes.Call, _methodGetFieldFromHandle);
+                        il.Emit(OpCodes.Call, _setterFieldValueMethod.MakeGenericMethod(type));
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Pop);
+                        il.Emit(OpCodes.Pop);
+                    }
+                }
+
+            }
+            else il.Emit(OpCodes.Stfld, field);
+
+            il.Emit(OpCodes.Ret);
         }
 
         private static MethodInfo GenerateCreateListFor(TypeBuilder typeBuilder, Type type) {

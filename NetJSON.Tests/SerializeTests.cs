@@ -1796,6 +1796,43 @@ namespace NetJSON.Tests {
 
             Assert.IsNotNull(exception, "Should throw invalid json exception");
         }
+
+        [TestMethod]
+        public void ShouldSerializeDeserializeAutoPropertyWithObjectInitializer()
+        {
+            var myObject2 = new SimpleObject2() { ID = 0, Name = "Test", Value = "Value" };
+            var json2 = NetJSON.Serialize(myObject2, new NetJSONSettings() { SkipDefaultValue = false });
+            var recreatedObject2 = NetJSON.Deserialize<SimpleObject2>(json2, new NetJSONSettings() { SkipDefaultValue = false });
+            Assert.AreEqual(myObject2.ID, recreatedObject2.ID);
+        }
+
+        [TestMethod]
+        public void ShouldSerializeDeserializeDefaultPropertyInConstructorWithObjectInitializer()
+        {
+            var myObject3 = new SimpleObject3() { ID = 0, Name = "Test", Value = "Value" };
+            var json3 = NetJSON.Serialize(myObject3);
+            var recreatedObject3 = NetJSON.Deserialize<SimpleObject3>(json3);
+            Assert.AreEqual(5, recreatedObject3.ID);
+        }
+    }
+
+    public class SimpleObject3
+    {
+        public SimpleObject3()
+        {
+            ID = 5;
+        }
+
+        public int ID { get; set; }
+        public string Name { get; set; }
+        public string Value { get; set; }
+    }
+
+    public class SimpleObject2
+    {
+        public int ID { get; set; } = -5;
+        public string Name { get; set; }
+        public string Value { get; set; }
     }
 
     public class Dummy
