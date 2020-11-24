@@ -25,7 +25,7 @@ using System.Text;
 using System.Xml.Serialization;
 
 
-#if NET_STANDARD && !NET_STANDARD_20
+#if NET_STANDARD && !NET_STANDARD_20 && !NET5_0
 using Microsoft.Extensions.DependencyModel;
 #endif
 
@@ -309,7 +309,7 @@ namespace NetJSON {
 
             private static NetJSONSerializer<T> GetSerializer()
             {     
-#if NET_STANDARD_20
+#if NET_STANDARD_20 || NET5_0
                 return new DynamicNetJSONSerializer<T>();
 #else
                 NetJSONSerializer<T> serializer = null;
@@ -1131,7 +1131,7 @@ namespace NetJSON {
 
             }
 
-#if !NET_STANDARD && !NET_5
+#if !NET_STANDARD && !NET5_0
             assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
         }
@@ -1159,7 +1159,7 @@ namespace NetJSON {
                 
             _types[objType] = returnType;
 
-#if !NET_STANDARD && !NET_5
+#if !NET_STANDARD && !NET5_0
             if (_generateAssembly)
                 assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
@@ -1376,7 +1376,7 @@ namespace NetJSON {
                 lock (_lockAsmObject) {
                     if (_assembly == null) {
                         _assembly =
-#if NET_STANDARD || NET_5
+#if NET_STANDARD || NET5_0
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1385,7 +1385,7 @@ namespace NetJSON {
                             new AssemblyName(NET_JSON_GENERATED_ASSEMBLY_NAME) {
                                 Version = new Version(1, 0, 0, 0)
                             },
-#if NET_STANDARD || NET_5
+#if NET_STANDARD || NET5_0
                             AssemblyBuilderAccess.Run
 #else
                             AssemblyBuilderAccess.RunAndSave
@@ -1428,7 +1428,7 @@ namespace NetJSON {
 
         private static AssemblyBuilder GenerateAssemblyBuilderNoShare(string asmName) {
             var assembly =
-#if NET_STANDARD || NET_5
+#if NET_STANDARD || NET5_0
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1437,7 +1437,7 @@ namespace NetJSON {
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
                 },
-#if !NET_STANDARD && !NET_5
+#if !NET_STANDARD && !NET5_0
                 AssemblyBuilderAccess.RunAndSave
 #else
                 AssemblyBuilderAccess.Run
@@ -1902,7 +1902,7 @@ namespace NetJSON {
             if (builder == null)
                 return new DynamicMethod(methodName, returnType, parameterTypes,
 #if NET_STANDARD
-#if NET_STANDARD_20
+#if NET_STANDARD_20 || NET5_0
                     Assembly.GetExecutingAssembly().ManifestModule
 #else
                     Assembly.GetEntryAssembly().ManifestModule
@@ -2517,13 +2517,13 @@ namespace NetJSON {
                     if (types == null) {
                         types = new List<Type>();
 #if NET_STANDARD
-#if NET_STANDARD_20
+#if NET_STANDARD_20 || NET5_0
     var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 #else
     var assemblies = DependencyContext.Default.GetDefaultAssemblyNames().Select(x => Assembly.Load(x));
 #endif
 #else
-    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 #endif
                         foreach (var asm in assemblies) {
                             try {
