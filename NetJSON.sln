@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Standard2_0.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.TestHarness", "NetJSON.TestHarness\NetJSON.TestHarness.csproj", "{A3C27161-165E-4357-9E1C-1A6FB334CF11}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net5_0", "NetJSON.Net5_0\NetJSON.Net5_0.csproj", "{49CFDAC0-D244-4112-A56B-B457E02C76C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -158,6 +160,18 @@ Global
 		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
 		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3C27161-165E-4357-9E1C-1A6FB334CF11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetCore-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetCore-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetCore-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetCore-Release|Any CPU.Build.0 = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetFX-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetFX-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetFX-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49CFDAC0-D244-4112-A56B-B457E02C76C5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1131,7 +1131,7 @@ namespace NetJSON {
 
             }
 
-#if !NET_STANDARD
+#if !NET_STANDARD && !NET_5
             assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
         }
@@ -1159,7 +1159,7 @@ namespace NetJSON {
                 
             _types[objType] = returnType;
 
-#if !NET_STANDARD
+#if !NET_STANDARD && !NET_5
             if (_generateAssembly)
                 assembly.Save(String.Concat(assembly.GetName().Name, _dllStr));
 #endif
@@ -1376,7 +1376,7 @@ namespace NetJSON {
                 lock (_lockAsmObject) {
                     if (_assembly == null) {
                         _assembly =
-#if NET_STANDARD
+#if NET_STANDARD || NET_5
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1385,7 +1385,7 @@ namespace NetJSON {
                             new AssemblyName(NET_JSON_GENERATED_ASSEMBLY_NAME) {
                                 Version = new Version(1, 0, 0, 0)
                             },
-#if NET_STANDARD
+#if NET_STANDARD || NET_5
                             AssemblyBuilderAccess.Run
 #else
                             AssemblyBuilderAccess.RunAndSave
@@ -1428,7 +1428,7 @@ namespace NetJSON {
 
         private static AssemblyBuilder GenerateAssemblyBuilderNoShare(string asmName) {
             var assembly =
-#if NET_STANDARD
+#if NET_STANDARD || NET_5
                 AssemblyBuilder
 #else
                 AppDomain.CurrentDomain
@@ -1437,7 +1437,7 @@ namespace NetJSON {
                 new AssemblyName(asmName) {
                     Version = new Version(1, 0, 0, 0)
                 },
-#if !NET_STANDARD
+#if !NET_STANDARD && !NET_5
                 AssemblyBuilderAccess.RunAndSave
 #else
                 AssemblyBuilderAccess.Run

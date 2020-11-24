@@ -93,7 +93,7 @@ namespace NetJSON.Internals
 
 	static partial class CompatibleExtensions
 	{
-#if !NET_STANDARD && !NET_PCL && !NET_46 && !NET_47
+#if !NET_STANDARD && !NET_PCL && !NET_46 && !NET_47 && !NET_5
 		internal static Type GetTypeInfo(this Type type) {
 			return type;
 		}
