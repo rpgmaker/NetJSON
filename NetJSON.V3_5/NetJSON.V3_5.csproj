@@ -59,7 +59,8 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net35\"
-xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net35\"</PostBuildEvent>
+xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net35\"
+xcopy /y "$(TargetDir)$(TargetName).pdb" "$(SolutionDir)NetJSON\lib\net35\"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -62,6 +62,7 @@
   <PropertyGroup>
     <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net40\"
 xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net40\"
+xcopy /y "$(TargetDir)$(TargetName).pdb" "$(SolutionDir)NetJSON\lib\net40\"
 
 </PostBuildEvent>
   </PropertyGroup>

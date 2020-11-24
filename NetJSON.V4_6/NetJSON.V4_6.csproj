@@ -67,6 +67,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)NetJSON\lib\net462\"
-xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net462\"</PostBuildEvent>
+xcopy /y "$(TargetDir)$(TargetName).xml" "$(SolutionDir)NetJSON\lib\net462\"
+xcopy /y "$(TargetDir)$(TargetName).pdb" "$(SolutionDir)NetJSON\lib\net462\"</PostBuildEvent>
   </PropertyGroup>
 </Project>
