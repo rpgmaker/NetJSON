@@ -30,7 +30,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.TestHarness", "NetJ
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net5_0", "NetJSON.Net5_0\NetJSON.Net5_0.csproj", "{49CFDAC0-D244-4112-A56B-B457E02C76C5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.Net5_0.Tests", "NetJSON.Net5_0.Tests\NetJSON.Net5_0.Tests.csproj", "{593B2B1F-212A-4F4D-853F-38FCA864AE33}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net5_0.Tests", "NetJSON.Net5_0.Tests\NetJSON.Net5_0.Tests.csproj", "{593B2B1F-212A-4F4D-853F-38FCA864AE33}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.Benchmark.Net5_0", "NetJSON.Benchmark.Net5_0\NetJSON.Benchmark.Net5_0.csproj", "{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -186,6 +188,18 @@ Global
 		{593B2B1F-212A-4F4D-853F-38FCA864AE33}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
 		{593B2B1F-212A-4F4D-853F-38FCA864AE33}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{593B2B1F-212A-4F4D-853F-38FCA864AE33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetCore-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetCore-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetCore-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetCore-Release|Any CPU.Build.0 = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetFX-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetFX-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetFX-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

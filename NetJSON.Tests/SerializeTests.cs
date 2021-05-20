@@ -1814,6 +1814,32 @@ namespace NetJSON.Tests {
             var recreatedObject3 = NetJSON.Deserialize<SimpleObject3>(json3);
             Assert.AreEqual(5, recreatedObject3.ID);
         }
+
+        [TestMethod]
+        public void ShouldSerializeDeserializeWithCustomSerializeRegistration()
+        {
+            NetJSON.RegisterCustomTypeSerializer<CustomObject>(SerializeCustomObject);
+            var obj = new CustomObjectHolder { Custom = new CustomObject { ID = 10, Name = "Test" }, Name = "Custom" };
+            var json = NetJSON.Serialize(obj);
+        }
+
+        public static void SerializeCustomObject(CustomObject customObject, StringBuilder sb, NetJSONSettings settings)
+        {
+            var result = $@"{{""ID"": {customObject.ID}, ""Name"": ""{customObject.Name}""}}";
+            sb.Append(result);
+        }
+    }
+
+    public class CustomObjectHolder
+    {
+        public string Name { get; set; }
+        public CustomObject Custom { get; set; }
+    }
+
+    public class CustomObject
+    {
+        public int ID { get; set; }
+        public string Name { get; set; }
     }
 
     public class SimpleObject3
