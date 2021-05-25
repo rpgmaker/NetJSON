@@ -15,7 +15,10 @@ namespace NetJSON.Benchmark.Net5_0
             WriteLine("4. Single values");
             WriteLine("5. Double values");
             WriteLine("6. String dictionary");
-            WriteLine("Choice benchmark aspect: ");
+            WriteLine("7. String-object dictionary");
+            WriteLine("8. Int32-object");
+            WriteLine("9. String-object");
+            WriteLine("Type the benchmark number and press Enter key: ");
             if (Int32.TryParse(ReadLine(), out int index)) {
 				switch (index) {
                     case 1:
@@ -35,6 +38,16 @@ namespace NetJSON.Benchmark.Net5_0
                         return;
                     case 6:
                         BenchmarkRunner.Run<StringDictionaryBenchmark>();
+                        return;
+                    case 7:
+                        BenchmarkRunner.Run<StringObjectDictionaryBenchmark>();
+                        return;
+                    case 8:
+                        BenchmarkRunner.Run<Int32Benchmark>();
+                        BenchmarkRunner.Run<BoxedInt32Benchmark>();
+                        return;
+                    case 9:
+                        BenchmarkRunner.Run<StringObjectBenchmark>();
                         return;
 					default:
 						break;
