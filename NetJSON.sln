@@ -32,7 +32,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net5_0", "NetJSON.N
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net5_0.Tests", "NetJSON.Net5_0.Tests\NetJSON.Net5_0.Tests.csproj", "{593B2B1F-212A-4F4D-853F-38FCA864AE33}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetJSON.Benchmark.Net5_0", "NetJSON.Benchmark.Net5_0\NetJSON.Benchmark.Net5_0.csproj", "{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Benchmark.Net5_0", "NetJSON.Benchmark.Net5_0\NetJSON.Benchmark.Net5_0.csproj", "{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net6_0", "NetJSON.Net6_0\NetJSON.Net6_0.csproj", "{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetJSON.Net6_0.Tests", "NetJSON.Net6_0.Tests\NetJSON.Net6_0.Tests.csproj", "{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -200,6 +204,30 @@ Global
 		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
 		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5F9D7EA0-9A3B-4535-8B7C-DE31B3E89286}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetCore-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetCore-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetCore-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetCore-Release|Any CPU.Build.0 = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetFX-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetFX-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetFX-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E04CCE8F-DD0C-4ABC-9A5D-59E0B6276B90}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetCore-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetCore-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetCore-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetCore-Release|Any CPU.Build.0 = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetFX-Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetFX-Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetFX-Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.NetFX-Release|Any CPU.Build.0 = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC03BC7E-67DC-4974-B771-C2DC14A2C25E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

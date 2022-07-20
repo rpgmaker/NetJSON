@@ -1,0 +1,396 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>NetJSON</name>
+    </assembly>
+    <members>
+        <member name="T:NetJSON.NetJSONPropertyAttribute">
+            <summary>
+            Attribute for renaming field/property name to use for serialization and deserialization
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONPropertyAttribute.Name">
+            <summary>
+            Name of property/field
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONPropertyAttribute.#ctor(System.String)">
+            <summary>
+            Default constructor
+            </summary>
+            <param name="name"></param>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.DateFormat">
+            <summary>
+            Determine date format: Default: Default
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.DateStringFormat">
+            <summary>
+            String Format to use for formatting date when provided
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.TimeZoneFormat">
+            <summary>
+            Determine time zone format: Default : Unspecified
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.Format">
+            <summary>
+            Determine formatting for output json: Default: Default
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.UseEnumString">
+            <summary>
+            Determine if Enum should be serialized as string or int value. Default: True
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.SkipDefaultValue">
+            <summary>
+            Determine if default value should be skipped: Default: True
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.CaseSensitive">
+            <summary>
+            Determine case sensitive for property/field name: Default: True
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.QuoteType">
+            <summary>
+            Quote Type: Default: Double Quote
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.IncludeTypeInformation">
+            <summary>
+            Enable including type information for serialization and deserialization
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.CamelCase">
+            <summary>
+            Enable camelCasing for property/field names
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONSettings.#ctor">
+            <summary>
+            Default constructor
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONSettings.Clone">
+            <summary>
+            Clone settings
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:NetJSON.NetJSONSettings.CurrentSettings">
+            <summary>
+            Returns current NetJSONSettings that correspond to old use of settings
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONKnownTypeAttribute">
+            <summary>
+            Attribute for configuration of Class that requires type information for serialization and deserialization
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSONKnownTypeAttribute.Type">
+            <summary>
+            Type
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONKnownTypeAttribute.#ctor(System.Type)">
+            <summary>
+            Default constructor
+            </summary>
+            <param name="type"></param>
+        </member>
+        <member name="T:NetJSON.NetJSONInvalidJSONException">
+            <summary>
+            Exception thrown for invalid json string
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONTypeMismatchException">
+            <summary>
+            Exception thrown for invalid json string
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONInvalidJSONPropertyException">
+            <summary>
+            Exception thrown for invalid json property attribute
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONInvalidJSONPropertyException.#ctor">
+            <summary>
+            Default constructor
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONInvalidAssemblyGeneration">
+            <summary>
+            Exception thrown for invalid assembly generation when adding all assembly into a specified assembly file
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSONInvalidAssemblyGeneration.#ctor(System.String)">
+            <summary>
+            Default constructor
+            </summary>
+            <param name="asmName"></param>
+        </member>
+        <member name="T:NetJSON.NetJSONDateFormat">
+            <summary>
+            Option for determining date formatting
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONDateFormat.Default">
+            <summary>
+            Default /Date(...)/
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONDateFormat.ISO">
+            <summary>
+            ISO Format
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONDateFormat.EpochTime">
+            <summary>
+            Unix Epoch Milliseconds
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONDateFormat.JsonNetISO">
+            <summary>
+            JSON.NET Format for backward compatibility
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONDateFormat.JavascriptSerializer">
+            <summary>
+            .NET System.Web.Script.Serialization.JavaScriptSerializer backward compatibility
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONTimeZoneFormat">
+            <summary>
+            Option for determining timezone formatting
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONTimeZoneFormat.Unspecified">
+            <summary>
+            Default unspecified
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONTimeZoneFormat.Utc">
+            <summary>
+            Utc
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONTimeZoneFormat.Local">
+            <summary>
+            Local time
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONQuote">
+            <summary>
+            Option for determine what type of quote to use for serialization and deserialization
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONQuote.Default">
+            <summary>
+            Default: double quote
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONQuote.Double">
+            <summary>
+            Use double quote
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONQuote.Single">
+            <summary>
+            Use single quote
+            </summary>
+        </member>
+        <member name="T:NetJSON.NetJSONFormat">
+            <summary>
+            Options for controlling serialize json format
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONFormat.Default">
+            <summary>
+            Default
+            </summary>
+        </member>
+        <member name="F:NetJSON.NetJSONFormat.Prettify">
+            <summary>
+            Prettify string
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSON.ShareAssembly">
+            <summary>
+            Flag to determine whether to store all generate serializer for types in a single assembly
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSON.CanSerialize">
+            <summary>
+            Delegate to override what member can get serialized
+            </summary>
+        </member>
+        <member name="P:NetJSON.NetJSON.SerializeAs">
+            <summary>
+            Delegate to override what name to use for members when serialized
+            </summary>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize(System.Type,System.Object)">
+            <summary>
+            Serialize value using the specified type
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize(System.Type,System.Object,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize value using the specified type and settings
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize(System.Object)">
+            <summary>
+            Serialize value using the underlying type of specified value
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize(System.Type,System.String)">
+            <summary>
+            Deserialize json to specified type
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize(System.Type,System.String,NetJSON.NetJSONSettings)">
+            <summary>
+            Deserialize json to specified type and settings
+            </summary>
+            <param name="type"></param>
+            <param name="value"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.RegisterTypeSerializer``1(System.Func{``0,System.String})">
+            <summary>
+            Register serializer primitive method for <typeparamref name="T"/> when object type is encountered
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="serializeFunc"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.RegisterCustomTypeSerializer``1(System.Action{``0,System.Text.StringBuilder,NetJSON.NetJSONSettings})">
+            <summary>
+            Register serializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="serializeFunc"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.RegisterCustomTypeDeserializer``1(NetJSON.NetJSON.DeserializeCustomTypeDelegate{``0})">
+            <summary>
+            Register deserializer for any custom user defined type with exclusion to enums for <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="deserializeFunc"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize``1(``0)">
+            <summary>
+            Serialize <typeparamref name="T"/> to json
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize``1(``0,System.IO.TextWriter)">
+            <summary>
+            Serialize <typeparamref name="T"/> to specified writer
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="value"></param>
+            <param name="writer"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize``1(System.String)">
+            <summary>
+            Deserialize json to <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="json"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize``1(System.IO.TextReader)">
+            <summary>
+            Deserialize reader content to <typeparamref name="T"/>
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="reader"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize``1(``0,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize specified <typeparamref name="T"/> using settings
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="value"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Serialize``1(``0,System.IO.TextWriter,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize specified <typeparamref name="T"/> to writer using settings
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="value"></param>
+            <param name="writer"></param>
+            <param name="settings"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.SerializeObject(System.Object,NetJSON.NetJSONSettings)">
+            <summary>
+            Serialize value using underlying object type
+            </summary>
+            <param name="value">Object value</param>
+            <param name="settings">Settings</param>
+            <returns>String</returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize``1(System.String,NetJSON.NetJSONSettings)">
+            <summary>
+            Deserialize json to <typeparamref name="T"/> using specified settings
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="json"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.Deserialize``1(System.IO.TextReader,NetJSON.NetJSONSettings)">
+            <summary>
+            Deserialize content of reader to <typeparamref name="T"/> using specified settings
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="reader"></param>
+            <param name="settings"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.DeserializeObject(System.String)">
+            <summary>
+            Deserialize json into Dictionary[string, object]
+            </summary>
+            <param name="json"></param>
+            <returns></returns>
+        </member>
+        <member name="M:NetJSON.NetJSON.GenerateUpdateCurrent(System.Reflection.Emit.ILGenerator,System.Reflection.Emit.LocalBuilder,System.Reflection.Emit.LocalBuilder)">
+            <summary>
+            current = *(ptr + index);
+            </summary>
+            <param name="il"></param>
+            <param name="current"></param>
+            <param name="ptr"></param>
+        </member>
+        <member name="M:NetJSON.NetJSON.IncrementIndexRef(System.Reflection.Emit.ILGenerator,System.Int32)">
+            <summary>
+            index++
+            </summary>
+            <param name="il"></param>
+        </member>
+    </members>
+</doc>

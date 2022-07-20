@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>NetJSON</AssemblyName>
+    <RootNamespace>NetJSON</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;NET_6</DefineConstants>
+    <DocumentationFile>bin\Debug\NetJSON.xml</DocumentationFile>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;NET_6</DefineConstants>
+    <DocumentationFile>bin\Release\NetJSON.xml</DocumentationFile>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\NetJSON\AutomaticTypeConverter.cs" Link="AutomaticTypeConverter.cs" />
+    <Compile Include="..\NetJSON\IntUtility.cs" Link="IntUtility.cs" />
+    <Compile Include="..\NetJSON\Models.cs" Link="Models.cs" />
+    <Compile Include="..\NetJSON\NetJSON.cs" Link="NetJSON.cs" />
+    <Compile Include="..\NetJSON\NetJSON.Internals.cs" Link="NetJSON.Internals.cs" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).xml&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;" />
+  </Target>
+
+</Project>

@@ -11,7 +11,7 @@ using System.Security;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Phoenix Service Bus")]
 [assembly: AssemblyProduct("NetJSON")]
-[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2018")]
+[assembly: AssemblyCopyright("Copyright © Phoenix Service Bus 2022")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -33,8 +33,8 @@ using System.Security;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.3.7")]
-[assembly: AssemblyFileVersion("1.3.7")]
+[assembly: AssemblyVersion("1.4.0")]
+[assembly: AssemblyFileVersion("1.4.0")]
 #if !NET_35 && !NET_STANDARD
 [assembly: SecurityRules(SecurityRuleSet.Level2, SkipVerificationInFullTrust = true)]
 #endif
