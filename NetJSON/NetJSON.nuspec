@@ -11,7 +11,7 @@
       - Add support for .NET 6.0
     </releaseNotes>
     <language>en-US</language>
-    <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
+    <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.txt</licenseUrl>
     <projectUrl>https://github.com/rpgmaker/NetJSON</projectUrl>
     <iconUrl>http://iomegatrix.com/Pictures/logo.jpg</iconUrl>
     <dependencies>
