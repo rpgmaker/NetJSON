@@ -4,14 +4,14 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.4.0</version> 
+    <version>1.4.1</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      - Add support for .NET 6.0
+      - Add support for .NET 7.0
     </releaseNotes>
     <language>en-US</language>
-    <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.text</licenseUrl>
+    <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.txt</licenseUrl>
     <projectUrl>https://github.com/rpgmaker/NetJSON</projectUrl>
     <iconUrl>http://iomegatrix.com/Pictures/logo.jpg</iconUrl>
     <dependencies>

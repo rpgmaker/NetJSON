@@ -28,8 +28,4 @@
     <Compile Include="..\NetJSON\NetJSON.Internals.cs" Link="NetJSON.Internals.cs" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).xml&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;&#xD;&#xA;xcopy /y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;$(SolutionDir)NetJSON\lib\net6.0\&quot;" />
-  </Target>
-
 </Project>
