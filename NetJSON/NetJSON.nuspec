@@ -4,7 +4,7 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.4.1</version> 
+    <version>1.4.2</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
@@ -34,4 +34,7 @@
       </group>
     </dependencies>
   </metadata>
+  <files>
+    <file src="*\**" target="\" exclude="obj\**\*.*;**\*.csproj"/>
+  </files>
 </package>
