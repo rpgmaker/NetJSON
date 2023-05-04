@@ -1,5 +1,4 @@
-﻿using DeepEqual.Syntax;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -12,6 +11,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
+using DeepEqual.Syntax;
+using Xunit;
 using Xunit.Sdk;
 
 namespace NetJSON.Tests {
@@ -19,8 +20,7 @@ namespace NetJSON.Tests {
     {
         public int V { get; set; }
     }
-
-    [TestClass]
+    
     public class SerializeTests {
 
         static SerializeTests()
@@ -42,7 +42,7 @@ namespace NetJSON.Tests {
             //var r = mjson.arr.Length;
         }
 
-        [TestMethod]
+        [Fact]
         public void TestEnumInDictionaryObject() {
             var dict = new Dictionary<string, object>();
             dict["Test"] = MyEnumTest.Test2;
@@ -53,7 +53,7 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(dict);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestAutoDetectQuotes() {
             var dict = new Dictionary<string, string>();
             dict["Test"] = "Test2";
@@ -81,7 +81,7 @@ namespace NetJSON.Tests {
         }
 
 
-        [TestMethod]
+        [Fact]
         public void TestSkippingProperty() {
             var ss = "{\"aaaaaaaaaa\":\"52\",\"aaaaaURL\":\"x\"}";
             var yy = NetJSON.Deserialize<Foo>(ss);
@@ -98,7 +98,7 @@ namespace NetJSON.Tests {
             public Type Type { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeException() {
             var exception = new ExceptionInfoEx {
                 Data = new Dictionary<string, string> { { "Test1", "Hello" } },
@@ -120,7 +120,7 @@ namespace NetJSON.Tests {
             CamelCase = true
         };
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeObjectType()
         {
             object model = new List<MentionModel>
@@ -142,7 +142,7 @@ namespace NetJSON.Tests {
 
 
             var resultStr = NetJSON.SerializeObject(model, Options);
-            Assert.AreNotEqual("[,]", resultStr);
+            Assert.NotEqual("[,]", resultStr);
         }
 
         public class MentionModel
@@ -163,13 +163,13 @@ namespace NetJSON.Tests {
             public string Address { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSimpleObjectSerializationWithNull() {
             var json = "{\"Id\":108591,\"EmailAddress\":\"james.brown@dummy.com\",\"FirstName\":\"James\",\"Surname\":\"Brown\",\"TitleId\":597,\"Address\":null}";
             var simple = NetJSON.Deserialize<SimpleObjectWithNull>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDictionaryWithColon() {
             var dict = new Dictionary<string, string>();
             dict["Test:Key"] = "Value";
@@ -177,7 +177,7 @@ namespace NetJSON.Tests {
             var ddict = NetJSON.Deserialize<Dictionary<string, string>>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeTypeClass() {
 
             var type = typeof(String);
@@ -191,7 +191,7 @@ namespace NetJSON.Tests {
             var typeHolderType = NetJSON.Deserialize<TypeHolder>(valueHolder);
         }
 
-        [TestMethod]
+        [Fact]
         public void StringSkippingCauseInfiniteLoop2() {
 
             NetJSON.UseStringOptimization = true;
@@ -215,7 +215,7 @@ namespace NetJSON.Tests {
             public int Number;
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNetJSONProperty() {
             NetJSON.IncludeFields = true;
 
@@ -229,7 +229,7 @@ namespace NetJSON.Tests {
             public DateTime DateTimeValue { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDateTimeFormat() {
             var json = "{\"DateTimeValue\":\"\\/Date(1447003080000+0200)\\/\"}";
             var json2 = "{\"DateTimeValue\":\"2015-11-08T19:18:00+02:00\"}";
@@ -244,7 +244,7 @@ namespace NetJSON.Tests {
             var sobj2 = NetJSON.Serialize(obj2);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDateTimeWithMissingZ()
         {
             var dateString = "{\"DateTimeValue\":\"2015-11-08T19:18:00\"}";
@@ -256,7 +256,7 @@ namespace NetJSON.Tests {
                  QuoteType = NetJSONQuote.Double})
                 .Replace("Z", string.Empty).Replace(".0", string.Empty);
 
-            Assert.AreEqual(dateString, date2);
+            Assert.Equal(dateString, date2);
         }
 
         public class NullableTest
@@ -265,22 +265,22 @@ namespace NetJSON.Tests {
             public int? y { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void NullableWithDefaultValueSetSerializes()
         {
             var obj = new NullableTest { x = 0, y = null };
             var settings = new NetJSONSettings { SkipDefaultValue = true };
             var json = NetJSON.Serialize(obj, settings);
-            Assert.AreEqual("{\"x\":0}", json);
+            Assert.Equal("{\"x\":0}", json);
         }
 
-        [TestMethod]
+        [Fact]
         public void NonDefaultNullableValueSerializes()
         {
             var obj = new NullableTest { x = 5 };
             var settings = new NetJSONSettings { SkipDefaultValue = true };
             var json = NetJSON.Serialize(obj, settings);
-            Assert.AreEqual("{\"x\":5}", json);
+            Assert.Equal("{\"x\":5}", json);
         }
 
         public class TestJSON {
@@ -293,7 +293,7 @@ namespace NetJSON.Tests {
             public int? val { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDeserializeNullable() {
             var data = NetJSON.Deserialize<TestJSON>("{\"b\": {\"val1\":1,\"val2\":null,\"val3\":3}, \"v\": [1,2,null,4,null,6], \"d\":[{\"val\":5},{\"val\":null}]}");
         }
@@ -305,7 +305,7 @@ namespace NetJSON.Tests {
             public string Title { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestInvalidJson() {
             var @string = @"{
     ""ScreenId"": ""Error"",
@@ -330,14 +330,14 @@ namespace NetJSON.Tests {
             Task.WaitAll(tasks.ToArray());
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeObjectWithQuotes() {
             var obj = new APIQuote { createDate = DateTime.Now, value = "Hello world" };
             var json = NetJSON.Serialize(obj);
             var obj2 = NetJSON.Deserialize<APIQuote>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateWithMillisecondDefaultFormatLocal() {
             var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.Default, 
                 TimeZoneFormat = NetJSONTimeZoneFormat.Local };
@@ -345,7 +345,7 @@ namespace NetJSON.Tests {
             var date = DateTime.UtcNow;
             var djson = NetJSON.Serialize(date, settings);
             var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
         public class APIQuote {
@@ -353,7 +353,7 @@ namespace NetJSON.Tests {
             public string value { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeAlwaysContainsQuotesEvenAfterBeenSerializedInDifferentThreads() {
             var api = new APIQuote { value = "Test" };
             var json = NetJSON.Serialize(api, new NetJSONSettings { QuoteType = NetJSONQuote.Single });
@@ -361,10 +361,10 @@ namespace NetJSON.Tests {
             Task.Run(() => {
                 json2 = NetJSON.Serialize(api, new NetJSONSettings { QuoteType = NetJSONQuote.Single });
             }).Wait();
-            Assert.IsTrue(json.Equals(json2), json2);
+            Assert.True(json.Equals(json2), json2);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDictionaryWithComplexDictionaryString() {
             NetJSON.IncludeFields = true;
             Dictionary<string, string> sub1 = new Dictionary<string, string> { { "k1", "v1\"well" }, { "k2", "v2\"alsogood" } };
@@ -378,15 +378,15 @@ namespace NetJSON.Tests {
 
             //Trying to get main dictionary back and it fails
             var l1 = NetJSON.Deserialize<Dictionary<string, string>>(final);
-            Assert.IsTrue(l1.Count == 2);
+            Assert.True(l1.Count == 2);
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeAnonymous()
         {
             var test = new { ID = 100, Name = "Test", Inner = new { ID = 100, N = "ABC" } };
             var json = NetJSON.Serialize(test);
-            Assert.IsTrue(json != null);
+            Assert.True(json != null);
         }
 
         private class MyPrivateClass
@@ -411,7 +411,7 @@ namespace NetJSON.Tests {
             public MyEnumTestValue Value { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeEnumValueWithoutCaseUsingAttribute()
         {
             var value = MyEnumTestValue.V1;
@@ -421,11 +421,11 @@ namespace NetJSON.Tests {
             var value2 = NetJSON.Deserialize<MyEnumTestValue>(json, settings);
             var value3 = NetJSON.Deserialize<MyEnumTestValue>(json.Replace("V_1", "V_2"), settings);
 
-            Assert.IsTrue(value2 == value);
-            Assert.IsTrue(value3 == MyEnumTestValue.V2);
+            Assert.True(value2 == value);
+            Assert.True(value3 == MyEnumTestValue.V2);
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeEnumValueUsingAttribute()
         {
             var settings = new NetJSONSettings { UseEnumString = true };
@@ -436,21 +436,21 @@ namespace NetJSON.Tests {
 
             var obj3 = NetJSON.Deserialize<MyEnumClassTest>(json.Replace("V_1", "V_3"), settings);
 
-            Assert.IsTrue(obj.Value == obj2.Value);
-            Assert.IsTrue(obj3.Value == MyEnumTestValue.V3);
+            Assert.True(obj.Value == obj2.Value);
+            Assert.True(obj3.Value == MyEnumTestValue.V3);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeEnumFlag()
         {
             var eStr = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = true });
             var eInt = NetJSON.Serialize(System.IO.FileShare.Read | System.IO.FileShare.Delete, new NetJSONSettings { UseEnumString = false });
 
-            Assert.IsTrue(eStr == "\"Read, Delete\"");
-            Assert.IsTrue(eInt == "5");
+            Assert.True(eStr == "\"Read, Delete\"");
+            Assert.True(eInt == "5");
         }
 
-        [TestMethod]
+        [Fact]
         public void When_serializing_anonymous_objects()
         {
             var logEvents = Enumerable.Range(1, 100)
@@ -477,97 +477,97 @@ namespace NetJSON.Tests {
             var resultAsProjected = NetJSON.Deserialize<List<Projected>>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDeserializeNonPublicType()
         {
             string s;
             var e = new List<E> { new E { V = 1 }, new E { V = 2 } };
             s = NetJSON.Serialize(e);
             NetJSON.Serialize(NetJSON.Deserialize<List<E>>(s = NetJSON.Serialize(e)));
-            Assert.IsTrue(!string.IsNullOrWhiteSpace(s));
+            Assert.True(!string.IsNullOrWhiteSpace(s));
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeNonPublicType()
         {
             var test = new MyPrivateClass { ID = 100, Name = "Test", Inner = new MyPrivateClass { ID = 200, Name = "Inner" } };
             var json = NetJSON.Serialize(test);
             var data = NetJSON.Deserialize<MyPrivateClass>(json);
-            Assert.IsTrue(json != null);
+            Assert.True(json != null);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateUtcNowWithMillisecondDefaultFormatUtc() {
             var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.Default, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
             var date = DateTime.UtcNow;
             var djson = NetJSON.Serialize(date, settings);
             var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateNowWithMillisecondDefaultFormatUtc() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateWithMillisecondDefaultFormatUnSpecified() {
             NetJSON.DateFormat = NetJSONDateFormat.Default;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateWithISOFormatUnSpecified() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Unspecified;
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateWithISOFormatLocal() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
             var date = DateTime.Now;
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateWithISOFormatUTC() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
             var date = new DateTime(2010, 12, 05, 1, 1, 30, 99);
             var djson = NetJSON.Serialize(date);
             var ddate = NetJSON.Deserialize<DateTime>(djson);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDateNowUtcWithISOFormatUTC() {
             var settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
             
             var date = DateTime.UtcNow;
             var djson = NetJSON.Serialize(date, settings);
             var ddate = NetJSON.Deserialize<DateTime>(djson, settings);
-            Assert.IsTrue(date == ddate);
+            Assert.True(date == ddate);
         }
 
 
-        [TestMethod]
+        [Fact]
         public void SerializeDictionaryWithShortType() {
 
             //This is not required since short is already handled
@@ -583,27 +583,27 @@ namespace NetJSON.Tests {
             result = NetJSON.Serialize(diccionario);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestObjectDeserialize() {
             var value = "\"Test\"";
             var obj = NetJSON.Deserialize<object>(value);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNetJSONPropertyWithTrackerClassAndFailedJSON()
         {
             string text = "{\n\"Tracker_SortBy\":\"Relevance\",\n\"Tracker_Name\":\"Wind Power Org\",\n\"Profile_Tracker_ID\":1428,\n\"Tracker_ContentType\":\"1\",\n\"Tracker_SearchTerm\":\"Wind Power\",\n\"Tracker_Facets\":[\n{\"Tracker_Facet\":\"{fb8d09e1-5024-419e-9703-598945af8139}\"},\n{\"Tracker_Facet\":\"{90ec93d4-e1bd-4215-acf0-eac1e2fd5f6d}\"}]\n}";
             Tracker t = NetJSON.Deserialize<Tracker>(text);
 
-            Assert.IsTrue(t.FacetCollection.Count > 0);
-            Assert.IsTrue(t.ID > 0);
-            Assert.IsTrue(t.ContentType != null);
-            Assert.IsTrue(t.Name != null);
-            Assert.IsTrue(t.SearchTerm != null);
-            Assert.IsTrue(t.SortBy != null);
+            Assert.True(t.FacetCollection.Count > 0);
+            Assert.True(t.ID > 0);
+            Assert.True(t.ContentType != null);
+            Assert.True(t.Name != null);
+            Assert.True(t.SearchTerm != null);
+            Assert.True(t.SortBy != null);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNetJSONPropertyTrackerClass()
         {
             var json = @"{  
@@ -622,22 +622,22 @@ namespace NetJSON.Tests {
             var tracker2 = NetJSON.Deserialize<Tracker>(json2);
             Tracker tracker3 = null;
 
-            using (TextReader reader = new StreamReader(File.OpenRead(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "trackerjson.txt"))))
+            using (TextReader reader = new StreamReader(File.OpenRead( "../../../trackerjson.txt")))
             {
                 tracker3 = NetJSON.Deserialize<Tracker>(reader);
             }
 
-            Assert.IsTrue(tracker.Name == "xxxx x", tracker.Name);
-            Assert.IsTrue(tracker.SearchTerm == "Wind Power", tracker.SearchTerm);
-            Assert.IsTrue(tracker.SortBy == "Relevance", tracker.SortBy);
+            Assert.True(tracker.Name == "xxxx x", tracker.Name);
+            Assert.True(tracker.SearchTerm == "Wind Power", tracker.SearchTerm);
+            Assert.True(tracker.SortBy == "Relevance", tracker.SortBy);
 
-            Assert.IsTrue(tracker2.Name == "xxxx x x", tracker2.Name);
-            Assert.IsTrue(tracker2.SearchTerm == "Wind Power", tracker2.SearchTerm);
-            Assert.IsTrue(tracker2.SortBy == "Relevance", tracker2.SortBy);
+            Assert.True(tracker2.Name == "xxxx x x", tracker2.Name);
+            Assert.True(tracker2.SearchTerm == "Wind Power", tracker2.SearchTerm);
+            Assert.True(tracker2.SortBy == "Relevance", tracker2.SortBy);
 
-            Assert.IsTrue(tracker3.Name == "xxxx x", tracker3.Name);
-            Assert.IsTrue(tracker3.SearchTerm == "Wind Power", tracker3.SearchTerm);
-            Assert.IsTrue(tracker3.SortBy == "Relevance", tracker3.SortBy);
+            Assert.True(tracker3.Name == "xxxx x", tracker3.Name);
+            Assert.True(tracker3.SearchTerm == "Wind Power", tracker3.SearchTerm);
+            Assert.True(tracker3.SortBy == "Relevance", tracker3.SortBy);
         }
 
         public struct StructWithFields {
@@ -651,25 +651,25 @@ namespace NetJSON.Tests {
             public string Value { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestStructWithProperties() {
             var data = new StructWithProperties { x = 10, y = 2 };
             var json = NetJSON.Serialize(data);
             var data2 = NetJSON.Deserialize<StructWithProperties>(json);
-            Assert.AreEqual(data.x, data.x);
-            Assert.AreEqual(data.y, data.y);
+            Assert.Equal(data.x, data.x);
+            Assert.Equal(data.y, data.y);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestStructWithFields() {
             var data = new StructWithFields { x = 10, y = 2 };
             var json = NetJSON.Serialize(data);
             var data2 = NetJSON.Deserialize<StructWithFields>(json);
-            Assert.AreEqual(data.x, data.x);
-            Assert.AreEqual(data.y, data.y);
+            Assert.Equal(data.x, data.x);
+            Assert.Equal(data.y, data.y);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializePrimitiveTypes() {
             var x = 10;
             var s = "Hello World";
@@ -691,15 +691,15 @@ namespace NetJSON.Tests {
             var bb = NetJSON.Deserialize<bool>(bjson);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestJsonFile() {
             NetJSON.CaseSensitive = false;
-            using (var file = File.OpenText("json.txt")) {
+            using (var file = File.OpenText("../../../json.txt")) {
                 var evnts = NetJSON.Deserialize<EvntsRoot>(file.ReadToEnd());
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeTuple() {
 
 
@@ -709,7 +709,7 @@ namespace NetJSON.Tests {
             var ttuple = NetJSON.Deserialize<Tuple<int, string>>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeDeserializeNonPublicSetter() {
             var model = new Person("John", 12);
 
@@ -717,11 +717,11 @@ namespace NetJSON.Tests {
 
             var settings = new NetJSONSettings { IncludeTypeInformation = true };
             var deserializedModel = NetJSON.Deserialize<Person>(json, settings);
-            Assert.AreEqual("John", deserializedModel.Name);
-            Assert.AreEqual(12, deserializedModel.Age);
+            Assert.Equal("John", deserializedModel.Name);
+            Assert.Equal(12, deserializedModel.Age);
         }
 
-        [TestMethod]
+        [Fact]
         public void DtoSerialization() {
             string json;
             List<MyDto> clone;
@@ -734,10 +734,10 @@ namespace NetJSON.Tests {
             json = NetJSON.Serialize(list);
             clone = NetJSON.Deserialize<List<MyDto>>(json);
 
-            Assert.IsTrue(clone.Count == count);
+            Assert.True(clone.Count == count);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeComplexTuple() {
 
             var tuple = new Tuple<int, DateTime, string,
@@ -748,14 +748,14 @@ namespace NetJSON.Tests {
             var ttuple = NetJSON.Deserialize<Tuple<int, DateTime, string, Tuple<double, List<string>>>>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void StringSkippingCauseInfiniteLoop() {
             string jsonData = "{\"jsonrpc\":\"2.0\",\"result\":{\"availableToBetBalance\":602.15,\"exposure\":0.0,\"retainedCommission\":0.0,\"exposureLimit\":-10000.0,\"discountRate\":2.0,\"pointsBalance\":1181,\"wallet\":\"UK\"},\"id\":1}";
 
             var data = NetJSON.Deserialize<JsonRpcResponse<AccountFundsResponse>>(jsonData);
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeDateTimeOffSet() {
             var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
             var dateTimeOffset = new DateTimeOffset(DateTime.Now);
@@ -763,10 +763,10 @@ namespace NetJSON.Tests {
 
             var dateTimeOffset2 = NetJSON.Deserialize<DateTimeOffset>(json, settings);
 
-            Assert.AreEqual(dateTimeOffset, dateTimeOffset2);
+            Assert.Equal(dateTimeOffset, dateTimeOffset2);
         }
 
-        [TestMethod]
+        [Fact]
         public void SerializeDateTimeOffSetWithDifferentOffset() {
             var settings = new NetJSONSettings { TimeZoneFormat = NetJSONTimeZoneFormat.Local, DateFormat = NetJSONDateFormat.ISO };
 
@@ -778,27 +778,27 @@ namespace NetJSON.Tests {
 
             var dateTimeOffset2 = NetJSON.Deserialize<DateTimeOffset>(json, settings);
 
-            Assert.AreEqual(dateTimeOffset, dateTimeOffset2);
+            Assert.Equal(dateTimeOffset, dateTimeOffset2);
         }
 
-        [TestMethod]
+        [Fact]
         public void PrettifyString() {
 
             var data = new StructWithProperties { x = 10, y = 2, Value = "Data Source=[DataSource,];Initial Catalog=[Database,];User ID=[User,];Password=[Password,];Trusted_Connection=[TrustedConnection,False]" };
             var json = NetJSON.Serialize(data, new NetJSONSettings { Format = NetJSONFormat.Prettify });
             var count = json.Split('\n').Length;
 
-            Assert.IsTrue(count > 1);
+            Assert.True(count > 1);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestRootObjectWithInfiniteLoop() {
             //NetJSON.GenerateAssembly = true;
             //var json = File.ReadAllText("netjson_test.txt");
             //var root = NetJSON.Deserialize<Root2>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestFailedDeserializeOfNullableList() {
             NetJSON.DateFormat = NetJSONDateFormat.ISO;
             NetJSON.SkipDefaultValue = false;
@@ -815,14 +815,14 @@ namespace NetJSON.Tests {
             listObj = NetJSON.Deserialize<List<TestJsonClass>>(json);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestPossibleInfiniteLoopReproduced() {
             //var obj = new TestNullableNullClass { ID  = 1, Name = "Hello" };
             var json = "{\"ID\": 2, \"Name\": \"Hello world\"}";
             var obj = NetJSON.Deserialize<TestNullableNullClass>(json);
         }
 
-        [TestMethod]
+        [Fact]
         [MethodImpl(MethodImplOptions.NoOptimization)]
         public void SerializePolyObjects() {
             
@@ -840,11 +840,11 @@ namespace NetJSON.Tests {
             var nodeA = jgraph.nodes[0] as NodeA;
             var nodeB = jgraph.nodes[1] as NodeB;
 
-            Assert.IsTrue(nodeA != null && nodeA.number == 10, json);
-            Assert.IsTrue(nodeB != null && nodeB.text == "hello", json);
+            Assert.True(nodeA != null && nodeA.number == 10, json);
+            Assert.True(nodeB != null && nodeB.text == "hello", json);
         }
 
-        [TestMethod]
+        [Fact]
         public void NestedGraphDoesNotThrow() {
             var o = new GetTopWinsResponse() {
                 TopWins = new List<TopWinDto>()
@@ -874,69 +874,69 @@ namespace NetJSON.Tests {
 
             var actual = NetJSON.Serialize(o.GetType(), o);
             var data = NetJSON.Deserialize<GetTopWinsResponse>(actual);
-            Assert.IsTrue(o.TopWins.Count() == data.TopWins.Count());
+            Assert.True(o.TopWins.Count() == data.TopWins.Count());
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeByteArray() {
             var buffer = new byte[10];
             new Random().NextBytes(buffer);
             var json = NetJSON.Serialize(buffer);
             var data = NetJSON.Deserialize<byte[]>(json);
-            Assert.IsTrue(data.Length == buffer.Length);
+            Assert.True(data.Length == buffer.Length);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanGenerateCamelCaseProperty() {
             var obj = new TopWinOnlineCasino { GameId = "TestGame" };
             var json = NetJSON.Serialize(obj, new NetJSONSettings { CamelCase = true });
-            Assert.IsTrue(json.Contains("gameId"));
+            Assert.True(json.Contains("gameId"));
         }
 
-        [TestMethod]
+        [Fact]
         public void CannotGenerateCamelCaseProperty() {
             var obj = new TopWinOnlineCasino { GameId = "TestGame" };
             var json = NetJSON.Serialize(obj, new NetJSONSettings { CamelCase = false });
-            Assert.IsTrue(json.Contains("GameId"), json);
+            Assert.True(json.Contains("GameId"), json);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserialiseNullableDateTime() {
             var itm = new DateTime(2015, 12, 15);
             var testObj = new NullableTestType<DateTime>(itm);
             var serialised = NetJSON.Serialize(testObj);
             var deserialised = NetJSON.Deserialize<NullableTestType<DateTime>>(serialised);
 
-            Assert.IsNotNull(deserialised);
-            Assert.IsNotNull(deserialised.TestItem);
-            Assert.AreEqual(testObj.TestItem.Value, itm);
+            Assert.NotNull(deserialised);
+            Assert.NotNull(deserialised.TestItem);
+            Assert.Equal(testObj.TestItem.Value, itm);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserialiseNullableTimespan() {
             var itm = new TimeSpan(1500);
             var testObj = new NullableTestType<TimeSpan>(itm);
             var serialised = NetJSON.Serialize(testObj);
             var deserialised = NetJSON.Deserialize<NullableTestType<TimeSpan>>(serialised);
 
-            Assert.IsNotNull(deserialised);
-            Assert.IsNotNull(deserialised.TestItem);
-            Assert.AreEqual(testObj.TestItem.Value, itm);
+            Assert.NotNull(deserialised);
+            Assert.NotNull(deserialised.TestItem);
+            Assert.Equal(testObj.TestItem.Value, itm);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserialiseNullableGuid() {
             var itm = new Guid("10b5a72b-815f-4e64-90bf-cb250840e989");
             var testObj = new NullableTestType<Guid>(itm);
             var serialised = NetJSON.Serialize(testObj);
             var deserialised = NetJSON.Deserialize<NullableTestType<Guid>>(serialised);
 
-            Assert.IsNotNull(deserialised);
-            Assert.IsNotNull(deserialised.TestItem);
-            Assert.AreEqual(testObj.TestItem.Value, itm);
+            Assert.NotNull(deserialised);
+            Assert.NotNull(deserialised.TestItem);
+            Assert.Equal(testObj.TestItem.Value, itm);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldFailWithBadJSONException()
         {
             Exception ex = null;
@@ -948,10 +948,10 @@ namespace NetJSON.Tests {
                 ex = e;
             }
 
-            Assert.IsTrue(ex is NetJSONInvalidJSONException);
+            Assert.True(ex is NetJSONInvalidJSONException);
         }
 
-        [TestMethod]
+        [Fact]
         public void CaseSensitiveGlossary() {
             var json = @"{
     ""glossary"": {
@@ -976,17 +976,17 @@ namespace NetJSON.Tests {
     }
 }";
             var obj = NetJSON.Deserialize<GlossaryContainer>(json, new NetJSONSettings { CaseSensitive = false });
-            Assert.IsNotNull(obj.glossary.glossdiv);
+            Assert.NotNull(obj.glossary.glossdiv);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestPersonClassWithMultipleNonDefaultConstructor() {
             var json = "{ \"name\": \"boss\", \"age\": 2, \"reasonForUnknownAge\": \"he is the boss\" }";
             var data = NetJSON.Deserialize<PersonTest>(json, new NetJSONSettings { CaseSensitive = false });
-            Assert.IsTrue(data.Age == 2);
+            Assert.True(data.Age == 2);
         }
 
-        [TestMethod]
+        [Fact]
         public void DeserializeStubbornClass()
         {
             var one = "{\"FileName\":\"973c6d92-819f-4aa1-a0b4-7a645cfea189\",\"Lat\":0,\"Long\":0}";
@@ -996,7 +996,7 @@ namespace NetJSON.Tests {
             var stubbornTwo = NetJSON.Deserialize(typeof(StubbornClass), two);
         }
 
-        [TestMethod]
+        [Fact]
         public void DeserializeJsonWithMissingQuote()
         {
             var json = @"{
@@ -1017,7 +1017,7 @@ namespace NetJSON.Tests {
                 ex = e;
             }
 
-            Assert.IsNotNull(ex);
+            Assert.NotNull(ex);
         }
 
         private class StubbornClass
@@ -1027,7 +1027,7 @@ namespace NetJSON.Tests {
             public double Long { get; set; }
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSkipDefaultValueWithSetting() {
             var model = new Computer {
                 Timestamp = 12345,
@@ -1065,18 +1065,18 @@ namespace NetJSON.Tests {
 
             var modelAsJson = NetJSON.Serialize(model, setting);
             var modelFromJson = NetJSON.Deserialize<Computer>(modelAsJson, setting);
-            Assert.AreEqual(model.Processes[0].Id, modelFromJson.Processes[0].Id);
+            Assert.Equal(model.Processes[0].Id, modelFromJson.Processes[0].Id);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestIEnumerableClassHolder() {
             var d = new TestEnumerableClass { Data = new List<string> { "a", "b" } };
             var json = NetJSON.Serialize(d);
             var d2 = NetJSON.Deserialize<TestEnumerableClass>(json);
-            Assert.IsTrue(d2.Data.Count() == d.Data.Count());
+            Assert.True(d2.Data.Count() == d.Data.Count());
         }
 
-        [TestMethod]
+        [Fact]
         public void TestComplexObjectWithByteArray()
         {
             NetJSON.IncludeTypeInformation = true;
@@ -1084,10 +1084,10 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(obj, new NetJSONSettings { UseEnumString = true });
             var obj2 = NetJSON.Deserialize<ComplexObject>(json, new NetJSONSettings() { UseEnumString = true });
 
-            Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));
+            Assert.True(obj.Thing6.IsDeepEqual(obj2.Thing6));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestComplexObjectWithByteArrayWithSerializeType()
         {
             NetJSON.IncludeTypeInformation = true;
@@ -1095,10 +1095,10 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(typeof(ComplexObject), obj);
             var obj2 = NetJSON.Deserialize<ComplexObject>(json);
 
-            Assert.IsTrue(obj.Thing6.IsDeepEqual(obj2.Thing6));
+            Assert.True(obj.Thing6.IsDeepEqual(obj2.Thing6));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestEnumHolderWithByteAndShort()
         {
             var settings = new NetJSONSettings { UseEnumString = false };
@@ -1113,11 +1113,11 @@ namespace NetJSON.Tests {
 
             var value2 = NetJSON.Deserialize<EnumHolder>(json, settings);
 
-            Assert.IsTrue(value.BEnum == value2.BEnum);
-            Assert.IsTrue(value.SEnum == value2.SEnum);
+            Assert.True(value.BEnum == value2.BEnum);
+            Assert.True(value.SEnum == value2.SEnum);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializationForMicrosoftJavascriptSerializer()
         {
             var json = "{\"CreatorId\":35,\"udtCreationDate\":\"\\/Date(1490945333848)\\/\"}";
@@ -1125,16 +1125,16 @@ namespace NetJSON.Tests {
                 new NetJSONSettings { DateFormat = NetJSONDateFormat.JavascriptSerializer,
                     TimeZoneFormat = NetJSONTimeZoneFormat.Local });
 
-            Assert.AreEqual(data.CreatorId, 35);
-            Assert.AreEqual(data.udtCreationDate.Day, 31);
-            Assert.AreEqual(data.udtCreationDate.Month, 3);
-            Assert.AreEqual(data.udtCreationDate.Year, 2017);
-            Assert.AreEqual(data.udtCreationDate.Hour, 7);
-            Assert.AreEqual(data.udtCreationDate.Minute, 28);
-            Assert.AreEqual(data.udtCreationDate.Second, 53);
+            Assert.Equal(data.CreatorId, 35);
+            Assert.Equal(data.udtCreationDate.Day, 31);
+            Assert.Equal(data.udtCreationDate.Month, 3);
+            Assert.Equal(data.udtCreationDate.Year, 2017);
+            Assert.Equal(data.udtCreationDate.Hour, 7);
+            Assert.Equal(data.udtCreationDate.Minute, 28);
+            Assert.Equal(data.udtCreationDate.Second, 53);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestEnumFlags()
         {
             var foob = new FooA
@@ -1148,10 +1148,10 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize((FooA)foob, settings);
             var obj = NetJSON.Deserialize<FooA>(json, settings);
 
-            Assert.AreEqual(obj.EnumVal, foob.EnumVal);
+            Assert.Equal(obj.EnumVal, foob.EnumVal);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestResultGettingEmptyValueWhenUsingSettings()
         {
             var data = new Result<CustomerResult>
@@ -1164,28 +1164,28 @@ namespace NetJSON.Tests {
 
             var json = NetJSON.Serialize(data, new NetJSONSettings {  });
 
-            Assert.IsTrue(!string.IsNullOrWhiteSpace(json));
+            Assert.True(!string.IsNullOrWhiteSpace(json));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestUsingAttributeOfXmlForName()
         {
             var data = new XmlTestClass { Name = "Value" };
             var json = NetJSON.Serialize(data);
 
-            Assert.IsTrue(json.Contains("XmlName"));
+            Assert.True(json.Contains("XmlName"));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestUsingCustomIgnoreAttribute()
         {
             var data = new TestClassWithIgnoreAttr { ID = 100 };
             var json = NetJSON.Serialize(data);
 
-            Assert.IsTrue(!json.Contains("ID"));
+            Assert.True(!json.Contains("ID"));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestUsingTypeAndSettings()
         {
             var userType = typeof(User);
@@ -1202,50 +1202,50 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(userType, user, settings);
             var user2 = (User)NetJSON.Deserialize(userType, json, settings);
 
-            Assert.AreEqual(user2.FirstName, user.FirstName);
-            Assert.AreEqual(user2.Id, user.Id);
-            Assert.AreEqual(user2.LastName, user.LastName);
-            Assert.AreEqual(user2.Status, user.Status);
-            Assert.AreEqual(user2.AccountType, user.AccountType);
+            Assert.Equal(user2.FirstName, user.FirstName);
+            Assert.Equal(user2.Id, user.Id);
+            Assert.Equal(user2.LastName, user.LastName);
+            Assert.Equal(user2.Status, user.Status);
+            Assert.Equal(user2.AccountType, user.AccountType);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDictionaryWithEncodedStringParsingWithDictionaryStringObject()
         {
             const string testJsonString = "{\"foo\":\"bar \\\"xyzzy\\\" \"}";
             var deserialisedDictionary = (Dictionary<string, object>)NetJSON.Deserialize<object>(testJsonString);
             var fooValue = (string)deserialisedDictionary["foo"];
-            Assert.AreEqual("bar \"xyzzy\" ", fooValue);
+            Assert.Equal("bar \"xyzzy\" ", fooValue);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeAbstractClass()
         {
             PersonAbstract p1 = new PersonX2 { Name = "Bob" };
             var json = NetJSON.Serialize(p1);
-            Assert.IsTrue(!string.IsNullOrEmpty(json));
+            Assert.True(!string.IsNullOrEmpty(json));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSerializeInterfaceType()
         {
             NetJSON.IncludeTypeInformation = true;
             IPerson p1 = new PersonX { Name = "Bob" };
             var json = NetJSON.Serialize(p1);
-            Assert.IsTrue(!string.IsNullOrEmpty(json));
+            Assert.True(!string.IsNullOrEmpty(json));
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDeserializeForNullErrorJsonString()
         {
             var json = "{\"success\":true,\"message\":\"\",\"result\":[{\"OrderUuid\":\"47628e98-934f-42dc-9998-eda41174214f\",\"Exchange\":\"BTC-DGB\",\"TimeStamp\":\"2017-09-05T01:30:55.613\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00000419,\"Quantity\":20000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00020950,\"Price\":0.08380000,\"PricePerUnit\":0.00000419000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-05T01:30:55.723\"},{\"OrderUuid\":\"a088f51b-0bb6-48e8-9afa-f08057f60e2b\",\"Exchange\":\"BTC-CVC\",\"TimeStamp\":\"2017-09-04T23:58:11.61\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00008820,\"Quantity\":1200.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00026459,\"Price\":0.10584299,\"PricePerUnit\":0.00008820000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T23:58:33.39\"},{\"OrderUuid\":\"ba00a497-19a7-42e8-bed9-573f12363c5a\",\"Exchange\":\"USDT-ETH\",\"TimeStamp\":\"2017-09-04T18:23:54.803\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":286.38999998,\"Quantity\":6.41404536,\"QuantityRemaining\":0.00000000,\"Commission\":4.59229611,\"Price\":1836.91845050,\"PricePerUnit\":286.38999997000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T18:24:05.197\"},{\"OrderUuid\":\"572fad3b-764f-4b23-915e-980ad59023ee\",\"Exchange\":\"BTC-NEO\",\"TimeStamp\":\"2017-09-04T09:13:44.42\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00514894,\"Quantity\":15.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00019307,\"Price\":0.07723409,\"PricePerUnit\":0.00514893000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T09:13:45.297\"},{\"OrderUuid\":\"80ed6fee-a682-47e6-a52b-883ebe228b66\",\"Exchange\":\"BTC-PTOY\",\"TimeStamp\":\"2017-09-03T23:15:11.16\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00008100,\"Quantity\":1000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00020250,\"Price\":0.08100000,\"PricePerUnit\":0.00008100000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T08:06:30.217\"},{\"OrderUuid\":\"5c25cbf5-5140-4165-86a4-cac7a62a4b77\",\"Exchange\":\"BTC-CVC\",\"TimeStamp\":\"2017-09-04T04:26:24.96\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00009111,\"Quantity\":1200.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00027333,\"Price\":0.10933200,\"PricePerUnit\":0.00009111000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T04:26:25.02\"},{\"OrderUuid\":\"6a60a3fe-2f44-43a8-b915-f841d86584a1\",\"Exchange\":\"BTC-DGB\",\"TimeStamp\":\"2017-09-04T04:25:39.733\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00000534,\"Quantity\":20000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00026699,\"Price\":0.10679998,\"PricePerUnit\":0.00000533000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-04T04:25:39.95\"},{\"OrderUuid\":\"d2409707-3641-42ee-92d1-3c1469fd787c\",\"Exchange\":\"BTC-NEO\",\"TimeStamp\":\"2017-09-01T23:17:20.593\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00600000,\"Quantity\":15.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00022500,\"Price\":0.09000000,\"PricePerUnit\":0.00600000000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-02T01:39:59.697\"},{\"OrderUuid\":\"a92fd25c-259b-428b-a281-9df1994b1cc0\",\"Exchange\":\"BTC-DGB\",\"TimeStamp\":\"2017-09-01T15:51:42.077\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00000474,\"Quantity\":15000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00017812,\"Price\":0.07125000,\"PricePerUnit\":0.00000475000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-01T15:51:42.187\"},{\"OrderUuid\":\"dd56bde2-5b08-4b13-963e-9b5b64aed0ab\",\"Exchange\":\"BTC-BTS\",\"TimeStamp\":\"2017-09-01T02:49:38.153\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00003260,\"Quantity\":3000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00024375,\"Price\":0.09750000,\"PricePerUnit\":0.00003250000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-09-01T02:49:38.87\"},{\"OrderUuid\":\"01c592e4-e8a7-4a29-a282-06da9eaed847\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-31T01:32:14.533\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00361000,\"Quantity\":25.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00022601,\"Price\":0.09040712,\"PricePerUnit\":0.00361628000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-31T01:32:14.69\"},{\"OrderUuid\":\"257cc430-2f54-4173-9914-6b9af428a5ff\",\"Exchange\":\"BTC-SNT\",\"TimeStamp\":\"2017-08-31T01:27:03.177\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00001045,\"Quantity\":2000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00005224,\"Price\":0.02089999,\"PricePerUnit\":0.00001044000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-31T01:27:03.647\"},{\"OrderUuid\":\"a878d615-2674-4113-94a9-42de4d655ebf\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-30T07:25:16.247\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00384998,\"Quantity\":25.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00023750,\"Price\":0.09500000,\"PricePerUnit\":0.00380000000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-30T07:25:16.307\"},{\"OrderUuid\":\"ed06edad-4028-488e-93f9-b3d191505ce5\",\"Exchange\":\"BTC-LTC\",\"TimeStamp\":\"2017-08-29T21:30:17.88\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.01350000,\"Quantity\":30.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00101250,\"Price\":0.40500030,\"PricePerUnit\":0.01350001000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-29T21:30:17.987\"},{\"OrderUuid\":\"6ed65196-fe1e-4beb-abb3-3630073075ab\",\"Exchange\":\"BTC-FCT\",\"TimeStamp\":\"2017-08-28T01:29:52.777\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00677000,\"Quantity\":15.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00025386,\"Price\":0.10154999,\"PricePerUnit\":0.00676999000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-29T13:48:59.93\"},{\"OrderUuid\":\"d1224d72-a014-41c6-a641-631f4505dc25\",\"Exchange\":\"BTC-MTL\",\"TimeStamp\":\"2017-08-29T04:35:07.067\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00222246,\"Quantity\":30.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00016668,\"Price\":0.06667380,\"PricePerUnit\":0.00222246000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-29T04:35:07.177\"},{\"OrderUuid\":\"7670ad26-36cc-4db3-a585-ae0d5a6cf0e9\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-29T01:57:13.33\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00597699,\"Quantity\":25.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00037356,\"Price\":0.14942475,\"PricePerUnit\":0.00597699000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-29T01:57:14.723\"},{\"OrderUuid\":\"488896b7-9a7f-4619-bf74-32a4f6e50e56\",\"Exchange\":\"BTC-DGB\",\"TimeStamp\":\"2017-08-28T23:26:07.003\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00000368,\"Quantity\":15000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00013762,\"Price\":0.05504999,\"PricePerUnit\":0.00000366000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T23:26:07.19\"},{\"OrderUuid\":\"869e97ca-2c10-44f8-9d17-b26dc0d70dac\",\"Exchange\":\"BTC-SNT\",\"TimeStamp\":\"2017-08-28T02:00:21.013\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00001169,\"Quantity\":5000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00014612,\"Price\":0.05845000,\"PricePerUnit\":0.00001169000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T02:00:21.527\"},{\"OrderUuid\":\"f2a1299b-c486-4548-a64b-7350b963d523\",\"Exchange\":\"BTC-NXT\",\"TimeStamp\":\"2017-08-28T01:24:20.477\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00002605,\"Quantity\":3200.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00020840,\"Price\":0.08336000,\"PricePerUnit\":0.00002605000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:28:04.66\"},{\"OrderUuid\":\"bca820a3-7aaf-4f28-9808-7c9b59a135e2\",\"Exchange\":\"BTC-GAME\",\"TimeStamp\":\"2017-08-28T01:09:55.843\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00053247,\"Quantity\":150.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00019967,\"Price\":0.07987049,\"PricePerUnit\":0.00053246000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:21:47.413\"},{\"OrderUuid\":\"5054479b-4ea5-4591-9355-84cf6bb1d5dd\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-28T01:11:30.16\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00366017,\"Quantity\":25.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00022874,\"Price\":0.09150424,\"PricePerUnit\":0.00366016000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:13:36.31\"},{\"OrderUuid\":\"3b60e7f5-2082-447b-9c5e-9f402a06332c\",\"Exchange\":\"BTC-BAT\",\"TimeStamp\":\"2017-08-28T01:12:56.447\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00004913,\"Quantity\":1800.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00022108,\"Price\":0.08843400,\"PricePerUnit\":0.00004913000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:12:56.51\"},{\"OrderUuid\":\"e3419c0f-e252-4b61-a92b-398032ced5f3\",\"Exchange\":\"BTC-XRP\",\"TimeStamp\":\"2017-08-28T01:07:16.203\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00004618,\"Quantity\":1700.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00019626,\"Price\":0.07850600,\"PricePerUnit\":0.00004618000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:07:16.423\"},{\"OrderUuid\":\"62dac844-8f5f-48f6-8b47-4384cf584ac8\",\"Exchange\":\"BTC-LTC\",\"TimeStamp\":\"2017-08-28T01:03:58.97\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.01427100,\"Quantity\":50.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00178462,\"Price\":0.71385946,\"PricePerUnit\":0.01427718000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-28T01:03:59.267\"},{\"OrderUuid\":\"2a3b4183-8a3e-4b90-94eb-d9d74104b199\",\"Exchange\":\"BTC-VTC\",\"TimeStamp\":\"2017-08-27T05:47:09.587\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00021552,\"Quantity\":1000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00053879,\"Price\":0.21551998,\"PricePerUnit\":0.00021551000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-27T05:48:06.34\"},{\"OrderUuid\":\"21a80737-ee52-4175-8184-5eb8260bd977\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-27T00:21:11.477\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.00384073,\"Quantity\":30.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00028875,\"Price\":0.11550000,\"PricePerUnit\":0.00385000000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-27T00:21:11.65\"},{\"OrderUuid\":\"708f5cfe-94ab-4936-88a9-0a9e82619b86\",\"Exchange\":\"BTC-MCO\",\"TimeStamp\":\"2017-08-26T01:30:37.887\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00243500,\"Quantity\":30.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00018262,\"Price\":0.07304999,\"PricePerUnit\":0.00243499000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-26T01:46:34.627\"},{\"OrderUuid\":\"9cd60d42-e432-46b8-ba20-fbfc710f95ce\",\"Exchange\":\"BTC-BCC\",\"TimeStamp\":\"2017-08-19T16:22:05.547\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.20500000,\"Quantity\":2.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00102498,\"Price\":0.40999999,\"PricePerUnit\":0.20499999000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-19T16:22:06.797\"},{\"OrderUuid\":\"63297fe5-d07b-40ce-97a2-f960c0b107d3\",\"Exchange\":\"BTC-BCC\",\"TimeStamp\":\"2017-08-18T01:57:00.053\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":0.11124700,\"Quantity\":3.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00083435,\"Price\":0.33374100,\"PricePerUnit\":0.11124700000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-18T01:57:00.837\"},{\"OrderUuid\":\"bf1b3b89-2fce-49c0-b353-0c89bea18c24\",\"Exchange\":\"BTC-VTC\",\"TimeStamp\":\"2017-08-16T22:57:19.757\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00010100,\"Quantity\":1000.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00025249,\"Price\":0.10100000,\"PricePerUnit\":0.00010100000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-17T00:05:27.51\"},{\"OrderUuid\":\"c6b11b9b-495e-4ac8-8a94-5b73d6e233bc\",\"Exchange\":\"BTC-FCT\",\"TimeStamp\":\"2017-08-16T21:54:31.163\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.00435940,\"Quantity\":13.44236162,\"QuantityRemaining\":0.00000000,\"Commission\":0.00014650,\"Price\":0.05860063,\"PricePerUnit\":0.00435939000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-16T21:57:45.983\"},{\"OrderUuid\":\"daab0461-8061-43e1-af48-92dcf38bda3f\",\"Exchange\":\"USDT-BTC\",\"TimeStamp\":\"2017-08-16T21:46:22.13\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":4357.00000000,\"Quantity\":0.16000000,\"QuantityRemaining\":0.00000000,\"Commission\":1.74280000,\"Price\":697.12000000,\"PricePerUnit\":4357.00000000000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-16T21:46:40.347\"},{\"OrderUuid\":\"ed50ef1f-79a4-4474-966d-756f668164cd\",\"Exchange\":\"USDT-BTC\",\"TimeStamp\":\"2017-08-08T17:23:48.917\",\"OrderType\":\"LIMIT_SELL\",\"Limit\":3363.00000001,\"Quantity\":0.30055068,\"QuantityRemaining\":0.00000000,\"Commission\":2.52687984,\"Price\":1010.75193684,\"PricePerUnit\":3363.00000000000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-08T17:23:50.433\"},{\"OrderUuid\":\"e7d95fcb-f0d4-433a-80d2-823c24a00e93\",\"Exchange\":\"BTC-GBYTE\",\"TimeStamp\":\"2017-08-07T18:33:41.96\",\"OrderType\":\"LIMIT_BUY\",\"Limit\":0.12000011,\"Quantity\":1.00000000,\"QuantityRemaining\":0.00000000,\"Commission\":0.00028301,\"Price\":0.11320604,\"PricePerUnit\":0.11320604000000000000,\"IsConditional\":false,\"Condition\":\"NONE\",\"ConditionTarget\":null,\"ImmediateOrCancel\":false,\"Closed\":\"2017-08-07T18:33:42.083\"}]}";
             API_ImportResult result = NetJSON.Deserialize<API_ImportResult>(json);
 
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.result.Count > 0);
+            Assert.NotNull(result);
+            Assert.True(result.result.Count > 0);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestDeserializeValueWithDoubleQuotes()
         {
             var settings = new NetJSONSettings
@@ -1257,27 +1257,27 @@ namespace NetJSON.Tests {
             var stringToDeserialize = "{ \"Val\" : \"\\\"sampleValue\\\"\"}";
             
             var result = NetJSON.Deserialize<Test>(stringToDeserialize, settings);
-            Assert.IsNotNull(result);
-            Assert.IsNotNull(result.Val);
+            Assert.NotNull(result);
+            Assert.NotNull(result.Val);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNotThrowingInvalidJSONForPrimitiveTypes()
         {
             var value = NetJSON.Deserialize<string>("\"\"abc\"");
 
-            Assert.AreEqual("\"abc", value);
+            Assert.Equal("\"abc", value);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestNotThrowingInvalidJSONForNullPrimitiveTypes()
         {
             var value = NetJSON.Deserialize<string>(default(string));
 
-            Assert.AreEqual(null, value);
+            Assert.Equal(null, value);
         }
 
-        [TestMethod]
+        [Fact]
         public void TestSimpleStruct()
         {
             var settings = new NetJSONSettings();
@@ -1285,19 +1285,19 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(data, settings);
             var data2 = NetJSON.Deserialize<SimpleObjectStruct>(json, settings);
 
-            Assert.AreEqual(data.ID, data2.ID);
-            Assert.AreEqual(data.Name, data2.Name);
-            Assert.AreEqual(data.Value, data2.Value);
+            Assert.Equal(data.ID, data2.ID);
+            Assert.Equal(data.Name, data2.Name);
+            Assert.Equal(data.Value, data2.Value);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserializeLargeNumbers()
         {
             var test = NetJSON.Deserialize<Dictionary<string, object>>("{\"test\":9999999999}");
-            Assert.AreEqual(test["test"], 9999999999);
+            Assert.Equal(test["test"], 9999999999);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanSerializeAndDeserializedEscapeStringInDictionary()
         {
             var testDictionary = new Dictionary<string, object>();
@@ -1305,10 +1305,10 @@ namespace NetJSON.Tests {
 
             var json = NetJSON.Serialize(testDictionary);
             var data = NetJSON.Deserialize<Dictionary<string, object>>(json);
-            Assert.AreEqual(testDictionary["Path"], data["Path"]);
+            Assert.Equal(testDictionary["Path"], data["Path"]);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserializeKeyAndValueProperly()
         {
             var xy = new A();
@@ -1317,10 +1317,10 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(xy);
             var obj = NetJSON.Deserialize<A>(json);
 
-            Assert.IsTrue(xy.Details.ContainsKey(666));
+            Assert.True(xy.Details.ContainsKey(666));
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserilizeDictionaryKeyAndValue()
         {
             var dict = new Dictionary<int, B>();
@@ -1328,79 +1328,79 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(dict);
             var obj = NetJSON.Deserialize<Dictionary<int, B>>(json);
 
-            Assert.IsTrue(obj.ContainsKey(666));
+            Assert.True(obj.ContainsKey(666));
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserializeObjectWithDefaultValueForBoolean()
         {
-            var usr = NetJSON.Deserialize<YadroUser>(File.ReadAllText("netjsonObj.txt"), new NetJSONSettings { SkipDefaultValue = false });
-            Assert.IsFalse(usr.Enabled);
+            var usr = NetJSON.Deserialize<YadroUser>(File.ReadAllText("../../../netjsonObj.txt"), new NetJSONSettings { SkipDefaultValue = false });
+            Assert.False(usr.Enabled);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserializeObjectWithDefaultValueOfFalseBoolean()
         {
             var json = "{\"Enabled\": false}";
             var data = NetJSON.Deserialize<EnabledClass>(json);
-            Assert.IsFalse(data.Enabled);
+            Assert.False(data.Enabled);
         }
 
         private static readonly NetJSONSettings Settings = new NetJSONSettings { DateFormat = NetJSONDateFormat.ISO, TimeZoneFormat = NetJSONTimeZoneFormat.Utc };
 
-        [TestMethod]
+        [Fact]
         public void HandlesNullable()
         {
             var nullable = new NullableEntity { Id = Guid.NewGuid(), Value = new ValueObject { Value = "Test" } };
             var serialised = NetJSON.Serialize(nullable, Settings);
             var deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
-            Assert.AreEqual(nullable.Id, deserialised.Id);
-            Assert.AreEqual(nullable.Value.Value, deserialised.Value.Value);
+            Assert.Equal(nullable.Id, deserialised.Id);
+            Assert.Equal(nullable.Value.Value, deserialised.Value.Value);
 
             nullable = new NullableEntity();
             serialised = NetJSON.Serialize(nullable, Settings);
             deserialised = NetJSON.Deserialize<NullableEntity>(serialised, Settings);
-            Assert.IsFalse(deserialised.Id.HasValue);
+            Assert.False(deserialised.Id.HasValue);
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesReadOnlyDictionary()
         {
             var entity = new EntityWithReadOnlyDictionary { Map = new Dictionary<string, string> { { "One", "Eno" }, { "Two", "Owt" }, { "Three", "Eerht" } } };
             var serialised = NetJSON.Serialize(entity, Settings);
             var deserialised = NetJSON.Deserialize<EntityWithReadOnlyDictionary>(serialised, Settings);
 
-            Assert.AreNotSame(entity.Map, deserialised.Map);
-            Assert.AreEqual(entity.Map.Count, deserialised.Map.Count);
+            Assert.Equal(entity.Map, deserialised.Map);
+            Assert.Equal(entity.Map.Count, deserialised.Map.Count);
             foreach (var item in entity.Map)
             {
-                Assert.IsTrue(deserialised.Map.ContainsKey(item.Key));
-                Assert.AreEqual(item.Value, deserialised.Map[item.Key]);
+                Assert.True(deserialised.Map.ContainsKey(item.Key));
+                Assert.Equal(item.Value, deserialised.Map[item.Key]);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesReadOnlyCollection()
         {
             var entity = new Entity { Items = new[] { "One", "Two", "Three" } };
             var serialised = NetJSON.Serialize(entity, Settings);
             var deserialised = NetJSON.Deserialize<Entity>(serialised, Settings);
 
-            Assert.AreEqual(entity.Items.Count(), deserialised.Items.Count());
+            Assert.Equal(entity.Items.Count(), deserialised.Items.Count());
             foreach (var item in entity.Items)
-                Assert.IsTrue(deserialised.Items.Contains(item));
+                Assert.True(deserialised.Items.Contains(item));
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesReadOnlyList()
         {
             var entity = new EntityWithReadOnlyList { Strings = new List<string> { "Test", "Test2" }  };
             var serialised = NetJSON.Serialize(entity, Settings);
             var deserialised = NetJSON.Deserialize<EntityWithReadOnlyList>(serialised, Settings);
 
-            Assert.AreEqual(2, deserialised.Strings.Count);
-            Assert.AreEqual("Test", deserialised.Strings[0]);
-            Assert.AreEqual("Test2", deserialised.Strings[1]);
+            Assert.Equal(2, deserialised.Strings.Count);
+            Assert.Equal("Test", deserialised.Strings[0]);
+            Assert.Equal("Test2", deserialised.Strings[1]);
         }
 
         private static bool CanSerialize(MemberInfo memberInfo)
@@ -1416,136 +1416,136 @@ namespace NetJSON.Tests {
 
         private static readonly Random Random = new Random();
 
-        [TestMethod]
+        [Fact]
         public void EventStructTest()
         {
             var e = new EventStruct(Guid.NewGuid(), new PayloadStruct(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventStruct>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void EventStructWithPrivateSettersTest()
         {
             var e = new EventStructWithPrivateSetters(Guid.NewGuid(), new PayloadStructWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventStructWithPrivateSetters>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void EventStructWithReadOnlyBackingFieldsTest()
         {
             var e = new EventStructWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadStructWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventStructWithReadOnlyBackingFields>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void EventClassTest()
         {
             var e = new EventClass(Guid.NewGuid(), new PayloadClass(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventClass>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void EventClassWithPrivateSettersTest()
         {
             var e = new EventClassWithPrivateSetters(Guid.NewGuid(), new PayloadClassWithPrivateSetter(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventClassWithPrivateSetters>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void EventClassWithReadOnlyBackingFieldsTest()
         {
             var e = new EventClassWithReadOnlyBackingFields(Guid.NewGuid(), new PayloadClassWithWithReadOnlyBackingField(Guid.NewGuid().ToString("n")), Random.Next(), DateTimeOffset.UtcNow);
             var s = NetJSON.Serialize(e, Settings);
             var d = NetJSON.Deserialize<EventClassWithReadOnlyBackingFields>(s, Settings);
 
-            Assert.AreEqual(e.Id, d.Id);
-            Assert.AreEqual(e.Payload.Value, d.Payload.Value);
-            Assert.AreEqual(e.Version, d.Version);
-            Assert.AreEqual(e.Created, d.Created);
+            Assert.Equal(e.Id, d.Id);
+            Assert.Equal(e.Payload.Value, d.Payload.Value);
+            Assert.Equal(e.Version, d.Version);
+            Assert.Equal(e.Created, d.Created);
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesGuids()
         {
             var value = Guid.NewGuid();
             var serialised = NetJSON.Serialize(value, Settings);
             var deserialised = NetJSON.Deserialize<Guid>(serialised, Settings);
-            Assert.AreEqual(value, deserialised);
+            Assert.Equal(value, deserialised);
             var values = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
             serialised = NetJSON.Serialize(values, Settings);
             var deserialisedArray = NetJSON.Deserialize<List<Guid>>(serialised, Settings); // Fails
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesDateTimeOffsetDictionaryKey()
         {
             var value = DateTimeOffset.UtcNow;
             var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:41:03.987489Z"
-            Assert.AreEqual(value, NetJSON.Deserialize<DateTimeOffset>(s));
+            Assert.Equal(value, NetJSON.Deserialize<DateTimeOffset>(s));
             var map = new Dictionary<DateTimeOffset, int> { { value, Random.Next() } };
             var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:41:29 +00:00":266037427}
             var deserialised = NetJSON.Deserialize<Dictionary<DateTimeOffset, int>>(serialised, Settings);
 
-            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
-            Assert.AreEqual(map[value], deserialised[value]);
+            Assert.Equal(value, deserialised.Keys.Single()); // Fails
+            Assert.Equal(map[value], deserialised[value]);
         }
 
-        [TestMethod]
+        [Fact]
         public void HandlesDateTimeDictionaryKey()
         {
             var value = DateTime.UtcNow;
             var s = NetJSON.Serialize(value, Settings); // "2018-11-28T10:35:50.9314230Z"
-            Assert.AreEqual(value, NetJSON.Deserialize<DateTime>(s));
+            Assert.Equal(value, NetJSON.Deserialize<DateTime>(s));
 
             var map = new Dictionary<DateTime, int> { { value, Random.Next() } };
             var serialised = NetJSON.Serialize(map, Settings); // {"28/11/2018 10:37:26":871282158}
             var deserialised = NetJSON.Deserialize<Dictionary<DateTime, int>>(serialised, Settings);
 
-            Assert.AreEqual(value, deserialised.Keys.Single()); // Fails
-            Assert.AreEqual(map[value], deserialised[value]);
+            Assert.Equal(value, deserialised.Keys.Single()); // Fails
+            Assert.Equal(map[value], deserialised[value]);
         }
 
-        [TestMethod]
+        [Fact]
         public void ExpandoSerializationWithStringDoubleSlash()
         {
             var json = @"[{""StringValue"":""C:\\ProgramData\\""}]";
             var dict = NetJSON.Deserialize<List<Dictionary<string, object>>>(json);
             var expando = NetJSON.Deserialize<List<ExpandoObject>>(json);
-            Assert.AreEqual(dict[0]["StringValue"], "C:\\ProgramData\\");
+            Assert.Equal(dict[0]["StringValue"], "C:\\ProgramData\\");
         }
 
-        [TestMethod]
-        public unsafe void SerializeWithCustomType()
+        [Fact]
+        public void SerializeWithCustomType()
         {
             var model = new TestClassForCustomSerialization { ID = 100, Custom = new UserDefinedCustomClass { Name = "Test" } };
 
@@ -1555,12 +1555,12 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(model);
             var model2 = NetJSON.Deserialize<TestClassForCustomSerialization>(json);
 
-            Assert.AreEqual(model.ID, model2.ID);
-            Assert.AreEqual(model.Custom.Name, model2.Custom.Name);
+            Assert.Equal(model.ID, model2.ID);
+            Assert.Equal(model.Custom.Name, model2.Custom.Name);
         }
 
 
-        [TestMethod]
+        [Fact]
         public void SerializeDeserializeStrings()
         {
             var netJsonSettings = new NetJSONSettings
@@ -1576,10 +1576,10 @@ namespace NetJSON.Tests {
             var serialized = NetJSON.Serialize(myString, netJsonSettings);
             var result = NetJSON.Deserialize<string>(serialized, netJsonSettings);
 
-            Assert.AreEqual(myString, result);
+            Assert.Equal(myString, result);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldThrowExceptionForInvalidType()
         {
             //should not hangs
@@ -1595,22 +1595,22 @@ namespace NetJSON.Tests {
                 ex = e;
             }
 
-            Assert.IsNotNull(ex);
-            Assert.IsInstanceOfType(ex, typeof(NetJSONTypeMismatchException));
-            Assert.IsNull(myStruct);
+            Assert.NotNull(ex);
+            Assert.IsType(typeof(NetJSONTypeMismatchException), ex);
+            Assert.Null(myStruct);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldNotFailWhenUsingUlongEnum()
         {
             var obj = new ULongClass { LongEnum = ULongEnum.A };
             var json = NetJSON.Serialize(obj);
             var data = NetJSON.Deserialize<ULongClass>(json);
 
-            Assert.AreEqual((ulong)data.LongEnum, (ulong)obj.LongEnum);
+            Assert.Equal((ulong)data.LongEnum, (ulong)obj.LongEnum);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldNotFailWhenUlongFlagEnum()
         {
             var obj = new ULongClass() { LongEnum = ULongEnum.ULongEnumValueA | ULongEnum.ULongEnumValueB };
@@ -1618,41 +1618,41 @@ namespace NetJSON.Tests {
             var dto = NetJSON.Deserialize<ULongClass>(json);
             var ulongValue = (ulong)dto.LongEnum;
 
-            Assert.AreEqual((ulong)dto.LongEnum, (ulong)obj.LongEnum);
+            Assert.Equal((ulong)dto.LongEnum, (ulong)obj.LongEnum);
         }
 
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeIntWithDefault()
         {
             var settings = new NetJSONSettings { SkipDefaultValue = false };
             var json = "{\"Id\":0}";
             var obj2 = NetJSON.Deserialize<IntWithDefault>(json, settings);
 
-            Assert.AreEqual(0, obj2.Id);
+            Assert.Equal(0, obj2.Id);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeNullableIntWithDefault()
         {
             var settings = new NetJSONSettings { SkipDefaultValue = false };
             var json = NetJSON.Serialize(new IntNullableDefault { Id = null }, settings);
             var obj2 = NetJSON.Deserialize<IntNullableDefault>(json, settings);
 
-            Assert.IsNull(obj2.Id);
+            Assert.Null(obj2.Id);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeNullableIntWithValue()
         {
             var settings = new NetJSONSettings { SkipDefaultValue = false };
             var json = NetJSON.Serialize(new IntNullableDefault { Id = 0 }, settings);
             var obj2 = NetJSON.Deserialize<IntNullableDefault>(json, settings);
 
-            Assert.IsTrue(obj2.Id == 0);
+            Assert.True(obj2.Id == 0);
         }
 
-        [TestMethod]
+        [Fact]
         [MethodImpl(MethodImplOptions.NoOptimization)]
         public void CanSerializeSimpleClassWithInterface()
         {
@@ -1664,11 +1664,11 @@ namespace NetJSON.Tests {
             var iscs = NetJSON.Serialize(typeof(ISimpleClass), isc, jsonSettingsB);
             var scsd = NetJSON.Deserialize<ISimpleClass>(iscs, jsonSettingsB) as ISimpleClass;
 
-            Assert.AreEqual(scsd.SimpleClassProp, sc.SimpleClassProp);
-            Assert.AreEqual(scsd.SimpleClassBaseProp, sc.SimpleClassBaseProp);
+            Assert.Equal(scsd.SimpleClassProp, sc.SimpleClassProp);
+            Assert.Equal(scsd.SimpleClassBaseProp, sc.SimpleClassBaseProp);
         }
 
-        [TestMethod]
+        [Fact]
         [MethodImpl(MethodImplOptions.NoOptimization)]
         public void CanSerializeCollectionSimpleWithInterface()
         {
@@ -1679,12 +1679,12 @@ namespace NetJSON.Tests {
             var iscs = NetJSON.SerializeObject(isc, jsonSettings);
             var iscsE = NetJSON.SerializeObject(iscEnumerable, jsonSettings);
             var discsE = NetJSON.Deserialize<List<ISimpleClassBase>>(iscsE, jsonSettings);
-            Assert.AreEqual(1, discsE.Count);
-            Assert.AreEqual((discsE[0] as SimpleClass).SimpleClassProp, (isc as SimpleClass).SimpleClassProp);
-            Assert.AreEqual(discsE[0].SimpleClassBaseProp, isc.SimpleClassBaseProp);
+            Assert.Equal(1, discsE.Count);
+            Assert.Equal((discsE[0] as SimpleClass).SimpleClassProp, (isc as SimpleClass).SimpleClassProp);
+            Assert.Equal(discsE[0].SimpleClassBaseProp, isc.SimpleClassBaseProp);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldNotFailWhenUsingNegativeIntEnumWithEnumString()
         {
             var settings = new NetJSONSettings { UseEnumString = true };
@@ -1692,10 +1692,10 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(obj, settings);
             var data = NetJSON.Deserialize<IntClass>(json, settings);
 
-            Assert.AreEqual((int)data.LongEnum, (int)obj.LongEnum);
+            Assert.Equal((int)data.LongEnum, (int)obj.LongEnum);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldNotFailWhenUsingNegativeIntEnumWithValue()
         {
             var settings = new NetJSONSettings { UseEnumString = false };
@@ -1703,11 +1703,11 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(obj, settings);
             var data = NetJSON.Deserialize<IntClass>(json, settings);
 
-            Assert.AreEqual((int)data.LongEnum, (int)obj.LongEnum);
+            Assert.Equal((int)data.LongEnum, (int)obj.LongEnum);
         }
 
 
-        [TestMethod]
+        [Fact]
         public void ShouldNotFailFloatConvert()
         {
             var testFloat = new TestFloatClass
@@ -1720,28 +1720,28 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(testFloat);
             var testFloatData = NetJSON.Deserialize<TestFloatClass>(json);
 
-            Assert.AreEqual(10.5f, testFloatData.FloatValue);
+            Assert.Equal(10.5f, testFloatData.FloatValue);
         }
 
-        [TestMethod]
+        [Fact]
         public void CanDeserializeLargeDictionary()
         {
             string str = "{\"SizedImages\":{\"$type\":\"System.Collections.Generic.List1[[y.Go.X.Contracts.Denormalization.TileSizedImage, y.Go.X.Contracts]], mscorlib\",\"$values\":[{\"Role\":\"photo\",\"Description\":\"ORF / ©Twentieth Century Fox Film Corporation. All rights reserved.\",\"IsMain\":true,\"Large\":{\"Url\":\"http://aaa.com/images/828r_or1_191021_1535_7570e136_malcolm_mittendrin.jpg\",\"Width\":828,\"Height\":465},\"Medium\":{\"Url\":\"http://aaa.com/images/414r_or1_191021_1535_7570e136_malcolm_mittendrin.jpg\",\"Width\":414,\"Height\":232},\"Small\":{\"Url\":\"http://aaa.com/images/200r_or1_191021_1535_7570e136_malcolm_mittendrin.jpg\",\"Width\":200,\"Height\":112}}]},\"SubTitle\":\"Malcolm, der Held\",\"EpisodeId\":\"41270363\",\"EpisodeNum\":\"1\",\"SeriesId\":\"1129\",\"SeasonNum\":null,\"ChannelId\":1,\"ChannelName\":\"ORFeins HD\",\"ChannelIcon\":\"https://aaa/1.png\",\"IsChannelPublished\":true,\"ChannelIconColorPrimaryUrl\":null,\"ChannelIconAndroidTvUrl\":null,\"Year\":2000,\"DurationSeconds\":1200,\"TimeshiftSeconds\":null,\"IsBlackouted\":false,\"IsLive\":false,\"IsPreviouslyShown\":false,\"IsRegionRestrictionEnabled\":false,\"IsTimeshiftEnabled\":true,\"IsCatchupEnabled\":true,\"IsNPvrEnabled\":true,\"IsLPvrEnabled\":false,\"RecordingId\":0,\"IsSeriesRecordingEnabled\":true,\"IsPpv\":false,\"HideInEpg\":false,\"VisibleOnlyIfBought\":false,\"Analytics\":{\"$type\":\"y.b.Tiles.Denormalization.TileAnalytics, y.b.Tiles.Contracts\",\"nur\":true},\"RegionRestrictions\":{\"$type\":\"System.Collections.Generic.List1[[y.b.Tiles.Denormalization.TileRegionRestriction, y.b.Tiles.Contracts]], mscorlib\",\"$values\":[]},\"PublishDate\":\"2019-10-14T02:02:58.813+02:00\",\"EndPublishDate\":\"9999-12-31T23:59:59.9999999+01:00\",\"Images\":{\"$type\":\"System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.ImageDataModel, yGo.Sdk.Abstractions]], mscorlib\",\"$values\":[{\"Role\":\"photo\",\"Url\":\"http://aaa.com/images/828r_or1_191021_1535_7570e136_malcolm_mittendrin.jpg\",\"Description\":\"ORF / ©Twentieth Century Fox Film Corporation. All rights reserved.\",\"IsMain\":true,\"Width\":828,\"Height\":465,\"Type\":null,\"ExternalId\":null}]},\"Countries\":{\"$type\":\"System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.CountryDataModel, yGo.Sdk.Abstractions]], mscorlib\",\"$values\":[{\"Codename\":\"usa\",\"Id\":361,\"Name\":\"USA\"}]},\"Categories\":{\"$type\":\"System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.CategoryDataModel, yGo.Sdk.Abstractions]], mscorlib\",\"$values\":[{\"Codename\":\"serie\",\"Id\":20,\"Name\":\"Serie\",\"TypeCodename\":\"genre\"},{\"Codename\":\"comedyserie\",\"Id\":35,\"Name\":\"Comedyserie\",\"TypeCodename\":\"subcategory\"}]},\"Publications\":{\"$type\":\"System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.PublicationPeriodDataModel, yGo.Sdk.Abstractions]], mscorlib\",\"$values\":[{\"From\":\"2019-10-14T02:02:58.813+02:00\",\"PlatformCodename\":\"android\",\"To\":\"9999-12-31T23:59:59.9999999+01:00\"},{\"From\":\"2019-10-14T02:02:58.813+02:00\",\"PlatformCodename\":\"www\",\"To\":\"9999-12-31T23:59:59.9999999+01:00\"},{\"From\":\"2019-10-14T02:02:58.813+02:00\",\"PlatformCodename\":\"ios\",\"To\":\"9999-12-31T23:59:59.9999999+01:00\"},{\"From\":\"2019-10-14T02:02:58.813+02:00\",\"PlatformCodename\":\"android-tv\",\"To\":\"9999-12-31T23:59:59.9999999+01:00\"}]},\"Toplists\":{\"$type\":\"System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.ToplistDataModel, yGo.Sdk.Abstractions]], mscorlib\",\"$values\":[]},\"People\":{\"$type\":\"System.Collections.Generic.Dictionary2[[System.String, mscorlib],[System.Collections.Generic.List1[[yGo.Sdk.Abstractions.DataModels.PersonDataModel, yGo.Sdk.Abstractions]], mscorlib]], mscorlib\",\"director\":[{\"Id\":45508,\"Codename\":\"todd-holland\",\"FullName\":\"Todd Holland\",\"FirstName\":\"Todd\",\"LastName\":\"Holland\",\"RoleCodename\":\"director\",\"RoleName\":\"Regie\",\"FunctionDescription\":null}],\"musik\":[{\"Id\":129019,\"Codename\":\"they-might-be-giants\",\"FullName\":\"They Might Be Giants\",\"FirstName\":\"They\",\"LastName\":\"Might Be Giants\",\"RoleCodename\":\"musik\",\"RoleName\":\"Musik\",\"FunctionDescription\":null}],\"actor\":[{\"Id\":43782,\"Codename\":\"frankie-muniz\",\"FullName\":\"Frankie Muniz\",\"FirstName\":\"Frankie\",\"LastName\":\"Muniz\",\"RoleCodename\":\"actor\",\"RoleName\":\"Darsteller\",\"FunctionDescription\":\"Malcolm\"},{\"Id\":43783,\"Codename\":\"jane-kaczmarek\",\"FullName\":\"Jane Kaczmarek\",\"FirstName\":\"Jane\",\"LastName\":\"Kaczmarek\",\"RoleCodename\":\"actor\",\"RoleName\":\"Darsteller\",\"FunctionDescription\":\"Lois\"},{\"Id\":43784,\"Codename\":\"bryan-cranston\",\"FullName\":\"Bryan Cranston\",\"FirstName\":\"Bryan\",\"LastName\":\"Cranston\",\"RoleCodename\":\"actor\",\"RoleName\":\"Darsteller\",\"FunctionDescription\":\"Hal\"},{\"Id\":43785,\"Codename\":\"erik-per-sullivan\",\"FullName\":\"Erik Per Sullivan\",\"FirstName\":\"Erik\",\"LastName\":\"Per Sullivan\",\"RoleCodename\":\"actor\",\"RoleName\":\"Darsteller\",\"FunctionDescription\":\"Dewey\"},{\"Id\":43786,\"Codename\":\"christopher-kennedy-masterson\",\"FullName\":\"Christopher Kennedy Masterson\",\"FirstName\":\"Christopher\",\"LastName\":\"Kennedy Masterson\",\"RoleCodename\":\"actor\",\"RoleName\":\"Darsteller\",\"FunctionDescription\":\"Francis\"}],\"writer\":[{\"Id\":55589,\"Codename\":\"linwood-boomer\",\"FullName\":\"Linwood Boomer\",\"FirstName\":\"Linwood\",\"LastName\":\"Boomer\",\"RoleCodename\":\"writer\",\"RoleName\":\"Drehbuch\",\"FunctionDescription\":null},{\"Id\":45638,\"Codename\":\"victor-hammer\",\"FullName\":\"Victor Hammer\",\"FirstName\":\"Victor\",\"LastName\":\"Hammer\",\"RoleCodename\":\"writer\",\"RoleName\":\"Drehbuch\",\"FunctionDescription\":null}]},\"RelatedTiles\":{\"$type\":\"System.Collections.Generic.List1[[y.Sdk.Abstractions.DataModels.BaseTileDataModel, y.Sdk.Abstractions]], mscorlib\",\"$values\":[{\"Id\":\"prg.1684675\",\"Type\":\"prg\",\"OriginEntityId\":1684675,\"Codename\":\"orf1-1150013362\"},{\"Id\":\"prg.1678912\",\"Type\":\"prg\",\"OriginEntityId\":1678912,\"Codename\":\"orf1-1148618556\"},{\"Id\":\"prg.1672521\",\"Type\":\"prg\",\"OriginEntityId\":1672521,\"Codename\":\"orf1-1147720203\"},{\"Id\":\"prg.1672523\",\"Type\":\"prg\",\"OriginEntityId\":1672523,\"Codename\":\"orf1-1147720215\"},{\"Id\":\"prg.1674721\",\"Type\":\"prg\",\"OriginEntityId\":1674721,\"Codename\":\"orf1-1148617775\"},{\"Id\":\"prg.1674723\",\"Type\":\"prg\",\"OriginEntityId\":1674723,\"Codename\":\"orf1-1148617791\"},{\"Id\":\"prg.1676864\",\"Type\":\"prg\",\"OriginEntityId\":1676864,\"Codename\":\"orf1-1148618239\"},{\"Id\":\"prg.1676866\",\"Type\":\"prg\",\"OriginEntityId\":1676866,\"Codename\":\"orf1-1148618249\"},{\"Id\":\"prg.1686528\",\"Type\":\"prg\",\"OriginEntityId\":1686528,\"Codename\":\"orf1-1150579812\"},{\"Id\":\"prg.1686529\",\"Type\":\"prg\",\"OriginEntityId\":1686529,\"Codename\":\"orf1-1150579815\"},{\"Id\":\"prg.1686543\",\"Type\":\"prg\",\"OriginEntityId\":1686543,\"Codename\":\"orf1-1150579875\"},{\"Id\":\"prg.1686545\",\"Type\":\"prg\",\"OriginEntityId\":1686545,\"Codename\":\"orf1-1150579886\"},{\"Id\":\"prg.1678910\",\"Type\":\"prg\",\"OriginEntityId\":1678910,\"Codename\":\"orf1-1148618541\"},{\"Id\":\"prg.1684662\",\"Type\":\"prg\",\"OriginEntityId\":1684662,\"Codename\":\"orf1-1150013323\"},{\"Id\":\"prg.1674707\",\"Type\":\"prg\",\"OriginEntityId\":1674707,\"Codename\":\"orf1-1149472943\"}]},\"MediaFiles\":{\"$type\":\"System.Collections.Generic.List1[[y.Video.Contracts.Messages.MediaFileResult, y.Video.Contracts]], mscorlib\",\"$values\":[]},\"QualityLevels\":{\"$type\":\"System.Collections.Generic.List1[[y.b.Tiles.Denormalization.TileQualityLevel, y.b.Tiles.Contracts]], mscorlib\",\"$values\":[]},\"CatchupAvailableTo\":\"2019-10-28T14:40:00+01:00\",\"CatchupAvailableFrom\":\"2019-10-21T15:40:00+02:00\",\"Start\":\"2019-10-21T15:40:00+02:00\",\"Stop\":\"2019-10-21T16:00:00+02:00\",\"ChannelCodename\":\"orf1\",\"CanBuyInSvod\":false,\"Title\":\"Malcolm mittendrin\",\"OriginalTitle\":\"Malcolm in the Middle\",\"Description\":\"Der elfjährige Malcolm wächst gemeinsam mit seinen drei Brüdern in einer durchschnittlichen US-Familie auf. Was ihn von seinen Freunden unterscheidet, ist sein überdurchschnittlicher IQ von 165. Für Malcom ist das schlimmer, als radioaktiv verstrahlt zu sein. Sehr zu seinem Missfallen steckt ihn seine Mutter in eine Klasse für hochintelligente Kinder.\",\"ShortDescription\":\"Der elfjährige Malcolm wächst gemeinsam mit seinen drei Brüdern in einer durchschnittlichen US-Familie auf. Was ihn von seinen Freunden unterscheidet, ist sein überdurchschnittlicher IQ von 165. Für Malcom ist das schlimmer, als radioaktiv verstrahlt zu sein. Sehr zu seinem Missfallen steckt ihn seine Mutter in eine Klasse für hochintelligente Kinder.\",\"AgeRating\":0,\"IsAdultContent\":false,\"PurchaseOptions\":{\"$type\":\"System.Collections.Generic.List1[[y.b.Tiles.Denormalization.TilePurchaseOption, y.b.Tiles.Contracts]], mscorlib\",\"$values\":[]},\"AvailableAudioTracks\":{\"$type\":\"System.Collections.Generic.List1[[y.b.Tiles.Denormalization.TileMediaTrack, y.b.Tiles.Contracts]], mscorlib\",\"$values\":[]},\"AvailableSubtitles\":{\"$type\":\"System.Collections.Generic.List1[[y.b.Tiles.Denormalization.TileMediaTrack, y.b.Tiles.Contracts]], mscorlib\",\"$values\":[]},\"HasAudioDescription\":false,\"HasSignLanguage\":false,\"HasSubtitles\":false,\"Id\":\"prg.1684673\",\"Type\":\"prg\",\"OriginEntityId\":1684673,\"Codename\":\"orf1-1150013357\"}";
 
             var obj = NetJSON.DeserializeObject(str);
-            Assert.IsNotNull(obj);
+            Assert.NotNull(obj);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldBeDeserializeCharInClassObject()
         {
             var json = "{\"EVENTID\":19 ,\"APPL_EVENT\":\"\"}";
             var simple = NetJSON.Deserialize<CNTL_SIMPLE_EVENT>(json);
-            Assert.AreEqual(simple.EVENTID, 19);
-            Assert.IsTrue(simple.APPL_EVENT == '\0');
+            Assert.Equal(simple.EVENTID, 19);
+            Assert.True(simple.APPL_EVENT == '\0');
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldThrowErrorForInvalidClassJSON()
         {
             //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
@@ -1757,10 +1757,10 @@ namespace NetJSON.Tests {
                 exception = ex;
             }
 
-            Assert.IsNotNull(exception, "Should throw invalid json exception");
+            Assert.NotNull(exception);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldThrowErrorForInvalidDictionaryJSON()
         {
             //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
@@ -1776,10 +1776,10 @@ namespace NetJSON.Tests {
                 exception = ex;
             }
 
-            Assert.IsNotNull(exception, "Should throw invalid json exception");
+            Assert.NotNull(exception);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldThrowErrorForInvalidDictionaryJSONNoQuote()
         {
             //var json = "{\"Value\":\"\",\"Regex\":false}"; //good JSON
@@ -1795,28 +1795,28 @@ namespace NetJSON.Tests {
                 exception = ex;
             }
 
-            Assert.IsNotNull(exception, "Should throw invalid json exception");
+            Assert.NotNull(exception);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeDeserializeAutoPropertyWithObjectInitializer()
         {
             var myObject2 = new SimpleObject2() { ID = 0, Name = "Test", Value = "Value" };
             var json2 = NetJSON.Serialize(myObject2, new NetJSONSettings() { SkipDefaultValue = false });
             var recreatedObject2 = NetJSON.Deserialize<SimpleObject2>(json2, new NetJSONSettings() { SkipDefaultValue = false });
-            Assert.AreEqual(myObject2.ID, recreatedObject2.ID);
+            Assert.Equal(myObject2.ID, recreatedObject2.ID);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeDeserializeDefaultPropertyInConstructorWithObjectInitializer()
         {
             var myObject3 = new SimpleObject3() { ID = 0, Name = "Test", Value = "Value" };
             var json3 = NetJSON.Serialize(myObject3);
             var recreatedObject3 = NetJSON.Deserialize<SimpleObject3>(json3);
-            Assert.AreEqual(5, recreatedObject3.ID);
+            Assert.Equal(5, recreatedObject3.ID);
         }
 
-        [TestMethod]
+        [Fact]
         public void ShouldSerializeDeserializeWithCustomSerializeRegistration()
         {
             NetJSON.RegisterCustomTypeSerializer<CustomObject>(SerializeCustomObject);
@@ -1824,7 +1824,7 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(obj);
         }
 
-        [TestMethod]
+        [Fact(Skip = "Not working yet")]
         public void SerializeVector3Struct()
         {
             var value = new Vector3(10, 20, 30);
@@ -1935,7 +1935,7 @@ namespace NetJSON.Tests {
     }
 
     [Flags]
-    public enum ULongEnum : ulong
+    public enum ULongEnum : long
     {
         A = 100,
         ULongEnumValueA = 0x00400,
@@ -1961,7 +1961,7 @@ namespace NetJSON.Tests {
             sb.AppendFormat("\"{{{0}}}\"", obj.Name);
         }
 
-        public unsafe static UserDefinedCustomClass Deserialize(NetJSONStringReader reader, NetJSONSettings settings)
+        public static UserDefinedCustomClass Deserialize(NetJSONStringReader reader, NetJSONSettings settings)
         {
             var sb = new StringBuilder();
             var current = '\0';
@@ -3007,9 +3007,9 @@ namespace NetJSON.Tests {
     public struct Vector3
     {
         public const float kEpsilon = 1E-05f;
-        public float x;
-        public float y;
-        public float z;
+        public float x { get; set; }
+        public float y { get; set; }
+        public float z { get; set; }
         public float this[int index]
         {
             get

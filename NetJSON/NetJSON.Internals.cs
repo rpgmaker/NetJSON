@@ -228,7 +228,7 @@ namespace NetJSON.Internals
         }
 
 		internal unsafe static bool FastStringToBool(string value) {
-			return value[0] == 't';
+			return value != null && value.Length > 0 && value[0] == 't';
 		}
 
 		internal static byte[] FastStringToByteArray(string value) {

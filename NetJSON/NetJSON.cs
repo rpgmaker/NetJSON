@@ -1707,7 +1707,7 @@ namespace NetJSON {
                 else if (eType == _longType)
                     il.Emit(OpCodes.Ldstr, SerializerUtilities.LongToStr((long)value));
                 else if (eType == typeof(ulong))
-                    il.Emit(OpCodes.Ldstr, IntUtility.ultoa((ulong)value));
+                    il.Emit(OpCodes.Ldstr, SerializerUtilities.LongToStr((long)Convert.ToUInt64(value)));
                 else if (eType == typeof(uint))
                     il.Emit(OpCodes.Ldstr, IntUtility.uitoa((uint)value));
                 else if (eType == typeof(byte))
@@ -4628,7 +4628,7 @@ namespace NetJSON {
             var isPrimitive = elementType.IsPrimitiveType();
             var isStringType = elementType == _stringType;
             var isByteArray = elementType == _byteArrayType;
-            var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray || elementType == _guidType;
+            var isStringBased = isStringType || nullableType == _timeSpanType || isByteArray || elementType == _guidType || elementType == _charType;
             var isCollectionType = !isArray && !_listType.IsAssignableFrom(type) && !(type.Name == IEnumerableStr) && !(type.Name == IListStr) && !(type.Name == ICollectionStr) && !(type.Name == IReadOnlyCollectionStr) && !(type.Name == IReadOnlyListStr);
 
             var isStringBasedLocal = il.DeclareLocal(_boolType);
@@ -4704,11 +4704,15 @@ namespace NetJSON {
                     il.Emit(OpCodes.Ldloc, isStringBasedLocal);
                     il.Emit(OpCodes.Brfalse, isStringBasedLabel1);
                     GenerateCreateListForStringBased(typeBuilder, il, elementType, isStringType, settings, obj, addMethod, current, ptr, bLabel);
+                    
+                    GenerateUpdateCurrent(il, current, ptr);
                     il.MarkLabel(isStringBasedLabel1);
 
                     il.Emit(OpCodes.Ldloc, isStringBasedLocal);
                     il.Emit(OpCodes.Brtrue, isStringBasedLabel2);
                     GenerateCreateListForNonStringBased(typeBuilder, il, elementType, settings, obj, addMethod, current);
+                    
+                    GenerateUpdateCurrent(il, current, ptr);
                     il.MarkLabel(isStringBasedLabel2);
                 } else {
                     var currentBlank = il.DefineLabel();
