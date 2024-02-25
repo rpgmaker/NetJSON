@@ -3108,57 +3108,6 @@ namespace NetJSON {
 
                         il.MarkLabel(skipDefaultValueTrueAndHasValueLabel);
                     }
-
-#region
-
-                    //if (_skipDefaultValue) {
-
-                    //    if (isNullable) {
-                    //        var hasValueMethod = originPropType.GetMethod("get_HasValue");
-                    //        il.Emit(OpCodes.Ldloca, nullablePropValue);
-                    //        il.Emit(OpCodes.Call, hasValueMethod);
-                    //        il.Emit(OpCodes.Brfalse, propNullLabel);
-                    //    }
-
-                    //    if (isStruct)
-                    //        il.Emit(OpCodes.Ldloca, propValue);
-                    //    else
-                    //        il.Emit(OpCodes.Ldloc, propValue);
-                    //    if (isValueType && isPrimitive) {
-                    //        LoadDefaultValueByType(il, propType);
-                    //    } else {
-                    //        if (!isValueType)
-                    //            il.Emit(OpCodes.Ldnull);
-                    //    }
-
-                    //    if (equalityMethod != null) {
-                    //        il.Emit(OpCodes.Call, equalityMethod);
-                    //        il.Emit(OpCodes.Brtrue, propNullLabel);
-                    //    } else {
-                    //        if (isStruct) {
-
-                    //            var tempValue = il.DeclareLocal(propType);
-
-                    //            il.Emit(OpCodes.Ldloca, tempValue);
-                    //            il.Emit(OpCodes.Initobj, propType);
-                    //            il.Emit(OpCodes.Ldloc, tempValue);
-                    //            il.Emit(OpCodes.Box, propType);
-                    //            il.Emit(OpCodes.Constrained, propType);
-
-                    //            il.Emit(OpCodes.Callvirt, _objectEquals);
-
-                    //            il.Emit(OpCodes.Brtrue, propNullLabel);
-
-                    //        } else
-                    //            il.Emit(OpCodes.Beq, propNullLabel);
-                    //    }
-                    //}
-
-#endregion
-
-                    //if (_skipDefaultValue) {
-                    //    il.MarkLabel(propNullLabel);
-                    //}
                 }
                 counter++;
             }
@@ -3318,6 +3267,11 @@ namespace NetJSON {
         /// <param name="value"></param>
         /// <returns></returns>
         public static string Serialize(Type type, object value) {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return _serializeWithTypes.GetOrAdd(type, _ => {
                 lock (GetDictLockObject("SerializeType", type.Name)) {
                     var name = String.Concat(SerializeStr, type.FullName);
@@ -3354,6 +3308,11 @@ namespace NetJSON {
         /// <returns></returns>
         public static string Serialize(Type type, object value, NetJSONSettings settings)
         {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return _serializeWithTypesSettings.GetOrAdd(type, _ => {
                 lock (GetDictLockObject("SerializeTypeSetting", type.Name))
                 {
@@ -3388,6 +3347,11 @@ namespace NetJSON {
         /// <param name="value"></param>
         /// <returns></returns>
         public static string Serialize(object value) {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return Serialize(value.GetType(), value);
         }
 
@@ -3398,6 +3362,11 @@ namespace NetJSON {
         /// <param name="value"></param>
         /// <returns></returns>
         public static object Deserialize(Type type, string value) {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return _deserializeWithTypes.GetOrAdd(type.FullName, _ => {
                 lock (GetDictLockObject("DeserializeType", type.Name)) {
                     var name = String.Concat(DeserializeStr, type.FullName);
@@ -3436,6 +3405,11 @@ namespace NetJSON {
         /// <returns></returns>
         public static object Deserialize(Type type, string value, NetJSONSettings settings)
         {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return _deserializeWithTypesSettings.GetOrAdd(type.FullName, _ => {
                 lock (GetDictLockObject("DeserializeTypeSettings", type.Name))
                 {
@@ -3620,6 +3594,11 @@ namespace NetJSON {
         /// <returns>String</returns>
         public static string SerializeObject(object value, NetJSONSettings settings)
         {
+            if (value == null)
+            {
+                return null;
+            }
+            
             return Serialize(value.GetType(), value, settings);
         }
 
@@ -5167,7 +5146,7 @@ namespace NetJSON {
 
 
                 //if (count == 0 && current == 'n') {
-                //    index += 3;
+                //    index += 4;
                 //    return null;
                 //}
                 il.Emit(OpCodes.Ldc_I4_0);
@@ -5178,7 +5157,7 @@ namespace NetJSON {
                 il.Emit(OpCodes.Ldloc, current);
                 il.Emit(OpCodes.Bne_Un, isNullObjectLabel);
 
-                IncrementIndexRef(il, count: 3);
+                IncrementIndexRef(il, count: 4);
 
                 if (isTypeValueType) {
                     var nullLocal = il.DeclareLocal(type);

@@ -190,6 +190,12 @@ namespace NetJSON.Internals
 
             var endChar = chr == '[' ? ']' : '}';
 
+	        // Ignore null string from json serialization
+            if (json == "null")
+            {
+	            return;
+            }
+            
             if(json[0] != chr)
             {
                 throw new NetJSONInvalidJSONException();

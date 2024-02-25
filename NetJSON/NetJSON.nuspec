@@ -4,11 +4,13 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.4.3</version> 
+    <version>1.4.4</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      - Fixed bug with non string based array such as boolean been last item in array
+      - Fixed issue with null value in array causing invalid json exception
+      - Fixed null reference exception when using serialize object method
+      - Fixed issue with literal null string causing invalid json exception
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.txt</licenseUrl>
