@@ -3269,7 +3269,7 @@ namespace NetJSON {
         public static string Serialize(Type type, object value) {
             if (value == null)
             {
-                return null;
+                return NullStr;
             }
             
             return _serializeWithTypes.GetOrAdd(type, _ => {
@@ -3310,7 +3310,7 @@ namespace NetJSON {
         {
             if (value == null)
             {
-                return null;
+                return NullStr;
             }
             
             return _serializeWithTypesSettings.GetOrAdd(type, _ => {
@@ -3596,7 +3596,7 @@ namespace NetJSON {
         {
             if (value == null)
             {
-                return "null";
+                return NullStr;
             }
             
             return Serialize(value.GetType(), value, settings);
