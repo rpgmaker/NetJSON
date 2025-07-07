@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>NetJSON</AssemblyName>
+    <RootNamespace>NetJSON</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;NET_8</DefineConstants>
+    <DocumentationFile>bin\Debug\NetJSON.xml</DocumentationFile>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE;NET_8</DefineConstants>
+    <DocumentationFile>bin\Release\NetJSON.xml</DocumentationFile>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\NetJSON\AutomaticTypeConverter.cs" Link="AutomaticTypeConverter.cs" />
+    <Compile Include="..\NetJSON\IntUtility.cs" Link="IntUtility.cs" />
+    <Compile Include="..\NetJSON\Models.cs" Link="Models.cs" />
+    <Compile Include="..\NetJSON\NetJSON.cs" Link="NetJSON.cs" />
+    <Compile Include="..\NetJSON\NetJSON.Internals.cs" Link="NetJSON.Internals.cs" />
+  </ItemGroup>
+
+</Project>

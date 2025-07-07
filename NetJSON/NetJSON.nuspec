@@ -4,13 +4,13 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.4.4</version> 
+    <version>1.4.5</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      - Fixed issue with null value in array causing invalid json exception
-      - Fixed null reference exception when using serialize object method
-      - Fixed issue with literal null string causing invalid json exception
+      - Return null string for null objects in general
+      - Fixed issue with skipping serialization when json contains new line prior to closing curly
+      - Added support for .net 8.0 and 9.0
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.txt</licenseUrl>

@@ -42,7 +42,6 @@ namespace NetJSON.Standard2_0.Tests
             Assert.NotNull(json);
         }
 
-
         [Fact]
         public void TestQueryObject()
         {

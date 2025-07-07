@@ -742,6 +742,7 @@ namespace NetJSON.Internals
 					switch (current) {
 						case '\n':
 						case '\r':
+							break;
 						case '\t':
 						case ' ':
 							++indexDiff;

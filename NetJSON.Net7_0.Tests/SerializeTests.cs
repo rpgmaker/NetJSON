@@ -1832,11 +1832,50 @@ namespace NetJSON.Tests {
             var value2 = NetJSON.Deserialize<Vector3>(json);
         }
 
+        [Fact]
+        public void DeserializeJsonWithTrailingWhitespace()
+        {
+            var json = """
+                       {
+                       "name":"John",
+                       "phone":"5698",
+                       "Id":123
+                       
+                       }
+                       """;
+            var result = NetJSON.Deserialize<CustomObjectWithNamePhoneId>(json);
+            Assert.Equal("John", result.name);
+            Assert.Equal("5698", result.phone);
+            Assert.Equal(123, result.Id);
+        }
+
+        [Fact]
+        public void SerializeNullStringAsNullString()
+        {
+            String value = null;
+            var json = NetJSON.Serialize(value);
+            Assert.Equal("null", json);
+        }
+        
+        [Fact]
+        public void SerializeNullAsNullString()
+        {
+            var json = NetJSON.Serialize(null);
+            Assert.Equal("null", json);
+        }
+
         public static void SerializeCustomObject(CustomObject customObject, StringBuilder sb, NetJSONSettings settings)
         {
             var result = $@"{{""ID"": {customObject.ID}, ""Name"": ""{customObject.Name}""}}";
             sb.Append(result);
         }
+    }
+
+    public class CustomObjectWithNamePhoneId
+    {
+        public string name { get; set; }
+        public string phone { get; set; }
+        public int Id { get; set; }
     }
 
     public class CustomObjectHolder

@@ -3349,7 +3349,7 @@ namespace NetJSON {
         public static string Serialize(object value) {
             if (value == null)
             {
-                return null;
+                return NullStr;
             }
             
             return Serialize(value.GetType(), value);
@@ -3596,7 +3596,7 @@ namespace NetJSON {
         {
             if (value == null)
             {
-                return null;
+                return "null";
             }
             
             return Serialize(value.GetType(), value, settings);
