@@ -555,6 +555,16 @@ namespace NetJSON.Tests {
             var ddate = NetJSON.Deserialize<DateTime>(djson);
             Assert.True(date == ddate);
         }
+        
+        [Fact]
+        public void TestSerializeDateWithISOFormatUTCWithDateTimeMinValue() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Utc;
+            var date = DateTime.MinValue;
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.True(date == ddate);
+        }
 
         [Fact]
         public void TestSerializeDateNowUtcWithISOFormatUTC() {
@@ -1824,7 +1834,7 @@ namespace NetJSON.Tests {
             var json = NetJSON.Serialize(obj);
         }
 
-        [Fact(Skip = "Not working yet")]
+        //[Fact(Skip = "Not working yet")]
         public void SerializeVector3Struct()
         {
             var value = new Vector3(10, 20, 30);

@@ -1068,7 +1068,7 @@ namespace NetJSON.Internals
 			var year = date.Year;
 
 			var value = (_cachedDateStringBuilder ?? (_cachedDateStringBuilder = new StringBuilder(25)))
-				.Clear().Append(IntToStr(year)).Append('-')
+				.Clear().Append(year < 1000 ? IntToStr(year).PadLeft(4, '0') : IntToStr(year)).Append('-')
 				.Append(month < 10 ? "0" : string.Empty)
 				.Append(IntToStr(month))
 			.Append('-').Append(day < 10 ? "0" : string.Empty).Append(IntToStr(day)).Append('T').Append(hour < 10 ? "0" : string.Empty).Append(IntToStr(hour)).Append(':')

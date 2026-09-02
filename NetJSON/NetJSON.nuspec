@@ -4,13 +4,11 @@
     <id>NetJSON</id> 
     <title>NetJSON</title>
     <tags>json json-serializer javascript JSON serializer binary</tags>
-    <version>1.4.5</version> 
+    <version>1.4.6</version> 
     <authors>TJ Bakre</authors>
     <description>Faster than Any Binary?</description>
     <releaseNotes>
-      - Return null string for null objects in general
-      - Fixed issue with skipping serialization when json contains new line prior to closing curly
-      - Added support for .net 8.0 and 9.0
+      - Fixed issue with invalid datetime iso format when year is less than 1000
     </releaseNotes>
     <language>en-US</language>
     <licenseUrl>https://github.com/rpgmaker/NetJSON/blob/master/LICENSE.txt</licenseUrl>
