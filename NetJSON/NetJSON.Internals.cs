@@ -1082,7 +1082,7 @@ namespace NetJSON.Internals
 				//var offset = TimeZone.CurrentTimeZone.GetUtcOffset(date);
 				var hours = Math.Abs(offset.Hours);
 				var minutes = Math.Abs(offset.Minutes);
-				value.Append(offset.Ticks >= 0 ? '+' : '-').Append(hours < 10 ? "0" : string.Empty).Append(IntToStr(hours)).Append(minutes < 10 ? "0" : string.Empty).Append(IntToStr(minutes));
+				value.Append(offset.Ticks >= 0 ? '+' : '-').Append(hours < 10 ? "0" : string.Empty).Append(IntToStr(hours)).Append(hours > 0 ? ":" : "").Append(minutes < 10 ? "0" : string.Empty).Append(IntToStr(minutes));
 			}
 
 			return value.ToString();

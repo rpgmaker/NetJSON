@@ -565,6 +565,16 @@ namespace NetJSON.Tests {
             var ddate = NetJSON.Deserialize<DateTime>(djson);
             Assert.True(date == ddate);
         }
+        
+        [Fact]
+        public void TestSerializeDateWithISOFormatUTCWithDateTimeForExpectedFormat() {
+            NetJSON.DateFormat = NetJSONDateFormat.ISO;
+            NetJSON.TimeZoneFormat = NetJSONTimeZoneFormat.Local;
+            var date = DateTimeOffset.Now;
+            var djson = NetJSON.Serialize(date);
+            var ddate = NetJSON.Deserialize<DateTime>(djson);
+            Assert.True(date == ddate);
+        }
 
         [Fact]
         public void TestSerializeDateNowUtcWithISOFormatUTC() {
